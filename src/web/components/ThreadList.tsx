@@ -170,7 +170,7 @@ export function ThreadList(props: {
 
   return (
     <section
-      className={`w-full shrink-0 flex-col border-r bg-background md:w-[368px] xl:w-[400px] ${
+      className={`w-full shrink-0 flex-col bg-background md:w-[368px] md:border-r xl:w-[400px] ${
         props.detailsOpen ? "hidden md:flex" : "flex"
       }`}
     >
@@ -203,7 +203,7 @@ export function ThreadList(props: {
             </Button>
           )}
 
-          <div className="flex min-w-0 flex-1 items-center justify-between gap-2 lg:hidden">
+          <div className="flex min-w-0 flex-1 items-center gap-1 lg:hidden">
             <Select
               value={String(props.scope)}
               onValueChange={(value) =>
@@ -215,7 +215,7 @@ export function ThreadList(props: {
               }
             >
               <SelectTrigger
-                className="-ml-2 h-8 min-w-0 max-w-[calc(100%-2.75rem)] border-transparent px-2 text-[15px] font-semibold shadow-none hover:bg-muted"
+                className="-ml-2 mr-auto h-8 min-w-0 border-transparent px-2 text-[15px] font-semibold shadow-none hover:bg-muted"
                 aria-label="Choose inbox"
               >
                 <SelectValue placeholder="All inboxes" />
@@ -231,14 +231,23 @@ export function ThreadList(props: {
                 <SelectItem value="contacts">Contacts</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="ghost" size="icon" onClick={props.onCompose} aria-label="Compose new message" title="Compose new message" className="shrink-0"><SquarePen className="h-4 w-4" /></Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={props.onCompose}
+              aria-label="Compose new message"
+              title="Compose"
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <SquarePen className="h-[18px] w-[18px]" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
               onClick={props.onOpenSettings}
               aria-label="Open settings"
               title="Settings"
-              className="-mr-1.5 text-muted-foreground"
+              className="-mr-1.5 shrink-0 text-muted-foreground hover:text-foreground"
             >
               <SettingsIcon className="h-[18px] w-[18px]" />
             </Button>

@@ -18,6 +18,7 @@ import {
   getBrowserPushState,
   unsubscribeCurrentBrowser,
 } from "../push-notifications";
+import { isIosBrowser, useInstallState } from "../pwa";
 import { BellIcon, MailIcon } from "./Icons";
 import { EmailTemplateEditor } from "./EmailTemplateEditor";
 import { McpSettings } from "./McpSettings";
@@ -157,9 +158,53 @@ export function GeneralSettings(props: {
           </SettingsPanel>
         </SettingsBlock>
 
+        <AppSettings />
+
         <McpSettings />
       </SettingsPage>
     </div>
+  );
+}
+
+function AppSettings() {
+  const install = useInstallState();
+  const ios = isIosBrowser();
+
+  return (
+    <SettingsBlock
+      id="app-settings-heading"
+      title="App"
+      description="Install Mailroom to open it in its own window, show unread counts on its icon, and get notifications from your operating system."
+    >
+      <SettingsPanel>
+        <div className="flex items-center gap-4 px-4 py-4 sm:px-5">
+          <img
+            src="/icons/icon-192.png"
+            alt=""
+            width={40}
+            height={40}
+            className="h-10 w-10 shrink-0 rounded-[10px] border"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13.5px] font-medium text-foreground">Mailroom app</p>
+            <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">
+              {install.installed
+                ? "Installed on this device."
+                : install.canPrompt
+                  ? "Available to install on this device."
+                  : ios
+                    ? "In Safari, tap Share, then Add to Home Screen."
+                    : "Use your browser's Install app option in the address bar or menu."}
+            </p>
+          </div>
+          {install.canPrompt && !install.installed && (
+            <Button size="sm" onClick={() => void install.prompt()} className="shrink-0">
+              Install
+            </Button>
+          )}
+        </div>
+      </SettingsPanel>
+    </SettingsBlock>
   );
 }
 
@@ -314,6 +359,9 @@ function notificationDescription(state: {
   subscribed: boolean;
 }): string {
   if (!state.configured) return "Push delivery has not been configured on this server.";
+  if (!state.supported && isIosBrowser()) {
+    return "On iPhone and iPad, add Mailroom to your Home Screen, then open it from there to turn on notifications.";
+  }
   if (!state.supported) return "This browser does not support push notifications.";
   if (state.blocked) return "Notifications are blocked in this browser's site settings.";
   if (state.globalEnabled && state.subscribed) {
