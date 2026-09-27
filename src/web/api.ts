@@ -259,10 +259,10 @@ export const searchThreads = (q: string, query: Omit<ThreadQuery, "status">) => 
   return request<ThreadSummary[]>(`/search?${params}`);
 };
 
-export type BulkThreadAction = "read" | "archive" | "unarchive";
+export type BulkThreadAction = "read" | "archive" | "unarchive" | "delete";
 
 export const bulkUpdateThreads = (ids: number[], action: BulkThreadAction) =>
-  request<{ ok: true; updated: number }>("/threads/bulk", {
+  request<{ ok: true; updated?: number; deleted_ids?: number[] }>("/threads/bulk", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ids, action }),
@@ -274,6 +274,12 @@ export const archiveThread = (id: number) => request(`/threads/${id}/archive`, {
 
 export const unarchiveThread = (id: number) =>
   request(`/threads/${id}/unarchive`, { method: "POST" });
+
+export const deleteThread = (id: number) =>
+  request<{ ok: true; deleted_ids: number[] }>(`/threads/${id}`, { method: "DELETE" });
+
+export const emptyArchive = () =>
+  request<{ ok: true; deleted: number; skipped: number }>("/archive/empty", { method: "POST" });
 
 export const sendReply = (
   id: number,

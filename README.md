@@ -16,7 +16,7 @@ Runs entirely on Cloudflare: Workers, Email Routing, D1, R2, and Web Push.
 - **AI reply drafts** — enable per-inbox drafting with custom instructions and playbooks; review and approve before sending.
 - **Automatic labels** — organize incoming mail with natural-language labeling rules.
 - **Contacts** — keep names, companies, phone numbers and notes for the people who email you, see their conversations, and pick them from autocomplete in To/Cc/Bcc. Named senders can be added automatically, and contacts can be imported from CSV or vCard files.
-- **Search and triage** — search message content, filter conversations, mark read or archive in bulk, and browse or restore archived conversations.
+- **Search and triage** — search message content, filter conversations, mark read or archive in bulk, browse or restore archived conversations, and permanently delete them one at a time, in bulk, or with Empty archive.
 - **MCP integration** — let external AI agents read conversations, compose emails, and send replies through scoped OAuth access.
 - **Browser notifications** — opt in to Web Push alerts for new messages.
 - **Email notifications** — optionally send a notice to one email address for new messages.
@@ -81,7 +81,7 @@ new inbound Message ──► Web Push ──► subscribed browsers
   `link-exchange`) with a natural-language match condition. New inbound mail is
   evaluated once with the `typesafe/jev` model and tagged with every matching
   label; replies are never labeled. The conversation list filters by label and
-  supports multi-select mark-read/archive.
+  supports multi-select mark-read/archive, and permanent delete and Empty archive in the Archive.
 - **Contacts**: a workspace-wide address book keyed by email address. When
   "Automatically create new contacts" is on (Settings > Contacts, default on),
   each new external sender whose From header carries a name becomes a Contact;

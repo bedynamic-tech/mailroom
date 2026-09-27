@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { requireSameOrigin } from "./csrf.ts";
 import { composeApi, copyAddresses } from "./compose.ts";
@@ -15,6 +15,12 @@ import {
   InboxDeletionError,
   purgeInboxObjects,
 } from "../inbox/delete";
+import {
+  ConversationDeletionError,
+  deleteArchivedConversations,
+  emptyArchive,
+  purgeConversationObjects,
+} from "../inbox/delete-conversations";
 import { validatePushSubscription } from "../notifications/push";
 import {
   effectiveTemplate,
@@ -842,13 +848,17 @@ api.post("/threads/bulk", async (c) => {
   if (ids.length === 0 || ids.length > 100) {
     return c.json({ error: "ids must contain 1-100 conversation ids" }, 400);
   }
+  if (body.action === "delete") return removeArchivedConversations(c, ids as number[]);
+
   const updates: Record<string, string> = {
     read: "is_read = 1",
     archive: "status = 'archived'",
     unarchive: "status = CASE status WHEN 'archived' THEN 'open' ELSE status END",
   };
   const update = typeof body.action === "string" ? updates[body.action] : undefined;
-  if (!update) return c.json({ error: "action must be read, archive or unarchive" }, 400);
+  if (!update) {
+    return c.json({ error: "action must be read, archive, unarchive or delete" }, 400);
+  }
 
   const placeholders = ids.map(() => "?").join(", ");
   const result = await c.env.DB.prepare(
@@ -877,6 +887,42 @@ api.post("/threads/:id/unarchive", async (c) => {
     .run();
   return c.json({ ok: true });
 });
+
+api.post("/archive/empty", async (c) => {
+  const deleted = await emptyArchive(c.env);
+  c.executionCtx.waitUntil(
+    purgeConversationObjects(c.env.RAW, deleted.objectKeys).catch((error) => {
+      console.error("Archive object cleanup failed", { error });
+    }),
+  );
+  return c.json({ ok: true, deleted: deleted.ids.length, skipped: deleted.skipped });
+});
+
+api.delete("/threads/:id", async (c) => {
+  const threadId = parsePositiveId(c.req.param("id"));
+  if (threadId === null) return c.json({ error: "Invalid conversation" }, 400);
+  return removeArchivedConversations(c, [threadId]);
+});
+
+async function removeArchivedConversations(c: Context<{ Bindings: Env }>, ids: number[]) {
+  try {
+    const deleted = await deleteArchivedConversations(c.env, { ids });
+    c.executionCtx.waitUntil(
+      purgeConversationObjects(c.env.RAW, deleted.objectKeys).catch((error) => {
+        console.error("Conversation object cleanup failed", {
+          threadIds: deleted.ids,
+          error,
+        });
+      }),
+    );
+    return c.json({ ok: true, deleted_ids: deleted.ids });
+  } catch (error) {
+    if (error instanceof ConversationDeletionError) {
+      return c.json({ error: error.message }, error.status);
+    }
+    throw error;
+  }
+}
 
 const replyCopies = z.object({
   cc: z.array(z.email().max(254)).max(MAX_RECIPIENTS_PER_MESSAGE),

@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { bulkUpdateThreads, type BulkThreadAction } from "../api";
+import { bulkUpdateThreads, emptyArchive, type BulkThreadAction } from "../api";
 import { formatTime } from "../lib";
 import { EmailAvatar } from "./EmailAvatar";
 import {
@@ -24,8 +24,10 @@ import {
   SettingsIcon,
   SparklesIcon,
   TagIcon,
+  TrashIcon,
   XIcon,
 } from "./Icons";
+import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
 
 export type ThreadFilter = "all" | "unread";
 export type ThreadScope = "all" | "archive" | "contacts" | number;
@@ -60,10 +62,12 @@ export function ThreadList(props: {
   onCompose: () => void;
   onOpenMailboxSettings: (id: number) => void;
   onSelect: (id: number) => void;
+  onDeselect: () => void;
 }) {
   const searchRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const [checked, setChecked] = useState<ReadonlySet<number>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState<"selected" | "all" | null>(null);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -121,6 +125,29 @@ export function ThreadList(props: {
     },
   });
 
+  const onConversationsDeleted = (ids: number[] | null) => {
+    setConfirmDelete(null);
+    setChecked(new Set());
+    if (ids === null) queryClient.removeQueries({ queryKey: ["thread"] });
+    else for (const id of ids) queryClient.removeQueries({ queryKey: ["thread", id] });
+    queryClient.invalidateQueries({ queryKey: ["threads"] });
+    queryClient.invalidateQueries({ queryKey: ["mailboxes"] });
+    const selected = props.selected;
+    if (selected !== null && (ids === null || ids.includes(selected))) props.onDeselect();
+  };
+
+  const deleteChecked = useMutation({
+    mutationFn: (ids: number[]) => bulkUpdateThreads(ids, "delete"),
+    onSuccess: (result, ids) => onConversationsDeleted(result.deleted_ids ?? ids),
+  });
+
+  const clearArchive = useMutation({
+    mutationFn: emptyArchive,
+    onSuccess: () => onConversationsDeleted(null),
+  });
+
+  const deletePending = deleteChecked.isPending || clearArchive.isPending;
+
   const toggleChecked = (id: number, value: boolean) => {
     setChecked((current) => {
       const next = new Set(current);
@@ -138,6 +165,7 @@ export function ThreadList(props: {
     visibleThreads.every((thread) => !checked.has(thread.id) || thread.status === "archived");
 
   const selectionMode = checkedCount > 0;
+  const showLabelFilter = availableLabels.length > 0 || props.activeLabel !== null;
   const showFetching = props.fetching && !props.loading;
 
   return (
@@ -266,7 +294,7 @@ export function ThreadList(props: {
               )}
               {selectionMode ? (
                 <>
-                  <span className="text-[13px] font-medium tabular-nums text-foreground">
+                  <span className="shrink-0 whitespace-nowrap text-[13px] font-medium tabular-nums text-foreground">
                     {checkedCount} selected
                   </span>
                   <span className="ml-auto flex items-center gap-0.5">
@@ -278,6 +306,22 @@ export function ThreadList(props: {
                     >
                       Mark read
                     </Button>
+                    {props.archive && checkedAllArchived && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        disabled={bulkUpdate.isPending || deletePending}
+                        onClick={() => {
+                          deleteChecked.reset();
+                          setConfirmDelete("selected");
+                        }}
+                        aria-label="Delete selected conversations permanently"
+                        title="Delete permanently"
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -288,11 +332,15 @@ export function ThreadList(props: {
                           action: checkedAllArchived ? "unarchive" : "archive",
                         })
                       }
+                      aria-label={checkedAllArchived ? "Move to inbox" : "Archive"}
+                      title={checkedAllArchived ? "Move to inbox" : undefined}
                     >
                       {checkedAllArchived ? (
                         <>
                           <InboxIcon className="h-3.5 w-3.5" />
-                          Move to inbox
+                          <span className={props.archive ? "sr-only" : undefined}>
+                            Move to inbox
+                          </span>
                         </>
                       ) : (
                         <>
@@ -325,7 +373,7 @@ export function ThreadList(props: {
                     </TabsList>
                   </Tabs>
 
-                  {(availableLabels.length > 0 || props.activeLabel !== null) && (
+                  {showLabelFilter && (
                     <Select
                       value={props.activeLabel === null ? "all" : String(props.activeLabel)}
                       onValueChange={(value) =>
@@ -358,12 +406,51 @@ export function ThreadList(props: {
                       </SelectContent>
                     </Select>
                   )}
+
+                  {props.archive && visibleThreads.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={deletePending}
+                      onClick={() => {
+                        clearArchive.reset();
+                        setConfirmDelete("all");
+                      }}
+                      className={`shrink-0 text-destructive hover:text-destructive ${
+                        showLabelFilter ? "" : "ml-auto"
+                      }`}
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                      Empty archive
+                    </Button>
+                  )}
                 </>
               )}
             </div>
           </>
         )}
       </header>
+
+      <DeleteConversationsDialog
+        open={confirmDelete !== null}
+        title={
+          confirmDelete === "all"
+            ? "Empty the archive?"
+            : `Delete ${checkedCount} ${checkedCount === 1 ? "conversation" : "conversations"}?`
+        }
+        description={
+          confirmDelete === "all"
+            ? "This permanently deletes every archived conversation in every inbox, with its messages, attachments, and drafts. This can’t be undone."
+            : "This permanently deletes the selected conversations, with their messages, attachments, and drafts. This can’t be undone."
+        }
+        confirmLabel={confirmDelete === "all" ? "Empty archive" : "Delete"}
+        pending={deletePending}
+        error={confirmDelete === "all" ? clearArchive.error : deleteChecked.error}
+        onConfirm={() =>
+          confirmDelete === "all" ? clearArchive.mutate() : deleteChecked.mutate([...checked])
+        }
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+      />
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {props.emptyInbox && (
