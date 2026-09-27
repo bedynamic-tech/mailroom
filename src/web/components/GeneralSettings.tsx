@@ -21,7 +21,6 @@ import {
 import { isIosBrowser, useInstallState } from "../pwa";
 import { BellIcon, MailIcon } from "./Icons";
 import { EmailTemplateEditor } from "./EmailTemplateEditor";
-import { McpSettings } from "./McpSettings";
 import {
   SettingsBlock,
   SettingsHeader,
@@ -33,6 +32,7 @@ export function GeneralSettings(props: {
   onBack: () => void;
   onOpenInboxes: () => void;
   onOpenContacts: () => void;
+  onOpenAi: () => void;
 }) {
   const queryClient = useQueryClient();
   const settings = useQuery({
@@ -93,6 +93,7 @@ export function GeneralSettings(props: {
         onOpenGeneral={() => undefined}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={props.onOpenContacts}
+        onOpenAi={props.onOpenAi}
       />
 
       <SettingsPage>
@@ -159,8 +160,6 @@ export function GeneralSettings(props: {
         </SettingsBlock>
 
         <AppSettings />
-
-        <McpSettings />
       </SettingsPage>
     </div>
   );

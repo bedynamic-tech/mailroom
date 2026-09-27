@@ -20,6 +20,7 @@ import {
 } from "./api";
 import { AccessSetup } from "./components/AccessSetup";
 import { AgentSettings } from "./components/AgentSettings";
+import { AiSettings } from "./components/AiSettings";
 import { Contacts } from "./components/Contacts";
 import { ContactSettings } from "./components/ContactSettings";
 import { GeneralSettings } from "./components/GeneralSettings";
@@ -31,7 +32,7 @@ import { ThreadView } from "./components/ThreadView";
 import { useUnreadBadge } from "./pwa";
 
 type WorkspaceView = "inbox" | "archive" | "contacts" | "settings";
-type SettingsSection = "general" | "inboxes" | "contacts";
+type SettingsSection = "general" | "inboxes" | "contacts" | "ai";
 
 export function App() {
   return (
@@ -59,6 +60,7 @@ export function App() {
         path="/settings/contacts"
         element={<Workspace view="settings" settingsSection="contacts" />}
       />
+      <Route path="/settings/ai" element={<Workspace view="settings" settingsSection="ai" />} />
       <Route
         path="/settings/inboxes"
         element={<Workspace view="settings" settingsSection="inboxes" />}
@@ -288,6 +290,7 @@ function Workspace(props: {
               onBack={() => navigate("/inbox")}
               onOpenInboxes={openInboxSettings}
               onOpenContacts={() => navigate("/settings/contacts")}
+              onOpenAi={() => navigate("/settings/ai")}
             />
           ) : props.settingsSection === "contacts" ? (
             <ContactSettings
@@ -295,6 +298,14 @@ function Workspace(props: {
               onOpenGeneral={() => navigate("/settings/general")}
               onOpenInboxes={openInboxSettings}
               onOpenContacts={() => navigate("/contacts")}
+              onOpenAi={() => navigate("/settings/ai")}
+            />
+          ) : props.settingsSection === "ai" ? (
+            <AiSettings
+              onBack={() => navigate("/inbox")}
+              onOpenGeneral={() => navigate("/settings/general")}
+              onOpenInboxes={openInboxSettings}
+              onOpenContacts={() => navigate("/settings/contacts")}
             />
           ) : (
             <AgentSettings
@@ -311,6 +322,7 @@ function Workspace(props: {
               }
               onOpenGeneral={() => navigate("/settings/general")}
               onOpenContacts={() => navigate("/settings/contacts")}
+              onOpenAi={() => navigate("/settings/ai")}
               onBack={() => navigate("/inbox")}
             />
           )}

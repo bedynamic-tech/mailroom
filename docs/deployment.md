@@ -141,7 +141,7 @@ every push. Its OAuth state lives in the `OAUTH_KV` namespace that deployment
 creates for you. The remaining step is to let MCP clients reach the OAuth
 endpoints, which Access blocks because it protects the whole Worker.
 
-1. Open **Settings → General** in Mailroom. The **AI agents (MCP)** card shows
+1. Open **Settings → AI** in Mailroom. The **MCP** card shows
    the server URL and checks whether the OAuth endpoints are publicly
    reachable.
 2. If it says Access blocks them, go to
@@ -307,4 +307,4 @@ deploy automatically. Continue with Access and domain setup above.
   says the values do not match, copy the values it shows now.
 - **MCP OAuth redirects to Access before discovery:** add the Bypass
   application for `/mcp` and `/.well-known` on that hostname. The
-  card in **Settings → General** confirms when it works.
+  card in **Settings → AI** confirms when it works.

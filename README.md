@@ -148,6 +148,7 @@ not `npx wrangler dev`: the test always targets port 5173 and `wrangler.dev.json
 - `/mailboxes/:mailboxId/threads/:threadId` — a conversation within that Inbox
 - `/settings/inboxes/:mailboxId` — Base Instructions and Playbooks for an Inbox
 - `/settings/general` — workspace-wide settings, including browser notifications
+- `/settings/ai` — MCP server URL and connection check
 
 Search and conversation filters are URL parameters (`?q=...&filter=unread|drafts`),
 so refresh, browser history, and shared links preserve the current view.
@@ -186,7 +187,7 @@ from the notification address itself does trigger a notice; notices are marked
 The MCP server runs in the same Worker as the web app, at
 `https://<your-hostname>/mcp`. It calls the Inbox domain modules directly and
 does not proxy or expose the Web API. The server URL is shown in
-**Settings → General**.
+**Settings → AI**.
 
 It uses the stateless MCP `2026-07-28` handler and keeps compatibility with
 published 2025 stateless clients. Its tools are:
