@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { composeEmail, ComposeRequestError, fetchDomains, fetchMailboxes } from "../api";
-import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_TOTAL_BYTES, MAX_MESSAGE_CHARS, MAX_SUBJECT_CHARS } from "../../shared/email-limits";
-import { splitAddressInput } from "../../shared/recipients";
+import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_TOTAL_BYTES, MAX_MESSAGE_CHARS, MAX_RECIPIENTS_PER_MESSAGE, MAX_SUBJECT_CHARS } from "../../shared/email-limits";
+import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
 import { PaperclipIcon, SendIcon, XIcon } from "./Icons";
 
 const ComposeContext = createContext<(mailboxId: number | null) => void>(() => {});
@@ -22,9 +22,9 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [preferredMailbox, setPreferredMailbox] = useState<number | null>(null);
   const [mailboxId, setMailboxId] = useState("");
-  const [to, setTo] = useState("");
-  const [cc, setCc] = useState("");
-  const [bcc, setBcc] = useState("");
+  const [to, setTo] = useState<string[]>([]);
+  const [cc, setCc] = useState<string[]>([]);
+  const [bcc, setBcc] = useState<string[]>([]);
   const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
   const [subject, setSubject] = useState("");
@@ -42,10 +42,18 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   const toRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const bccRef = useRef<HTMLInputElement>(null);
+  const toField = useRef<RecipientInputHandle>(null);
+  const ccField = useRef<RecipientInputHandle>(null);
+  const bccField = useRef<RecipientInputHandle>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes, enabled: open });
   const domains = useQuery({ queryKey: ["domains"], queryFn: fetchDomains, enabled: open });
-  const hasDraft = Boolean(to || cc || bcc || subject || text || files.length);
+  const hasDraft = Boolean(to.length || cc.length || bcc.length || subject || text || files.length);
+  const remaining = MAX_RECIPIENTS_PER_MESSAGE - to.length - cc.length - bcc.length;
+  // Copies never take the last slot while the message still needs its To recipient.
+  const copyCapacity = remaining - (to.length === 0 ? 1 : 0);
+  const lowered = (values: string[]) => values.map((value) => value.toLowerCase());
+  const takenBy = (...lists: string[][]) => new Set(lists.flatMap(lowered));
   const locked = sending || uncertain;
   const activeDomains = new Set(domains.data?.filter((domain) => domain.status === "active").map((domain) => domain.name.toLowerCase()));
   const available = (mailboxes.data ?? []).filter((mailbox) => activeDomains.has(mailbox.address.split("@")[1]?.toLowerCase()));
@@ -70,19 +78,34 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   }, [hasDraft]);
 
   const reset = () => {
-    setTo(""); setCc(""); setBcc(""); setShowCc(false); setShowBcc(false); setSubject(""); setText(""); setFiles([]);
+    setTo([]); setCc([]); setBcc([]); setShowCc(false); setShowBcc(false); setSubject(""); setText(""); setFiles([]);
     setNotice(null); setFileError(null); setFailed(false); setUncertain(false);
     setConfirmDiscard(false); attempt.current = null;
   };
 
   const send = async () => {
-    if (inFlight.current || confirmDiscard || (!uncertain && (!ready || !formRef.current?.reportValidity()))) return;
-    if (!uncertain && !text.trim() && files.length === 0) {
-      setNotice("Write a message or attach a file before sending.");
-      return;
+    if (inFlight.current || confirmDiscard) return;
+    let recipients = { to, cc, bcc };
+    if (!uncertain) {
+      if (!ready) return;
+      // Add any address still being typed; stop if one of them is invalid.
+      const committed = [toField.current?.commit() ?? to, ccField.current?.commit() ?? cc, bccField.current?.commit() ?? bcc];
+      if (committed.some((list) => list === null)) return;
+      const [nextTo, nextCc, nextBcc] = committed as string[][];
+      recipients = { to: nextTo, cc: nextCc, bcc: nextBcc };
+      if (recipients.to.length === 0) {
+        setNotice("Add a recipient before sending.");
+        toRef.current?.focus();
+        return;
+      }
+      if (!formRef.current?.reportValidity()) return;
+      if (!text.trim() && files.length === 0) {
+        setNotice("Write a message or attach a file before sending.");
+        return;
+      }
     }
     if (!attempt.current) {
-      attempt.current = { mailboxId: Number(mailboxId), to: to.trim(), cc: splitAddressInput(cc), bcc: splitAddressInput(bcc), subject: subject.trim(), text: text.trim(), files: [...files], attemptId: crypto.randomUUID() };
+      attempt.current = { mailboxId: Number(mailboxId), to: recipients.to[0]!, cc: recipients.cc, bcc: recipients.bcc, subject: subject.trim(), text: text.trim(), files: [...files], attemptId: crypto.randomUUID() };
     }
     inFlight.current = true;
     setSending(true); setNotice(null); setFailed(false);
@@ -163,27 +186,32 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                     {available.map((mailbox) => <option key={mailbox.id} value={mailbox.id}>{mailbox.address}</option>)}
                   </select>
                 </div>
-                <div className="flex min-h-12 items-center gap-3 border-b">
-                  <label htmlFor="compose-to" className="w-14 shrink-0 text-sm text-muted-foreground">To</label>
-                  <Input ref={toRef} id="compose-to" type="email" autoComplete="off" required maxLength={254} placeholder="recipient@example.com" value={to} onChange={(event) => setTo(event.target.value)} className="min-w-0 border-0 shadow-none" />
+                <div className="flex min-h-12 items-start gap-3 border-b">
+                  <label htmlFor="compose-to" className="w-14 shrink-0 py-3.5 text-sm text-muted-foreground">To</label>
+                  <RecipientInput ref={toField} inputRef={toRef} id="compose-to" label="To" values={to} onChange={setTo} capacity={Math.min(1 - to.length, remaining)} taken={takenBy(cc, bcc)} placeholder="recipient@example.com" className="px-2.5 py-1.5" />
                   {(!showCc || !showBcc) && (
-                    <span className="flex shrink-0 items-center">
+                    <span className="flex shrink-0 items-center py-2.5">
                       {!showCc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Cc recipients" onClick={() => { setShowCc(true); requestAnimationFrame(() => ccRef.current?.focus()); }}>Cc</Button>}
                       {!showBcc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Bcc recipients" onClick={() => { setShowBcc(true); requestAnimationFrame(() => bccRef.current?.focus()); }}>Bcc</Button>}
                     </span>
                   )}
                 </div>
                 {showCc && (
-                  <div className="flex min-h-12 items-center gap-3 border-b">
-                    <label htmlFor="compose-cc" className="w-14 shrink-0 text-sm text-muted-foreground">Cc</label>
-                    <Input ref={ccRef} id="compose-cc" type="email" multiple autoComplete="off" placeholder="Separate addresses with commas" value={cc} onChange={(event) => setCc(event.target.value)} className="min-w-0 border-0 shadow-none" />
+                  <div className="flex min-h-12 items-start gap-3 border-b">
+                    <label htmlFor="compose-cc" className="w-14 shrink-0 py-3.5 text-sm text-muted-foreground">Cc</label>
+                    <RecipientInput ref={ccField} inputRef={ccRef} id="compose-cc" label="Cc" values={cc} onChange={setCc} capacity={copyCapacity} taken={takenBy(to, bcc)} placeholder="Add Cc recipients" className="px-2.5 py-1.5" />
                   </div>
                 )}
                 {showBcc && (
-                  <div className="flex min-h-12 items-center gap-3 border-b">
-                    <label htmlFor="compose-bcc" className="w-14 shrink-0 text-sm text-muted-foreground">Bcc</label>
-                    <Input ref={bccRef} id="compose-bcc" type="email" multiple autoComplete="off" placeholder="Separate addresses with commas" value={bcc} onChange={(event) => setBcc(event.target.value)} className="min-w-0 border-0 shadow-none" />
+                  <div className="flex min-h-12 items-start gap-3 border-b">
+                    <label htmlFor="compose-bcc" className="w-14 shrink-0 py-3.5 text-sm text-muted-foreground">Bcc</label>
+                    <RecipientInput ref={bccField} inputRef={bccRef} id="compose-bcc" label="Bcc" values={bcc} onChange={setBcc} capacity={copyCapacity} taken={takenBy(to, cc)} placeholder="Add Bcc recipients" className="px-2.5 py-1.5" />
                   </div>
+                )}
+                {copyCapacity <= 0 && (
+                  <p role="status" className="border-b py-2 text-xs text-muted-foreground">
+                    This message has reached the limit of {MAX_RECIPIENTS_PER_MESSAGE} recipients.
+                  </p>
                 )}
                 <div className="flex min-h-12 items-center gap-3 border-b">
                   <label htmlFor="compose-subject" className="w-14 shrink-0 text-sm text-muted-foreground">Subject</label>

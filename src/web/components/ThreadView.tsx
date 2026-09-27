@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   archiveThread,
@@ -11,7 +11,7 @@ import {
   unarchiveThread,
 } from "../api";
 import type { Draft, Message } from "../../shared/types";
-import { splitAddressInput } from "../../shared/recipients";
+import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits";
 import {
   deriveAgentDraftStatus,
   type AgentDraftStatus,
@@ -34,6 +34,7 @@ import {
   XIcon,
 } from "./Icons";
 import { LinkifiedText } from "./LinkifiedText";
+import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
 
 export function ThreadView(props: {
   threadId: number;
@@ -44,8 +45,8 @@ export function ThreadView(props: {
   const queryClient = useQueryClient();
   const [replyText, setReplyText] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [replyCc, setReplyCc] = useState("");
-  const [replyBcc, setReplyBcc] = useState("");
+  const [replyCc, setReplyCc] = useState<string[]>([]);
+  const [replyBcc, setReplyBcc] = useState<string[]>([]);
   const [showCopies, setShowCopies] = useState(false);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
   const [failedAttemptKey, setFailedAttemptKey] = useState<string | null>(null);
@@ -56,6 +57,8 @@ export function ThreadView(props: {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ccInputRef = useRef<HTMLInputElement>(null);
   const bccInputRef = useRef<HTMLInputElement>(null);
+  const ccField = useRef<RecipientInputHandle>(null);
+  const bccField = useRef<RecipientInputHandle>(null);
   const attemptIds = useRef(new Map<string, { text: string; id: string }>());
 
   const detail = useQuery({
@@ -83,8 +86,8 @@ export function ThreadView(props: {
   useEffect(() => {
     setReplyText("");
     setPendingFiles([]);
-    setReplyCc("");
-    setReplyBcc("");
+    setReplyCc([]);
+    setReplyBcc([]);
     setShowCopies(false);
     setSendNotice(null);
     setFailedAttemptKey(null);
@@ -125,8 +128,8 @@ export function ThreadView(props: {
       if (result.status === "sent") {
         setReplyText("");
         setPendingFiles([]);
-        setReplyCc("");
-        setReplyBcc("");
+        setReplyCc([]);
+        setReplyBcc([]);
         setShowCopies(false);
         setUsedDraftId(null);
       }
@@ -223,6 +226,18 @@ export function ThreadView(props: {
     lastMessageDirection: thread.last_message_direction,
   });
 
+  // Replies always go to the latest inbound Message's reply target (see sendReplyAttempt).
+  const latestInbound = messages.filter((message) => message.direction === "inbound").at(-1);
+  const replyTargets = latestInbound
+    ? (() => {
+        const replyTo = parseAddressList(latestInbound.reply_to_addresses);
+        return replyTo.length ? replyTo : [latestInbound.from_address];
+      })()
+    : [];
+  const copyCapacity =
+    MAX_RECIPIENTS_PER_MESSAGE - replyTargets.length - replyCc.length - replyBcc.length;
+  const lowered = (values: string[]) => values.map((value) => value.toLowerCase());
+
   const attemptFor = (key: string, text: string) => {
     const existing = attemptIds.current.get(key);
     if (existing?.text === text) return existing.id;
@@ -234,10 +249,10 @@ export function ThreadView(props: {
   const submitReply = () => {
     const text = replyText.trim();
     if ((text || pendingFiles.length > 0) && !reply.isPending && !discard.isPending) {
-      if (ccInputRef.current?.reportValidity() === false) return;
-      if (bccInputRef.current?.reportValidity() === false) return;
-      const cc = splitAddressInput(replyCc);
-      const bcc = splitAddressInput(replyBcc);
+      // Add any address still being typed; stop if one of them is invalid.
+      const cc = ccField.current ? ccField.current.commit() : replyCc;
+      const bcc = bccField.current ? bccField.current.commit() : replyBcc;
+      if (!cc || !bcc) return;
       const fingerprint = `${text} ${pendingFiles.map((file) => `${file.name}:${file.size}`).join(",")} cc:${cc.join(",")} bcc:${bcc.join(",")}`;
       const attemptKey = usedDraftId === null ? "manual" : `draft-${usedDraftId}`;
       reply.mutate({
@@ -393,24 +408,41 @@ export function ThreadView(props: {
             </div>
             {showCopies && (
               <div className="border-b border-border/70 text-xs">
-                <CopyRecipientsRow
-                  id="reply-cc"
-                  label="Cc"
-                  inputRef={ccInputRef}
-                  value={replyCc}
-                  disabled={reply.isPending}
-                  onChange={setReplyCc}
-                  onSubmit={submitReply}
-                />
-                <CopyRecipientsRow
-                  id="reply-bcc"
-                  label="Bcc"
-                  inputRef={bccInputRef}
-                  value={replyBcc}
-                  disabled={reply.isPending}
-                  onChange={setReplyBcc}
-                  onSubmit={submitReply}
-                />
+                <CopyRecipientsRow label="Cc" htmlFor="reply-cc">
+                  <RecipientInput
+                    ref={ccField}
+                    inputRef={ccInputRef}
+                    id="reply-cc"
+                    label="Cc"
+                    values={replyCc}
+                    onChange={setReplyCc}
+                    capacity={copyCapacity}
+                    taken={new Set(lowered([...replyTargets, ...replyBcc]))}
+                    disabled={reply.isPending}
+                    placeholder="Add Cc recipients"
+                    onSubmitShortcut={submitReply}
+                  />
+                </CopyRecipientsRow>
+                <CopyRecipientsRow label="Bcc" htmlFor="reply-bcc">
+                  <RecipientInput
+                    ref={bccField}
+                    inputRef={bccInputRef}
+                    id="reply-bcc"
+                    label="Bcc"
+                    values={replyBcc}
+                    onChange={setReplyBcc}
+                    capacity={copyCapacity}
+                    taken={new Set(lowered([...replyTargets, ...replyCc]))}
+                    disabled={reply.isPending}
+                    placeholder="Add Bcc recipients"
+                    onSubmitShortcut={submitReply}
+                  />
+                </CopyRecipientsRow>
+                {copyCapacity <= 0 && (
+                  <p role="status" className="px-3.5 pb-2 text-muted-foreground">
+                    This reply has reached the limit of {MAX_RECIPIENTS_PER_MESSAGE} recipients.
+                  </p>
+                )}
               </div>
             )}
             <Textarea
@@ -540,38 +572,13 @@ export function ThreadView(props: {
   );
 }
 
-function CopyRecipientsRow(props: {
-  id: string;
-  label: string;
-  inputRef: RefObject<HTMLInputElement | null>;
-  value: string;
-  disabled: boolean;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-}) {
+function CopyRecipientsRow(props: { label: string; htmlFor: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-9 items-center gap-2 px-3.5">
-      <label htmlFor={props.id} className="w-8 shrink-0 text-muted-foreground">
+    <div className="flex items-start gap-2 px-3.5">
+      <label htmlFor={props.htmlFor} className="w-8 shrink-0 py-2.5 text-muted-foreground">
         {props.label}
       </label>
-      <input
-        ref={props.inputRef}
-        id={props.id}
-        type="email"
-        multiple
-        autoComplete="off"
-        value={props.value}
-        disabled={props.disabled}
-        onChange={(event) => props.onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            if (event.metaKey || event.ctrlKey) props.onSubmit();
-          }
-        }}
-        placeholder="Separate addresses with commas"
-        className="min-w-0 flex-1 bg-transparent py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60"
-      />
+      {props.children}
     </div>
   );
 }
