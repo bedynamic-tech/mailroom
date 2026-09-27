@@ -1,10 +1,14 @@
+import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
   disableBrowserNotifications,
+  disableEmailNotifications,
   enableBrowserNotifications,
   fetchGeneralSettings,
+  updateEmailNotifications,
 } from "../api";
 import {
   BrowserPushError,
@@ -12,7 +16,7 @@ import {
   getBrowserPushState,
   unsubscribeCurrentBrowser,
 } from "../push-notifications";
-import { BellIcon } from "./Icons";
+import { BellIcon, MailIcon } from "./Icons";
 import { McpSettings } from "./McpSettings";
 import {
   SettingsBlock,
@@ -139,12 +143,98 @@ export function GeneralSettings(props: {
                 Applies to new email received by every inbox in this workspace.
               </span>
             </div>
+            <EmailNotificationSetting
+              savedAddress={settings.data?.email_notification_address ?? null}
+              loading={settings.isLoading}
+            />
           </SettingsPanel>
         </SettingsBlock>
 
         <McpSettings />
       </SettingsPage>
     </div>
+  );
+}
+
+function EmailNotificationSetting(props: {
+  savedAddress: string | null;
+  loading: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [address, setAddress] = useState(props.savedAddress ?? "");
+  useEffect(() => setAddress(props.savedAddress ?? ""), [props.savedAddress]);
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["settings", "general"] });
+  const save = useMutation({
+    mutationFn: (value: string) => updateEmailNotifications(value),
+    onSettled: refresh,
+  });
+  const turnOff = useMutation({
+    mutationFn: disableEmailNotifications,
+    onSuccess: () => setAddress(""),
+    onSettled: refresh,
+  });
+
+  const busy = save.isPending || turnOff.isPending;
+  const trimmed = address.trim();
+  const unchanged = trimmed.toLowerCase() === (props.savedAddress ?? "");
+  const error = save.error ?? turnOff.error;
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (trimmed) save.mutate(trimmed);
+  };
+
+  return (
+    <form onSubmit={onSubmit} className="border-t px-4 py-4 sm:px-5">
+      <label
+        htmlFor="email-notification-address"
+        className="flex items-center gap-2 text-[13.5px] font-medium text-foreground"
+      >
+        <MailIcon className="h-4 w-4 text-muted-foreground" />
+        Email notifications
+      </label>
+      <p className="mt-1 max-w-xl text-[13px] leading-5 text-muted-foreground">
+        {props.savedAddress
+          ? `A notice is sent to ${props.savedAddress} when any inbox receives a new email.`
+          : "Send a notice to an email address when any inbox receives a new email. It is sent from the inbox that received the email."}
+      </p>
+      <div className="mt-3 flex max-w-xl flex-wrap items-center gap-2">
+        <Input
+          id="email-notification-address"
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={address}
+          onChange={(event) => setAddress(event.target.value)}
+          disabled={props.loading || busy}
+          className="min-w-[14rem] flex-1"
+        />
+        <Button
+          type="submit"
+          size="sm"
+          disabled={props.loading || busy || !trimmed || unchanged}
+        >
+          {save.isPending ? "Saving…" : props.savedAddress ? "Update" : "Turn on"}
+        </Button>
+        {props.savedAddress && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => turnOff.mutate()}
+            disabled={busy}
+          >
+            {turnOff.isPending ? "Turning off…" : "Turn off"}
+          </Button>
+        )}
+      </div>
+      {error && (
+        <p className="mt-2 text-xs leading-5 text-destructive" role="alert">
+          {error.message || "Couldn’t update email notifications. Try again."}
+        </p>
+      )}
+    </form>
   );
 }
 

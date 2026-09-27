@@ -18,6 +18,7 @@ Runs entirely on Cloudflare: Workers, Email Routing, D1, R2, and Web Push.
 - **Search and triage** — search message content, filter conversations, mark read or archive in bulk, and browse or restore archived conversations.
 - **MCP integration** — let external AI agents read conversations, compose emails, and send replies through scoped OAuth access.
 - **Browser notifications** — opt in to Web Push alerts for new messages.
+- **Email notifications** — optionally send a notice to one email address for new messages.
 - **Self-hosted on Cloudflare** — run in your own account, with Cloudflare Access protecting the web app.
 
 ## Deploy
@@ -154,6 +155,15 @@ VAPID keys and uses the deploying Cloudflare user's email as the push contact
 **Settings → General**. Every browser that should receive
 notifications must grant permission and subscribe once; turning the global
 switch off removes all stored subscriptions.
+
+Email notifications are also off by default. Enter an address under
+**Settings → General** to receive a short notice (sender, subject, preview and
+a link to the conversation) whenever any inbox receives a new email. The notice
+is sent through Email Sending from the inbox that received the email, so
+delivering to arbitrary external addresses requires Workers Paid. The address
+cannot be one of the workspace's own inboxes, and mail from the notification
+address or from an inbox never triggers a notice, so forwards and
+auto-responders cannot loop.
 
 ## MCP server
 

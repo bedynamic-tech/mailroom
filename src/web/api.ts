@@ -98,6 +98,16 @@ export const enableBrowserNotifications = (subscription: BrowserPushSubscription
 export const disableBrowserNotifications = () =>
   request<{ ok: true }>("/settings/browser-notifications", { method: "DELETE" });
 
+export const updateEmailNotifications = (address: string) =>
+  request<{ ok: true }>("/settings/email-notifications", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address }),
+  });
+
+export const disableEmailNotifications = () =>
+  request<{ ok: true }>("/settings/email-notifications", { method: "DELETE" });
+
 export const fetchDomains = () => request<Domain[]>("/domains");
 
 export const createDomain = (input: { name: string }) =>

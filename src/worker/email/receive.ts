@@ -3,6 +3,7 @@ import { enqueueDraftRun } from "../agent/runs";
 import { splitQuotedTail } from "../../shared/quote";
 import { labelNewThread } from "./label";
 import { notifyNewEmail } from "../notifications/push";
+import { notifyNewEmailByEmail } from "../notifications/email";
 import {
   addressOf,
   addressesOf,
@@ -18,7 +19,8 @@ export async function receiveEmail(
   env: Env,
   ctx: ExecutionContext,
 ): Promise<void> {
-  const mailbox = await findMailbox(env, message.to.trim().toLowerCase());
+  const inboxAddress = message.to.trim().toLowerCase();
+  const mailbox = await findMailbox(env, inboxAddress);
   if (!mailbox) {
     message.setReject("Inbox not configured");
     return;
@@ -104,6 +106,22 @@ export async function receiveEmail(
       senderAddress: sender || "unknown",
       subject,
     }).catch((error) => console.error("Browser notification task failed", error)),
+  );
+
+  ctx.waitUntil(
+    notifyNewEmailByEmail(env, {
+      threadId: stored.threadId,
+      inboxAddress,
+      senderName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
+      senderAddress: sender,
+      subject,
+      preview: snippet,
+    }).catch((error) =>
+      console.error("Email notification task failed", {
+        threadId: stored.threadId,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    ),
   );
 
   if (mailbox.agent_mode !== "off" && !isAutoSubmitted(parsed)) {

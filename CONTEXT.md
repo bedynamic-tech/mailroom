@@ -71,3 +71,7 @@ _Avoid_: Ticket, chat
 **Browser Notifications**:
 A workspace-wide opt-in that sends a new-email notification to every subscribed browser, across all Inboxes. Each browser maintains its own Push Subscription; turning the global setting off disables delivery and clears all stored subscriptions.
 _Avoid_: Inbox notifications, notification channel
+
+**Email Notifications**:
+A workspace-wide opt-in that sends a short new-email notice to one external email address, across all Inboxes. The notice is sent from the Inbox that received the email and is marked auto-generated; mail from the notification address or from any Inbox never produces a notice.
+_Avoid_: Forwarding, digest, alert email

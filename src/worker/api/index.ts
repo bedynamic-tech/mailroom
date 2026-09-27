@@ -13,6 +13,7 @@ import {
   purgeInboxObjects,
 } from "../inbox/delete";
 import { validatePushSubscription } from "../notifications/push";
+import { normalizeNotificationAddress } from "../notifications/email";
 import type {
   Attachment,
   BrowserPushSubscription,
@@ -34,8 +35,9 @@ api.route("/compose", composeApi);
 api.get("/settings/general", async (c) => {
   const [settings, subscriptions] = await Promise.all([
     c.env.DB.prepare(
-      "SELECT browser_notifications_enabled FROM global_settings WHERE id = 1",
-    ).first<{ browser_notifications_enabled: number }>(),
+      `SELECT browser_notifications_enabled, email_notification_address
+       FROM global_settings WHERE id = 1`,
+    ).first<{ browser_notifications_enabled: number; email_notification_address: string | null }>(),
     c.env.DB.prepare("SELECT COUNT(*) AS count FROM push_subscriptions")
       .first<{ count: number }>(),
   ]);
@@ -47,6 +49,7 @@ api.get("/settings/general", async (c) => {
     browser_notifications_configured: configured,
     push_subscription_count: Number(subscriptions?.count ?? 0),
     vapid_public_key: configured ? c.env.VAPID_PUBLIC_KEY! : null,
+    email_notification_address: settings?.email_notification_address ?? null,
   };
   return c.json(result);
 });
@@ -100,6 +103,40 @@ api.delete("/settings/browser-notifications", async (c) => {
     ),
     c.env.DB.prepare("DELETE FROM push_subscriptions"),
   ]);
+  return c.json({ ok: true });
+});
+
+api.put("/settings/email-notifications", async (c) => {
+  const body = await c.req.json<{ address?: unknown }>().catch(() => null);
+  const address = normalizeNotificationAddress(body?.address);
+  if (!address) return c.json({ error: "Enter a valid email address" }, 400);
+
+  const isInbox = await c.env.DB.prepare("SELECT id FROM mailboxes WHERE address = ?")
+    .bind(address)
+    .first();
+  if (isInbox) {
+    return c.json({ error: "Notifications can't be sent to one of this workspace's inboxes" }, 400);
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE global_settings
+     SET email_notification_address = ?,
+         email_notification_origin = ?,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE id = 1`,
+  )
+    .bind(address, new URL(c.req.url).origin)
+    .run();
+  return c.json({ ok: true });
+});
+
+api.delete("/settings/email-notifications", async (c) => {
+  await c.env.DB.prepare(
+    `UPDATE global_settings
+     SET email_notification_address = NULL,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE id = 1`,
+  ).run();
   return c.json({ ok: true });
 });
 
