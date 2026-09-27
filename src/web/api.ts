@@ -66,6 +66,8 @@ export class ComposeRequestError extends Error {
 export async function composeEmail(input: {
   mailboxId: number;
   to: string;
+  cc: string[];
+  bcc: string[];
   subject: string;
   text: string;
   files: File[];
@@ -74,6 +76,8 @@ export async function composeEmail(input: {
   const form = new FormData();
   form.set("mailbox_id", String(input.mailboxId));
   form.set("to", input.to);
+  for (const address of input.cc) form.append("cc", address);
+  for (const address of input.bcc) form.append("bcc", address);
   form.set("subject", input.subject);
   form.set("text", input.text);
   form.set("attempt_id", input.attemptId);
@@ -264,10 +268,13 @@ export const sendReply = (
   attemptId: string,
   draftId?: number,
   attachments: File[] = [],
+  copies: { cc: string[]; bcc: string[] } = { cc: [], bcc: [] },
 ) => {
   const form = new FormData();
   form.set("text", text);
   form.set("attempt_id", attemptId);
+  for (const address of copies.cc) form.append("cc", address);
+  for (const address of copies.bcc) form.append("bcc", address);
   if (draftId !== undefined) form.set("draft_id", String(draftId));
   for (const file of attachments) form.append("attachments", file, file.name);
   return request<ReplyAttemptResult>(`/threads/${id}/reply`, {

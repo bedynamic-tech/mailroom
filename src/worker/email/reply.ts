@@ -1,4 +1,6 @@
 import type { ReplyAttemptResult } from "../../shared/types";
+import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
+import { dedupeRecipients, normalizeEmailAddress } from "../../shared/recipients.ts";
 import {
   attachmentFingerprint,
   normalizeAttachments,
@@ -22,6 +24,9 @@ export interface ReplyIntent {
   attemptId: string;
   threadId: number;
   text: string;
+  /** Extra Cc/Bcc recipients; To is always the reviewed inbound reply target. */
+  cc?: string[];
+  bcc?: string[];
   attachments?: OutboundAttachmentInput[];
   draftId?: number;
   sentBy?: "human" | "agent";
@@ -40,6 +45,8 @@ interface StoredAttempt {
   status: "pending" | "sending" | "sent" | "failed";
   text_body: string;
   to_addresses: string;
+  cc_addresses?: string;
+  bcc_addresses?: string;
   attachments: string;
   message_id: string | null;
   error: string | null;
@@ -116,6 +123,16 @@ export async function sendReplyAttempt(
   if (recipients.length > 20) {
     throw new ReplyIntentError("Reply has too many recipients", 400);
   }
+  // Retries reuse the stored copies so a reviewed attempt keeps its audience.
+  const copies = existing
+    ? { cc: parseAddresses(existing.cc_addresses ?? "[]"), bcc: parseAddresses(existing.bcc_addresses ?? "[]") }
+    : copyRecipients(recipients, intent);
+  if (recipients.length + copies.cc.length + copies.bcc.length > MAX_RECIPIENTS_PER_MESSAGE) {
+    throw new ReplyIntentError(
+      `Reply can have at most ${MAX_RECIPIENTS_PER_MESSAGE} recipients`,
+      400,
+    );
+  }
   if (
     intent.expectedRecipients &&
     !sameAddresses(recipients, intent.expectedRecipients)
@@ -141,8 +158,8 @@ export async function sendReplyAttempt(
       await env.DB.prepare(
         `INSERT INTO reply_attempts
            (id, thread_id, inbound_message_id, draft_id, status, text_body, to_addresses,
-            attachments, sent_by, actor_id, oauth_client_id)
-         VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
+            attachments, sent_by, actor_id, oauth_client_id, cc_addresses, bcc_addresses)
+         VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
           intent.attemptId,
@@ -155,6 +172,8 @@ export async function sendReplyAttempt(
           intent.sentBy ?? (intent.draftId ? "agent" : "human"),
           intent.actorId ?? null,
           intent.oauthClientId ?? null,
+          JSON.stringify(copies.cc),
+          JSON.stringify(copies.bcc),
         )
         .run();
       if (
@@ -207,6 +226,8 @@ export async function sendReplyAttempt(
       ({ messageId } = await sendEmail(env, {
         from: { address: thread.mailbox_address },
         to: recipients,
+        cc: copies.cc,
+        bcc: copies.bcc,
         subject,
         text: intent.text.trim(),
         attachments: sendableAttachments(attachments),
@@ -262,8 +283,8 @@ export async function sendReplyAttempt(
       `INSERT INTO messages
          (thread_id, message_id, in_reply_to, references_ids, direction, sent_by,
           from_address, from_name, to_addresses, reply_to_addresses,
-          subject, text_body, created_at)
-       VALUES (?, ?, ?, ?, 'outbound', ?, ?, ?, ?, '[]', ?, ?, ?)`,
+          subject, text_body, created_at, cc_addresses, bcc_addresses)
+       VALUES (?, ?, ?, ?, 'outbound', ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?)`,
     ).bind(
       intent.threadId,
       messageId,
@@ -276,6 +297,8 @@ export async function sendReplyAttempt(
       subject,
       intent.text.trim(),
       now,
+      JSON.stringify(copies.cc),
+      JSON.stringify(copies.bcc),
     ),
     ...recordAttachmentStatements(env.DB, staged, messageId),
     env.DB.prepare(
@@ -322,6 +345,7 @@ function existingResult(
     existing.thread_id !== intent.threadId ||
     existing.text_body !== intent.text.trim() ||
     existing.draft_id !== (intent.draftId ?? null) ||
+    !sameCopies(existing, intent) ||
     attachmentFingerprint(parseStagedAttachments(existing.attachments)) !==
       attachmentFingerprint(attachments) ||
     (intent.inboundMessageId !== undefined &&
@@ -352,6 +376,23 @@ function parseAddresses(raw: string): string[] {
   } catch {
     return [];
   }
+}
+
+function copyRecipients(to: string[], intent: ReplyIntent): { cc: string[]; bcc: string[] } {
+  const { cc, bcc } = dedupeRecipients({
+    to,
+    cc: (intent.cc ?? []).map(normalizeEmailAddress),
+    bcc: (intent.bcc ?? []).map(normalizeEmailAddress),
+  });
+  return { cc, bcc };
+}
+
+function sameCopies(existing: StoredAttempt, intent: ReplyIntent): boolean {
+  const copies = copyRecipients(parseAddresses(existing.to_addresses), intent);
+  return (
+    sameAddresses(parseAddresses(existing.cc_addresses ?? "[]"), copies.cc) &&
+    sameAddresses(parseAddresses(existing.bcc_addresses ?? "[]"), copies.bcc)
+  );
 }
 
 function sameAddresses(actual: string[], expected: string[]): boolean {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   archiveThread,
@@ -11,6 +11,7 @@ import {
   unarchiveThread,
 } from "../api";
 import type { Draft, Message } from "../../shared/types";
+import { splitAddressInput } from "../../shared/recipients";
 import {
   deriveAgentDraftStatus,
   type AgentDraftStatus,
@@ -43,6 +44,9 @@ export function ThreadView(props: {
   const queryClient = useQueryClient();
   const [replyText, setReplyText] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [replyCc, setReplyCc] = useState("");
+  const [replyBcc, setReplyBcc] = useState("");
+  const [showCopies, setShowCopies] = useState(false);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
   const [failedAttemptKey, setFailedAttemptKey] = useState<string | null>(null);
   const [usedDraftId, setUsedDraftId] = useState<number | null>(null);
@@ -50,6 +54,8 @@ export function ThreadView(props: {
   const markedRead = useRef<number | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const ccInputRef = useRef<HTMLInputElement>(null);
+  const bccInputRef = useRef<HTMLInputElement>(null);
   const attemptIds = useRef(new Map<string, { text: string; id: string }>());
 
   const detail = useQuery({
@@ -77,6 +83,9 @@ export function ThreadView(props: {
   useEffect(() => {
     setReplyText("");
     setPendingFiles([]);
+    setReplyCc("");
+    setReplyBcc("");
+    setShowCopies(false);
     setSendNotice(null);
     setFailedAttemptKey(null);
     setUsedDraftId(null);
@@ -105,12 +114,20 @@ export function ThreadView(props: {
       attemptKey: string;
       draftId?: number;
       files?: File[];
+      cc: string[];
+      bcc: string[];
     }) =>
-      sendReply(props.threadId, args.text, args.attemptId, args.draftId, args.files ?? []),
+      sendReply(props.threadId, args.text, args.attemptId, args.draftId, args.files ?? [], {
+        cc: args.cc,
+        bcc: args.bcc,
+      }),
     onSuccess: (result, args) => {
       if (result.status === "sent") {
         setReplyText("");
         setPendingFiles([]);
+        setReplyCc("");
+        setReplyBcc("");
+        setShowCopies(false);
         setUsedDraftId(null);
       }
       setFailedAttemptKey(null);
@@ -217,11 +234,17 @@ export function ThreadView(props: {
   const submitReply = () => {
     const text = replyText.trim();
     if ((text || pendingFiles.length > 0) && !reply.isPending && !discard.isPending) {
-      const fingerprint = `${text} ${pendingFiles.map((file) => `${file.name}:${file.size}`).join(",")}`;
+      if (ccInputRef.current?.reportValidity() === false) return;
+      if (bccInputRef.current?.reportValidity() === false) return;
+      const cc = splitAddressInput(replyCc);
+      const bcc = splitAddressInput(replyBcc);
+      const fingerprint = `${text} ${pendingFiles.map((file) => `${file.name}:${file.size}`).join(",")} cc:${cc.join(",")} bcc:${bcc.join(",")}`;
       const attemptKey = usedDraftId === null ? "manual" : `draft-${usedDraftId}`;
       reply.mutate({
         text,
         files: pendingFiles,
+        cc,
+        bcc,
         draftId: usedDraftId ?? undefined,
         attemptId: attemptFor(attemptKey, fingerprint),
         attemptKey,
@@ -333,6 +356,21 @@ export function ThreadView(props: {
                 <span className="truncate font-medium text-foreground/80" title={thread.mailbox_address}>
                   {thread.mailbox_address}
                 </span>
+                {!showCopies && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    className="ml-1 shrink-0 text-muted-foreground"
+                    aria-label="Add Cc or Bcc recipients"
+                    disabled={reply.isPending}
+                    onClick={() => {
+                      setShowCopies(true);
+                      requestAnimationFrame(() => ccInputRef.current?.focus());
+                    }}
+                  >
+                    Cc/Bcc
+                  </Button>
+                )}
               </span>
               <DraftAssist
                 status={agentStatus}
@@ -353,6 +391,28 @@ export function ThreadView(props: {
                 onStart={() => startDraft.mutate()}
               />
             </div>
+            {showCopies && (
+              <div className="border-b border-border/70 text-xs">
+                <CopyRecipientsRow
+                  id="reply-cc"
+                  label="Cc"
+                  inputRef={ccInputRef}
+                  value={replyCc}
+                  disabled={reply.isPending}
+                  onChange={setReplyCc}
+                  onSubmit={submitReply}
+                />
+                <CopyRecipientsRow
+                  id="reply-bcc"
+                  label="Bcc"
+                  inputRef={bccInputRef}
+                  value={replyBcc}
+                  disabled={reply.isPending}
+                  onChange={setReplyBcc}
+                  onSubmit={submitReply}
+                />
+              </div>
+            )}
             <Textarea
               value={replyText}
               disabled={reply.isPending || discard.isPending}
@@ -480,6 +540,51 @@ export function ThreadView(props: {
   );
 }
 
+function CopyRecipientsRow(props: {
+  id: string;
+  label: string;
+  inputRef: RefObject<HTMLInputElement | null>;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="flex min-h-9 items-center gap-2 px-3.5">
+      <label htmlFor={props.id} className="w-8 shrink-0 text-muted-foreground">
+        {props.label}
+      </label>
+      <input
+        ref={props.inputRef}
+        id={props.id}
+        type="email"
+        multiple
+        autoComplete="off"
+        value={props.value}
+        disabled={props.disabled}
+        onChange={(event) => props.onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (event.metaKey || event.ctrlKey) props.onSubmit();
+          }
+        }}
+        placeholder="Separate addresses with commas"
+        className="min-w-0 flex-1 bg-transparent py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60"
+      />
+    </div>
+  );
+}
+
+function parseAddressList(raw: string | null | undefined): string[] {
+  try {
+    const values = JSON.parse(raw || "[]") as unknown;
+    return Array.isArray(values) ? values.filter((value): value is string => typeof value === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function MessageCard({ message }: { message: Message }) {
   const [showQuoted, setShowQuoted] = useState(false);
   const isOutbound = message.direction === "outbound";
@@ -487,6 +592,8 @@ function MessageCard({ message }: { message: Message }) {
     ? message.from_name || message.from_address
     : message.from_name || message.from_address;
   const { main, quoted } = splitQuotedTail(message.text_body ?? "");
+  const cc = parseAddressList(message.cc_addresses);
+  const bcc = isOutbound ? parseAddressList(message.bcc_addresses) : [];
 
   return (
     <Card className="gap-0 p-4 sm:p-5">
@@ -504,8 +611,18 @@ function MessageCard({ message }: { message: Message }) {
             {isOutbound && message.sent_by === "human" && <AuthorBadge tone="human">You</AuthorBadge>}
           </div>
           <div className="mt-0.5 truncate text-xs text-muted-foreground">
-            {isOutbound ? `to ${JSON.parse(message.to_addresses || "[]").join(", ")}` : message.from_address}
+            {isOutbound ? `to ${parseAddressList(message.to_addresses).join(", ")}` : message.from_address}
           </div>
+          {cc.length > 0 && (
+            <div className="truncate text-xs text-muted-foreground" title={cc.join(", ")}>
+              cc {cc.join(", ")}
+            </div>
+          )}
+          {bcc.length > 0 && (
+            <div className="truncate text-xs text-muted-foreground" title={bcc.join(", ")}>
+              bcc {bcc.join(", ")}
+            </div>
+          )}
         </div>
         <time
           dateTime={message.created_at}

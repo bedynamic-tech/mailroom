@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { composeEmail, ComposeRequestError, fetchDomains, fetchMailboxes } from "../api";
 import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_TOTAL_BYTES, MAX_MESSAGE_CHARS, MAX_SUBJECT_CHARS } from "../../shared/email-limits";
+import { splitAddressInput } from "../../shared/recipients";
 import { PaperclipIcon, SendIcon, XIcon } from "./Icons";
 
 const ComposeContext = createContext<(mailboxId: number | null) => void>(() => {});
@@ -22,6 +23,10 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   const [preferredMailbox, setPreferredMailbox] = useState<number | null>(null);
   const [mailboxId, setMailboxId] = useState("");
   const [to, setTo] = useState("");
+  const [cc, setCc] = useState("");
+  const [bcc, setBcc] = useState("");
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
   const [subject, setSubject] = useState("");
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -35,10 +40,12 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   const inFlight = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const toRef = useRef<HTMLInputElement>(null);
+  const ccRef = useRef<HTMLInputElement>(null);
+  const bccRef = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes, enabled: open });
   const domains = useQuery({ queryKey: ["domains"], queryFn: fetchDomains, enabled: open });
-  const hasDraft = Boolean(to || subject || text || files.length);
+  const hasDraft = Boolean(to || cc || bcc || subject || text || files.length);
   const locked = sending || uncertain;
   const activeDomains = new Set(domains.data?.filter((domain) => domain.status === "active").map((domain) => domain.name.toLowerCase()));
   const available = (mailboxes.data ?? []).filter((mailbox) => activeDomains.has(mailbox.address.split("@")[1]?.toLowerCase()));
@@ -63,7 +70,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   }, [hasDraft]);
 
   const reset = () => {
-    setTo(""); setSubject(""); setText(""); setFiles([]);
+    setTo(""); setCc(""); setBcc(""); setShowCc(false); setShowBcc(false); setSubject(""); setText(""); setFiles([]);
     setNotice(null); setFileError(null); setFailed(false); setUncertain(false);
     setConfirmDiscard(false); attempt.current = null;
   };
@@ -75,7 +82,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (!attempt.current) {
-      attempt.current = { mailboxId: Number(mailboxId), to: to.trim(), subject: subject.trim(), text: text.trim(), files: [...files], attemptId: crypto.randomUUID() };
+      attempt.current = { mailboxId: Number(mailboxId), to: to.trim(), cc: splitAddressInput(cc), bcc: splitAddressInput(bcc), subject: subject.trim(), text: text.trim(), files: [...files], attemptId: crypto.randomUUID() };
     }
     inFlight.current = true;
     setSending(true); setNotice(null); setFailed(false);
@@ -159,7 +166,25 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                 <div className="flex min-h-12 items-center gap-3 border-b">
                   <label htmlFor="compose-to" className="w-14 shrink-0 text-sm text-muted-foreground">To</label>
                   <Input ref={toRef} id="compose-to" type="email" autoComplete="off" required maxLength={254} placeholder="recipient@example.com" value={to} onChange={(event) => setTo(event.target.value)} className="min-w-0 border-0 shadow-none" />
+                  {(!showCc || !showBcc) && (
+                    <span className="flex shrink-0 items-center">
+                      {!showCc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Cc recipients" onClick={() => { setShowCc(true); requestAnimationFrame(() => ccRef.current?.focus()); }}>Cc</Button>}
+                      {!showBcc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Bcc recipients" onClick={() => { setShowBcc(true); requestAnimationFrame(() => bccRef.current?.focus()); }}>Bcc</Button>}
+                    </span>
+                  )}
                 </div>
+                {showCc && (
+                  <div className="flex min-h-12 items-center gap-3 border-b">
+                    <label htmlFor="compose-cc" className="w-14 shrink-0 text-sm text-muted-foreground">Cc</label>
+                    <Input ref={ccRef} id="compose-cc" type="email" multiple autoComplete="off" placeholder="Separate addresses with commas" value={cc} onChange={(event) => setCc(event.target.value)} className="min-w-0 border-0 shadow-none" />
+                  </div>
+                )}
+                {showBcc && (
+                  <div className="flex min-h-12 items-center gap-3 border-b">
+                    <label htmlFor="compose-bcc" className="w-14 shrink-0 text-sm text-muted-foreground">Bcc</label>
+                    <Input ref={bccRef} id="compose-bcc" type="email" multiple autoComplete="off" placeholder="Separate addresses with commas" value={bcc} onChange={(event) => setBcc(event.target.value)} className="min-w-0 border-0 shadow-none" />
+                  </div>
+                )}
                 <div className="flex min-h-12 items-center gap-3 border-b">
                   <label htmlFor="compose-subject" className="w-14 shrink-0 text-sm text-muted-foreground">Subject</label>
                   <Input id="compose-subject" required maxLength={MAX_SUBJECT_CHARS} placeholder="Add a subject" value={subject} onChange={(event) => setSubject(event.target.value)} className="min-w-0 border-0 shadow-none" />

@@ -1,4 +1,6 @@
 import { normalizeSubject } from "./rules.ts";
+import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
+import { dedupeRecipients, normalizeEmailAddress } from "../../shared/recipients.ts";
 import type { ComposeAttemptResult } from "../../shared/types.ts";
 export type { ComposeAttemptResult } from "../../shared/types.ts";
 import {
@@ -24,6 +26,8 @@ export interface ComposeIntent {
   attemptId: string;
   mailboxId: number;
   to: string[];
+  cc?: string[];
+  bcc?: string[];
   subject: string;
   text: string;
   attachments?: OutboundAttachmentInput[];
@@ -41,6 +45,8 @@ interface StoredAttempt {
   thread_id: number | null;
   status: ComposeAttemptStatus;
   to_addresses: string;
+  cc_addresses: string;
+  bcc_addresses: string;
   subject: string;
   text_body: string;
   attachments: string;
@@ -59,6 +65,12 @@ export async function sendNewEmailAttempt(
   const attachments = normalizeAttachments(intent.attachments ?? []);
   if (normalized.to.length !== 1 || !normalized.to[0]) {
     throw new ComposeIntentError("New email requires exactly one recipient", 400);
+  }
+  if (normalized.to.length + normalized.cc.length + normalized.bcc.length > MAX_RECIPIENTS_PER_MESSAGE) {
+    throw new ComposeIntentError(
+      `New email can have at most ${MAX_RECIPIENTS_PER_MESSAGE} recipients`,
+      400,
+    );
   }
   if (!normalized.subject) throw new ComposeIntentError("Subject is required", 400);
   if (!normalized.text && attachments.length === 0) {
@@ -102,8 +114,8 @@ export async function sendNewEmailAttempt(
       await env.DB.prepare(
         `INSERT INTO outbound_attempts
            (id, mailbox_id, status, to_addresses, subject, text_body, attachments,
-            actor_id, oauth_client_id, sent_by)
-         VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
+            actor_id, oauth_client_id, sent_by, cc_addresses, bcc_addresses)
+         VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
           normalized.attemptId,
@@ -115,6 +127,8 @@ export async function sendNewEmailAttempt(
           normalized.actorId ?? null,
           normalized.oauthClientId ?? null,
           normalized.sentBy ?? "agent",
+          JSON.stringify(normalized.cc),
+          JSON.stringify(normalized.bcc),
         )
         .run();
       if (
@@ -184,6 +198,8 @@ export async function sendNewEmailAttempt(
       ({ messageId } = await sendEmail(env, {
         from: { address: inbox.address },
         to: normalized.to,
+        cc: normalized.cc,
+        bcc: normalized.bcc,
         subject: normalized.subject,
         text: normalized.text,
         attachments: sendableAttachments(attachments),
@@ -223,8 +239,8 @@ export async function sendNewEmailAttempt(
       `INSERT INTO messages
          (thread_id, message_id, references_ids, direction, sent_by,
           from_address, from_name, to_addresses, reply_to_addresses,
-          subject, text_body, created_at)
-       VALUES (?, ?, '[]', 'outbound', ?, ?, NULL, ?, '[]', ?, ?, ?)`,
+          subject, text_body, created_at, cc_addresses, bcc_addresses)
+       VALUES (?, ?, '[]', 'outbound', ?, ?, NULL, ?, '[]', ?, ?, ?, ?, ?)`,
     ).bind(
       conversationId,
       messageId,
@@ -234,6 +250,8 @@ export async function sendNewEmailAttempt(
       normalized.subject,
       normalized.text,
       now,
+      JSON.stringify(normalized.cc),
+      JSON.stringify(normalized.bcc),
     ),
     ...recordAttachmentStatements(env.DB, staged, messageId),
     env.DB.prepare(
@@ -286,6 +304,8 @@ function existingResult(
   if (
     existing.mailbox_id !== intent.mailboxId ||
     existing.to_addresses !== JSON.stringify(intent.to) ||
+    (existing.cc_addresses ?? "[]") !== JSON.stringify(intent.cc) ||
+    (existing.bcc_addresses ?? "[]") !== JSON.stringify(intent.bcc) ||
     existing.subject !== intent.subject ||
     existing.text_body !== intent.text ||
     attachmentFingerprint(parseStagedAttachments(existing.attachments)) !==
@@ -317,31 +337,27 @@ function failedResult(id: string, conversationId: number | null, error: string):
   };
 }
 
-interface NormalizedIntent extends Omit<ComposeIntent, "to" | "subject" | "text"> {
+interface NormalizedIntent extends Omit<ComposeIntent, "to" | "cc" | "bcc" | "subject" | "text"> {
   to: string[];
+  cc: string[];
+  bcc: string[];
   subject: string;
   text: string;
 }
 
 function normalizeIntent(intent: ComposeIntent): NormalizedIntent {
+  const normalizeList = (addresses: string[] = []) =>
+    addresses.map(normalizeEmailAddress).filter(Boolean);
   return {
     ...intent,
-    to: [...new Map(
-      intent.to.map((address) => {
-        const normalized = normalizeEmailAddress(address);
-        return [normalized.toLowerCase(), normalized] as const;
-      }),
-    ).values()],
+    ...dedupeRecipients({
+      to: normalizeList(intent.to),
+      cc: normalizeList(intent.cc),
+      bcc: normalizeList(intent.bcc),
+    }),
     subject: intent.subject.trim(),
     text: intent.text.trim(),
   };
-}
-
-function normalizeEmailAddress(address: string): string {
-  const trimmed = address.trim();
-  const at = trimmed.lastIndexOf("@");
-  if (at <= 0) return trimmed;
-  return `${trimmed.slice(0, at)}@${trimmed.slice(at + 1).toLowerCase()}`;
 }
 
 function snippet(text: string): string {
