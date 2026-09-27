@@ -9,27 +9,27 @@ import type { MailRule, MailRuleInput } from "../../shared/types.ts";
 
 type Db = { DB: D1Database };
 
-const MAIL_RULE_COLUMNS = `r.*, m.address AS mailbox_address, l.name AS label_name
+const MAIL_RULE_COLUMNS = `r.*, m.address AS mailbox_address, l.name AS label_name,
+    (SELECT COUNT(*) FROM mail_rule_forwards f
+     WHERE f.rule_id = r.id AND f.status = 'sent') AS forward_count,
+    (SELECT f.error FROM mail_rule_forwards f
+     WHERE f.rule_id = r.id ORDER BY f.id DESC LIMIT 1) AS last_forward_error
   FROM mail_rules r
   LEFT JOIN mailboxes m ON m.id = r.mailbox_id
   LEFT JOIN labels l ON l.id = r.label_id`;
 
-const BOOLEAN_FIELDS = [
-  "enabled",
-  "has_attachment",
-  "mark_read",
-  "archive",
-  "skip_draft",
-  "skip_notifications",
-] as const;
+const BOOLEAN_FIELDS = ["enabled", "mark_read", "archive", "skip_draft", "skip_notifications"] as const;
+const JSON_FIELDS = ["conditions", "forward_to", "forward_cc", "forward_bcc"] as const;
 
-type MailRuleRow = Omit<MailRule, (typeof BOOLEAN_FIELDS)[number]> &
-  Record<(typeof BOOLEAN_FIELDS)[number], number>;
+type MailRuleRow = Omit<MailRule, (typeof BOOLEAN_FIELDS)[number] | (typeof JSON_FIELDS)[number]> &
+  Record<(typeof BOOLEAN_FIELDS)[number], number> &
+  Record<(typeof JSON_FIELDS)[number], string>;
 
 function toMailRule(row: MailRuleRow): MailRule {
-  const rule = { ...row } as unknown as MailRule;
+  const rule = { ...row } as unknown as Record<string, unknown>;
   for (const field of BOOLEAN_FIELDS) rule[field] = Boolean(row[field]);
-  return rule;
+  for (const field of JSON_FIELDS) rule[field] = JSON.parse(row[field]);
+  return rule as unknown as MailRule;
 }
 
 export class MailRuleError extends Error {
@@ -64,8 +64,8 @@ export async function createMailRule(env: Db, body: unknown): Promise<MailRule> 
   }
   const result = await env.DB.prepare(
     `INSERT INTO mail_rules
-       (mailbox_id, name, enabled, from_pattern, subject_contains, body_contains, has_attachment,
-        label_id, mark_read, archive, skip_draft, skip_notifications)
+       (mailbox_id, name, enabled, conditions, label_id, mark_read, archive, skip_draft,
+        skip_notifications, forward_to, forward_cc, forward_bcc)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(...ruleValues(input))
@@ -79,10 +79,9 @@ export async function updateMailRule(env: Db, id: number, body: unknown): Promis
   const input = await validate(env, body);
   const result = await env.DB.prepare(
     `UPDATE mail_rules
-     SET mailbox_id = ?, name = ?, enabled = ?, from_pattern = ?, subject_contains = ?,
-         body_contains = ?, has_attachment = ?, label_id = ?, mark_read = ?, archive = ?,
-         skip_draft = ?, skip_notifications = ?,
-         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     SET mailbox_id = ?, name = ?, enabled = ?, conditions = ?, label_id = ?, mark_read = ?,
+         archive = ?, skip_draft = ?, skip_notifications = ?, forward_to = ?, forward_cc = ?,
+         forward_bcc = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
      WHERE id = ?`,
   )
     .bind(...ruleValues(input), id)
@@ -113,6 +112,17 @@ async function validate(env: Db, body: unknown): Promise<MailRuleInput> {
       .first();
     if (!label) throw new MailRuleError("That label doesn't belong to the chosen inbox", 400);
   }
+  const recipients = [...input.forward_to, ...input.forward_cc, ...input.forward_bcc];
+  if (recipients.length > 0) {
+    // Forwarding into the workspace would store the same email again, or loop.
+    const own = await env.DB.prepare(
+      `SELECT address FROM mailboxes
+       WHERE lower(address) IN (${recipients.map(() => "?").join(", ")}) LIMIT 1`,
+    )
+      .bind(...recipients.map((address) => address.toLowerCase()))
+      .first<{ address: string }>();
+    if (own) throw new MailRuleError(`${own.address} is one of this workspace's inboxes`, 400);
+  }
   return input;
 }
 
@@ -121,15 +131,15 @@ function ruleValues(input: MailRuleInput): unknown[] {
     input.mailbox_id,
     input.name,
     input.enabled ? 1 : 0,
-    input.from_pattern,
-    input.subject_contains,
-    input.body_contains,
-    input.has_attachment ? 1 : 0,
+    JSON.stringify(input.conditions),
     input.label_id,
     input.mark_read ? 1 : 0,
     input.archive ? 1 : 0,
     input.skip_draft ? 1 : 0,
     input.skip_notifications ? 1 : 0,
+    JSON.stringify(input.forward_to),
+    JSON.stringify(input.forward_cc),
+    JSON.stringify(input.forward_bcc),
   ];
 }
 
@@ -146,20 +156,36 @@ export async function matchingMailRules(
   )
     .bind(mailboxId)
     .all<MailRuleRow>();
-  return results.map(toMailRule).filter((rule) => mailRuleMatches(rule, message));
+  return results.map(toMailRule).filter((rule) => mailRuleMatches(rule.conditions, message));
+}
+
+export interface RuleForward {
+  ruleId: number;
+  to: string[];
+  cc: string[];
+  bcc: string[];
 }
 
 export interface AppliedMailRules {
   ruleIds: number[];
   skipDraft: boolean;
   skipNotifications: boolean;
+  /** One forward per matching rule that forwards; the caller sends them. */
+  forwards: RuleForward[];
 }
+
+export const NO_MAIL_RULES: AppliedMailRules = {
+  ruleIds: [],
+  skipDraft: false,
+  skipNotifications: false,
+  forwards: [],
+};
 
 /**
  * Evaluates the enabled Mail Rules for the Inbox `mailboxId` (and those for
  * all Inboxes) against a stored inbound Message, applies the Labels, read
  * and archive actions of every match to its Conversation, and records the
- * matches. The caller honours the returned draft and notification skips.
+ * matches. The caller honours the returned skips and sends the forwards.
  */
 export async function applyMailRules(
   env: Db,
@@ -167,7 +193,7 @@ export async function applyMailRules(
   now = new Date().toISOString(),
 ): Promise<AppliedMailRules> {
   const matched = await matchingMailRules(env, args.mailboxId, args.message);
-  if (matched.length === 0) return { ruleIds: [], skipDraft: false, skipNotifications: false };
+  if (matched.length === 0) return NO_MAIL_RULES;
 
   const actions = combineMailRuleActions(matched);
   const ruleIds = matched.map((rule) => rule.id);
@@ -199,5 +225,8 @@ export async function applyMailRules(
     ruleIds,
     skipDraft: actions.skip_draft,
     skipNotifications: actions.skip_notifications,
+    forwards: matched
+      .filter((rule) => rule.forward_to.length > 0)
+      .map((rule) => ({ ruleId: rule.id, to: rule.forward_to, cc: rule.forward_cc, bcc: rule.forward_bcc })),
   };
 }

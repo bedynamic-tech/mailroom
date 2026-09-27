@@ -1,4 +1,4 @@
-import PostalMime, { type Attachment, type Email } from "postal-mime";
+import PostalMime, { type Address, type Attachment, type Email } from "postal-mime";
 import { enqueueDraftRun } from "../agent/runs";
 import { splitQuotedTail } from "../../shared/quote";
 import { labelNewThread } from "./label";
@@ -6,8 +6,10 @@ import { recordSender } from "../contacts/contacts";
 import { notifyNewEmail } from "../notifications/push";
 import { notifyNewEmailByEmail } from "../notifications/email";
 import { matchBlockedSender } from "../spam/blocklist";
-import { applyMailRules, matchingMailRules, type AppliedMailRules } from "./mail-rules";
-import type { MailRuleSubject } from "../../shared/mail-rules";
+import { applyMailRules, matchingMailRules, NO_MAIL_RULES } from "./mail-rules";
+import type { MailRuleAddress, MailRuleSubject } from "../../shared/mail-rules";
+import { sendRuleForward, type ForwardedOriginal } from "./rule-forward";
+import { FORWARD_HEADER } from "./send";
 import {
   addressOf,
   addressesOf,
@@ -16,6 +18,7 @@ import {
   isAutoSubmitted,
   normalizeSubject,
   rawFingerprint,
+  replyRecipients,
 } from "./rules";
 
 export async function receiveEmail(
@@ -104,14 +107,39 @@ export async function receiveEmail(
     mailboxId: mailbox.id,
     threadId: stored.threadId,
     message: ruleSubject(parsed),
-  }).catch((error): AppliedMailRules => {
+  }).catch((error) => {
     // A broken rule must never bounce or lose mail that is already stored.
     console.error("Mail rules failed", {
       threadId: stored.threadId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return { ruleIds: [], skipDraft: false, skipNotifications: false };
+    return NO_MAIL_RULES;
   });
+
+  if (rules.forwards.length > 0) {
+    // A copy of one of our own forwards is never forwarded again, so two
+    // rules (or a rule and an outside auto-forward) can't loop.
+    if (hasHeader(parsed, FORWARD_HEADER)) {
+      console.log("Skipped forwarding an email a rule already forwarded", { threadId: stored.threadId });
+    } else {
+      const original = forwardedOriginal(parsed);
+      for (const forward of rules.forwards) {
+        ctx.waitUntil(
+          sendRuleForward(env, {
+            forward,
+            mailboxId: mailbox.id,
+            messageId: stored.messageId,
+            original,
+          }).catch((error) =>
+            console.error("Rule forward task failed", {
+              ruleId: forward.ruleId,
+              error: error instanceof Error ? error.message : String(error),
+            }),
+          ),
+        );
+      }
+    }
+  }
 
   if (sender && !isAutoSubmitted(parsed)) {
     ctx.waitUntil(
@@ -174,13 +202,49 @@ export async function receiveEmail(
 
 function ruleSubject(parsed: Email): MailRuleSubject {
   return {
-    fromAddress: addressOf(parsed.from),
-    fromName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
+    from: mailboxOf(parsed.from),
+    to: mailboxesOf(parsed.to),
+    cc: mailboxesOf(parsed.cc),
     subject: parsed.subject ?? "",
     body: parsed.text ?? htmlToText(parsed.html ?? ""),
-    // Inline resources such as signature logos are not attachments people sent.
-    attachmentCount: parsed.attachments.filter((item) => item.disposition !== "inline").length,
+    attachmentNames: sentAttachments(parsed).map((item) => item.filename ?? ""),
   };
+}
+
+// Inline resources such as signature logos are not attachments people sent.
+function sentAttachments(parsed: Email): Attachment[] {
+  return parsed.attachments.filter((item) => item.disposition !== "inline");
+}
+
+function forwardedOriginal(parsed: Email): ForwardedOriginal {
+  return {
+    from: mailboxOf(parsed.from),
+    replyTo: replyRecipients(parsed)[0] ?? null,
+    to: mailboxesOf(parsed.to),
+    cc: mailboxesOf(parsed.cc),
+    date: parsed.date ?? null,
+    subject: parsed.subject ?? "",
+    text: parsed.text ?? htmlToText(parsed.html ?? ""),
+    attachments: sentAttachments(parsed),
+  };
+}
+
+function mailboxOf(address: Address | undefined): MailRuleAddress {
+  return {
+    address: addressOf(address),
+    name: address && "name" in address && address.name ? address.name : null,
+  };
+}
+
+function mailboxesOf(addresses: Address[] | undefined): MailRuleAddress[] {
+  return (addresses ?? []).flatMap((entry) =>
+    "group" in entry && entry.group ? entry.group.map(mailboxOf) : [mailboxOf(entry)],
+  ).filter((entry) => entry.address);
+}
+
+function hasHeader(parsed: Email, name: string): boolean {
+  const key = name.toLowerCase();
+  return (parsed.headers ?? []).some((header) => header.key.toLowerCase() === key);
 }
 
 async function rejectIfBlocked(

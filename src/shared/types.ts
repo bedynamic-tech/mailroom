@@ -253,14 +253,47 @@ export interface BlockSenderResult {
   archived: number;
 }
 
-/** What a Mail Rule looks for. Every condition that is set must match. */
+export type MailRuleField =
+  | "from"
+  | "to"
+  | "cc"
+  | "subject"
+  | "body"
+  | "attachment_name"
+  | "has_attachment";
+
+export type MailRuleOperator =
+  | "contains"
+  | "not_contains"
+  | "is"
+  | "is_not"
+  | "starts_with"
+  | "ends_with"
+  /** The address is at this domain or one of its subdomains. */
+  | "domain_is"
+  /** Has attachment: at least one, or none. Inline images do not count. */
+  | "yes"
+  | "no";
+
+/** Whether every ("all") or at least one ("any") of a list of conditions must hold. */
+export type MailRuleMatch = "all" | "any";
+
+export interface MailRuleCondition {
+  field: MailRuleField;
+  operator: MailRuleOperator;
+  /** Empty for operators that take no value. */
+  value: string;
+}
+
+export interface MailRuleConditionGroup {
+  match: MailRuleMatch;
+  conditions: MailRuleCondition[];
+}
+
+/** What a Mail Rule looks for: conditions and one level of condition groups. */
 export interface MailRuleConditions {
-  /** An address, a domain (also covering subdomains), or text in the sender's name or address. */
-  from_pattern: string | null;
-  subject_contains: string | null;
-  body_contains: string | null;
-  /** Require at least one attachment; inline images do not count. */
-  has_attachment: boolean;
+  match: MailRuleMatch;
+  items: Array<MailRuleCondition | MailRuleConditionGroup>;
 }
 
 /** What a Mail Rule does to a matching inbound Message and its Conversation. */
@@ -273,13 +306,18 @@ export interface MailRuleActions {
   skip_draft: boolean;
   /** Send no browser or email notification for the Message. */
   skip_notifications: boolean;
+  /** Forward the Message from its Inbox; empty To means no forward. */
+  forward_to: string[];
+  forward_cc: string[];
+  forward_bcc: string[];
 }
 
-export interface MailRuleInput extends MailRuleConditions, MailRuleActions {
+export interface MailRuleInput extends MailRuleActions {
   /** The Inbox this rule applies to, or null for all Inboxes. */
   mailbox_id: number | null;
   name: string;
   enabled: boolean;
+  conditions: MailRuleConditions;
 }
 
 export interface MailRule extends MailRuleInput {
@@ -289,6 +327,10 @@ export interface MailRule extends MailRuleInput {
   /** How many inbound emails this rule has matched. */
   match_count: number;
   last_matched_at: string | null;
+  /** Forwards this rule has sent. */
+  forward_count: number;
+  /** The provider error of this rule's latest forward, when that forward failed. */
+  last_forward_error: string | null;
   created_at: string;
   updated_at: string;
 }

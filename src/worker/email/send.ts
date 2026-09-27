@@ -29,7 +29,14 @@ export interface OutgoingEmail {
   autoSubmitted?: "auto-replied" | "auto-generated";
   /** Durable send-attempt id for tracing an ambiguous send in provider logs. */
   attemptId?: string;
+  /** Where recipients' replies go instead of the From address. */
+  replyTo?: string;
+  /** The Mail Rule that forwarded this email; inbound copies carrying it are never forwarded again. */
+  forwardedByRule?: number;
 }
+
+/** Marks email a Mail Rule forwarded, so a copy arriving back is not forwarded again. */
+export const FORWARD_HEADER = "X-Mailroom-Forward";
 
 export interface SendEmailEnv {
   EMAIL: {
@@ -43,6 +50,7 @@ export interface SendEmailEnv {
       html?: string;
       attachments?: OutgoingAttachment[];
       headers?: Record<string, string>;
+      replyTo?: string;
     }): Promise<{ messageId: string }>;
   };
 }
@@ -61,7 +69,9 @@ export async function sendEmail(env: SendEmailEnv, mail: OutgoingEmail): Promise
   if (mail.references?.length) headers["References"] = mail.references.join(" ");
   if (mail.autoSubmitted) headers["Auto-Submitted"] = mail.autoSubmitted;
   if (mail.attemptId) headers["X-Mailroom-Attempt"] = mail.attemptId;
+  if (mail.forwardedByRule !== undefined) headers[FORWARD_HEADER] = String(mail.forwardedByRule);
 
+  if (!env.EMAIL) throw new Error("Email sending isn't configured for this deployment");
   const result = await env.EMAIL.send({
     from: mail.from.name
       ? { email: mail.from.address, name: mail.from.name }
@@ -72,6 +82,7 @@ export async function sendEmail(env: SendEmailEnv, mail: OutgoingEmail): Promise
     subject: mail.subject,
     text: mail.text,
     ...(mail.attachments?.length ? { attachments: mail.attachments } : {}),
+    ...(mail.replyTo ? { replyTo: mail.replyTo } : {}),
     headers,
   });
 
