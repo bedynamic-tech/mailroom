@@ -2,8 +2,15 @@ import { Hono } from "hono";
 import {
   normalizeContactAddress,
   parseContactFields,
+  type ContactFields,
 } from "../contacts/contacts.ts";
-import type { Contact, ContactConversation, ContactDetail } from "../../shared/types.ts";
+import { MAX_CONTACT_IMPORT_BATCH } from "../../shared/contacts.ts";
+import type {
+  Contact,
+  ContactConversation,
+  ContactDetail,
+  ContactImportResult,
+} from "../../shared/types.ts";
 
 export const CONTACT_PAGE_SIZE = 100;
 const CONTACT_CONVERSATION_LIMIT = 20;
@@ -97,6 +104,89 @@ contactsApi.post("/", async (c) => {
     .first<Contact>();
   return c.json(contact, 201);
 });
+
+/**
+ * Adds or updates many Contacts at once. New addresses become Contacts;
+ * for existing ones, imported details fill empty fields, or replace them
+ * when `overwrite` is set. Blank imported values never clear a field.
+ */
+contactsApi.post("/import", async (c) => {
+  const body = await readBody(c.req.raw);
+  const entries = body?.contacts;
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return c.json({ error: "Send the contacts to import" }, 400);
+  }
+  if (entries.length > MAX_CONTACT_IMPORT_BATCH) {
+    return c.json({ error: `Import at most ${MAX_CONTACT_IMPORT_BATCH} contacts per request` }, 400);
+  }
+  const overwrite = body?.overwrite === true ? 1 : 0;
+
+  const { results: inboxes } = await c.env.DB.prepare("SELECT address FROM mailboxes")
+    .all<{ address: string }>();
+  const inboxAddresses = new Set(inboxes.map((inbox) => inbox.address.toLowerCase()));
+
+  const result: ContactImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
+  const rows = new Map<string, ReturnType<typeof importRow>>();
+  const skip = (address: string, error: string) => {
+    result.skipped++;
+    if (result.errors.length < 20) result.errors.push({ address, error });
+  };
+  for (const entry of entries) {
+    const record = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {};
+    const address = normalizeContactAddress(record.address);
+    const label = typeof record.address === "string" ? record.address.slice(0, 254) : "";
+    if (!address) skip(label, "Not a valid email address");
+    else if (inboxAddresses.has(address)) skip(address, "One of this workspace's inboxes");
+    else if (rows.has(address)) skip(address, "Listed more than once");
+    else {
+      const parsed = parseContactFields(record);
+      if ("error" in parsed) skip(address, parsed.error);
+      else rows.set(address, importRow(address, parsed.fields));
+    }
+  }
+
+  const addresses = [...rows.keys()];
+  for (let i = 0; i < addresses.length; i += 90) {
+    const chunk = addresses.slice(i, i + 90);
+    const existing = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM contacts WHERE address IN (${chunk.map(() => "?").join(", ")})`,
+    )
+      .bind(...chunk)
+      .first<{ count: number }>();
+    result.updated += Number(existing?.count ?? 0);
+  }
+  result.created = addresses.length - result.updated;
+
+  const statements = [...rows.values()].map((row) =>
+    c.env.DB.prepare(
+      `INSERT INTO contacts (address, name, company, phone, notes, last_seen_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, (
+         SELECT MAX(created_at) FROM messages
+         WHERE from_address = ?1 COLLATE NOCASE AND direction = 'inbound'
+       ))
+       ON CONFLICT(address) DO UPDATE SET
+         name = CASE WHEN ?6 THEN COALESCE(excluded.name, name) ELSE COALESCE(name, excluded.name) END,
+         company = CASE WHEN ?6 THEN COALESCE(excluded.company, company) ELSE COALESCE(company, excluded.company) END,
+         phone = CASE WHEN ?6 THEN COALESCE(excluded.phone, phone) ELSE COALESCE(phone, excluded.phone) END,
+         notes = CASE WHEN ?6 THEN COALESCE(excluded.notes, notes) ELSE COALESCE(notes, excluded.notes) END,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+    ).bind(...row, overwrite),
+  );
+  for (let i = 0; i < statements.length; i += 100) {
+    await c.env.DB.batch(statements.slice(i, i + 100));
+  }
+  return c.json(result);
+});
+
+function importRow(address: string, fields: ContactFields) {
+  return [
+    address,
+    fields.name ?? null,
+    fields.company ?? null,
+    fields.phone ?? null,
+    fields.notes ?? null,
+  ] as const;
+}
 
 contactsApi.patch("/:id", async (c) => {
   const id = parseId(c.req.param("id"));

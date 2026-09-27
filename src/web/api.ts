@@ -3,6 +3,7 @@ import type {
   ComposeAttemptResult,
   Contact,
   ContactDetail,
+  ContactImportResult,
   ContactInput,
   Domain,
   EmailNotificationTemplate,
@@ -344,3 +345,10 @@ export const updateContact = (id: number, input: Omit<ContactInput, "address">) 
 
 export const deleteContact = (id: number) =>
   request<{ ok: true }>(`/contacts/${id}`, { method: "DELETE" });
+
+export const importContacts = (contacts: ContactInput[], overwrite: boolean) =>
+  request<ContactImportResult>("/contacts/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contacts, overwrite }),
+  });

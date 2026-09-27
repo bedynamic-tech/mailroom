@@ -221,3 +221,12 @@ export interface ContactDetail {
   conversation_count: number;
   conversations: ContactConversation[];
 }
+
+export interface ContactImportResult {
+  created: number;
+  /** Existing Contacts the import matched by address. */
+  updated: number;
+  skipped: number;
+  /** The first few skipped entries and why. */
+  errors: Array<{ address: string; error: string }>;
+}

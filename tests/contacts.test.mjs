@@ -171,3 +171,50 @@ test("contacts API creates, lists, searches, updates and deletes contacts", asyn
   assert.equal((await f.call("GET", `/${created.body.id}`)).status, 404);
   assert.equal((await f.call("DELETE", `/${created.body.id}`)).status, 404);
 });
+
+test("contacts import creates new contacts, fills or overwrites existing ones and reports skips", async (t) => {
+  const f = fixture(t);
+  inbound(f.db, { thread: 3, from: "new@example.org", at: "2026-04-01T00:00:00.000Z" });
+  f.db.prepare("INSERT INTO contacts (address, name, company) VALUES ('old@example.org', 'Kept Name', NULL)").run();
+
+  const first = await f.call("POST", "/import", {
+    contacts: [
+      { address: "New@Example.org", name: "New Person", notes: "From import" },
+      { address: "old@example.org", name: "Imported Name", company: "Imported Co" },
+      { address: "new@example.org", name: "Again" },
+      { address: "support@example.com", name: "Our inbox" },
+      { address: "nope", name: "Bad" },
+      { address: "long@example.org", name: "x".repeat(200) },
+    ],
+  });
+  assert.equal(first.status, 200);
+  assert.deepEqual(
+    { created: first.body.created, updated: first.body.updated, skipped: first.body.skipped },
+    { created: 1, updated: 1, skipped: 4 },
+  );
+  assert.deepEqual(first.body.errors.map((e) => e.error), [
+    "Listed more than once",
+    "One of this workspace's inboxes",
+    "Not a valid email address",
+    "name is too long",
+  ]);
+  const row = (address) => ({ ...f.db.prepare("SELECT name, company, notes, last_seen_at FROM contacts WHERE address = ?").get(address) });
+  assert.deepEqual(row("new@example.org"), {
+    name: "New Person", company: null, notes: "From import", last_seen_at: "2026-04-01T00:00:00.000Z",
+  });
+  // Without overwrite, existing details stay and only empty fields are filled.
+  assert.deepEqual(row("old@example.org"), { name: "Kept Name", company: "Imported Co", notes: null, last_seen_at: null });
+
+  const second = await f.call("POST", "/import", {
+    overwrite: true,
+    contacts: [{ address: "old@example.org", name: "Imported Name", company: "" }],
+  });
+  assert.equal(second.body.updated, 1);
+  // Overwrite replaces details, but a blank imported value never clears one.
+  assert.deepEqual(row("old@example.org"), { name: "Imported Name", company: "Imported Co", notes: null, last_seen_at: null });
+
+  assert.equal((await f.call("POST", "/import", { contacts: [] })).status, 400);
+  assert.equal((await f.call("POST", "/import", {
+    contacts: Array.from({ length: 501 }, (_, i) => ({ address: `p${i}@example.org` })),
+  })).status, 400);
+});

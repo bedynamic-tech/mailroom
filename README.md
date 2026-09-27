@@ -15,7 +15,7 @@ Runs entirely on Cloudflare: Workers, Email Routing, D1, R2, and Web Push.
 - **Compose and reply** — send new emails or reply to conversations, with attachments.
 - **AI reply drafts** — enable per-inbox drafting with custom instructions and playbooks; review and approve before sending.
 - **Automatic labels** — organize incoming mail with natural-language labeling rules.
-- **Contacts** — keep names, companies, phone numbers and notes for the people who email you, see their conversations, and pick them from autocomplete in To/Cc/Bcc. Named senders can be added automatically.
+- **Contacts** — keep names, companies, phone numbers and notes for the people who email you, see their conversations, and pick them from autocomplete in To/Cc/Bcc. Named senders can be added automatically, and contacts can be imported from CSV or vCard files.
 - **Search and triage** — search message content, filter conversations, mark read or archive in bulk, and browse or restore archived conversations.
 - **MCP integration** — let external AI agents read conversations, compose emails, and send replies through scoped OAuth access.
 - **Browser notifications** — opt in to Web Push alerts for new messages.
@@ -88,6 +88,9 @@ new inbound Message ──► Web Push ──► subscribed browsers
   automated mail and the workspace's own Inboxes are skipped. Existing Contacts
   track when mail last arrived either way, and names edited by people are never
   overwritten. Recipient fields suggest matching Contacts as you type.
+  Settings > Contacts also imports CSV files (Google Contacts, Outlook or any
+  file with an Email column) and vCard files; imported details fill empty
+  fields unless "Replace details of existing contacts" is checked.
 
 ## Setup
 

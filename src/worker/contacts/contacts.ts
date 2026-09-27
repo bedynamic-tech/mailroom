@@ -1,11 +1,7 @@
 import { isEmailAddress } from "../../shared/recipients.ts";
+import { CONTACT_FIELD_LIMITS } from "../../shared/contacts.ts";
 
-export const CONTACT_FIELD_LIMITS = {
-  name: 120,
-  company: 120,
-  phone: 40,
-  notes: 4000,
-} as const;
+export { CONTACT_FIELD_LIMITS };
 
 export type ContactField = keyof typeof CONTACT_FIELD_LIMITS;
 
