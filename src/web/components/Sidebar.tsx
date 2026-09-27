@@ -2,25 +2,37 @@ import type { Mailbox } from "../../shared/types";
 import { useRef, useState } from "react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
-import { ArchiveIcon, ContactsIcon, InboxIcon, SettingsIcon, SidebarIcon, XIcon } from "./Icons";
+import {
+  ArchiveIcon,
+  ChevronDownIcon,
+  ContactsIcon,
+  InboxIcon,
+  SettingsIcon,
+  SidebarIcon,
+  XIcon,
+} from "./Icons";
 
 const COLLAPSED_KEY = "mailroom.sidebarCollapsed";
+const INBOXES_COLLAPSED_KEY = "mailroom.sidebarInboxesCollapsed";
 
-function readCollapsed() {
+function readFlag(key: string) {
   try {
-    return window.localStorage.getItem(COLLAPSED_KEY) === "1";
+    return window.localStorage.getItem(key) === "1";
   } catch {
     return false;
   }
 }
 
-function writeCollapsed(collapsed: boolean) {
+function writeFlag(key: string, value: boolean) {
   try {
-    window.localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
+    window.localStorage.setItem(key, value ? "1" : "0");
   } catch {
     // Storage can be unavailable (private mode, blocked site data).
   }
 }
+
+const readCollapsed = () => readFlag(COLLAPSED_KEY);
+const writeCollapsed = (collapsed: boolean) => writeFlag(COLLAPSED_KEY, collapsed);
 
 type SidebarNavProps = {
   mailboxes: Mailbox[];
@@ -139,6 +151,14 @@ function SidebarContent(
 ) {
   const totalUnread = props.mailboxes.reduce((sum, mailbox) => sum + mailbox.unread_count, 0);
   const { compact, onPeek: peek } = props;
+  const [inboxesCollapsed, setInboxesCollapsed] = useState(() => readFlag(INBOXES_COLLAPSED_KEY));
+  const showInboxToggle = !compact && props.mailboxes.length > 0;
+
+  const toggleInboxes = () => {
+    const next = !inboxesCollapsed;
+    setInboxesCollapsed(next);
+    writeFlag(INBOXES_COLLAPSED_KEY, next);
+  };
 
   return (
     <>
@@ -162,27 +182,61 @@ function SidebarContent(
 
       <nav aria-label="Mail" className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2 pt-1 pb-4">
         <div className="space-y-px">
-          <SidebarItem
-            label="All inboxes"
-            icon={<InboxIcon className="h-4 w-4" />}
-            unread={totalUnread}
-            compact={compact}
-            active={props.activeView === "inbox" && props.selected === null}
-            onClick={() => props.onSelect(null)}
-            onPeek={peek}
-          />
-          {!compact && props.mailboxes.length > 0 && (
-            <div role="group" aria-label="Inboxes" className="ml-[18px] space-y-px border-l pl-[7px]">
-              {props.mailboxes.map((mailbox) => (
-                <SidebarItem
-                  key={mailbox.id}
-                  label={mailbox.address}
-                  unread={mailbox.unread_count}
-                  compact={false}
-                  active={props.activeView === "inbox" && props.selected === mailbox.id}
-                  onClick={() => props.onSelect(mailbox.id)}
+          <div className="relative">
+            <SidebarItem
+              label="All inboxes"
+              icon={<InboxIcon className="h-4 w-4" />}
+              unread={totalUnread}
+              compact={compact}
+              active={props.activeView === "inbox" && props.selected === null}
+              onClick={() => props.onSelect(null)}
+              onPeek={peek}
+              trailingSpace={showInboxToggle}
+            />
+            {showInboxToggle && (
+              <button
+                type="button"
+                onClick={toggleInboxes}
+                title={inboxesCollapsed ? "Show inboxes" : "Hide inboxes"}
+                aria-label={inboxesCollapsed ? "Show inboxes" : "Hide inboxes"}
+                aria-expanded={!inboxesCollapsed}
+                aria-controls="sidebar-inboxes"
+                className="absolute inset-y-0 right-0 my-auto flex h-7 w-7 touch:h-9 touch:w-9 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <ChevronDownIcon
+                  className={cn(
+                    "h-4 w-4 transition-transform duration-200 ease-out",
+                    inboxesCollapsed && "-rotate-90",
+                  )}
                 />
-              ))}
+              </button>
+            )}
+          </div>
+          {showInboxToggle && (
+            <div
+              className={cn(
+                "grid transition-[grid-template-rows] duration-200 ease-out",
+                inboxesCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
+              )}
+            >
+              <div
+                id="sidebar-inboxes"
+                role="group"
+                aria-label="Inboxes"
+                inert={inboxesCollapsed}
+                className="ml-[18px] min-h-0 space-y-px overflow-hidden border-l pl-[7px]"
+              >
+                {props.mailboxes.map((mailbox) => (
+                  <SidebarItem
+                    key={mailbox.id}
+                    label={mailbox.address}
+                    unread={mailbox.unread_count}
+                    compact={false}
+                    active={props.activeView === "inbox" && props.selected === mailbox.id}
+                    onClick={() => props.onSelect(mailbox.id)}
+                  />
+                ))}
+              </div>
             </div>
           )}
           <SidebarItem
@@ -245,6 +299,8 @@ function SidebarItem(props: {
   active: boolean;
   onClick: () => void;
   onPeek?: () => void;
+  /** Leaves room on the right for a control overlaid on the row. */
+  trailingSpace?: boolean;
 }) {
   return (
     <button
@@ -259,6 +315,7 @@ function SidebarItem(props: {
         props.active
           ? "bg-sidebar-accent font-medium text-foreground"
           : "text-foreground/80 hover:bg-sidebar-accent/60 hover:text-foreground",
+        props.trailingSpace && "pr-8 touch:pr-10",
       )}
     >
       {props.icon && (
