@@ -1,0 +1,9 @@
+From: Alice Customer <customer@example.com>
+To: support@yourdomain.com
+Subject: Test inbound email
+Message-ID: <test-manual-001@example.com>
+Date: Thu, 20 Aug 2026 12:00:00 +0000
+Content-Type: text/plain; charset=utf-8
+
+Hello, this is a test email to verify the inbound pipeline.
+Can you check my order status?

@@ -1,0 +1,11 @@
+From: Support Form <forms@example.com>
+Reply-To: Real Customer <reply-customer@example.com>
+To: support@yourdomain.com
+Subject: Re: Screenshot attached
+Message-ID: <test-reopen-001@example.com>
+In-Reply-To: <test-attachment-001@example.com>
+References: <test-attachment-001@example.com>
+Date: Sat, 22 Aug 2026 12:05:00 +0000
+Content-Type: text/plain; charset=utf-8
+
+Here is one more detail: it happens immediately after login.

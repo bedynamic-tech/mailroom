@@ -1,0 +1,8 @@
+# No secrets are required for the initial deployment or local development.
+# Optional browser notifications: copy to .dev.vars, uncomment the lines below,
+# and fill in a matching key pair from `npm run vapid:generate`.
+# For production, add these as Worker secrets; see docs/deployment.md.
+# Never commit real values.
+# VAPID_PUBLIC_KEY=
+# VAPID_PRIVATE_JWK=
+# VAPID_SUBJECT=mailto:admin@example.com

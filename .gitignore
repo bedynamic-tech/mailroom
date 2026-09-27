@@ -1,0 +1,14 @@
+node_modules/
+.npm-cache/
+dist/
+.wrangler/
+.wrangler-mcp-build/
+.dev.vars
+.DS_Store
+*.log
+*.tsbuildinfo
+.lody/
+
+# Legacy config of the former separate MCP Worker. It holds owner-specific
+# values; keep it out of Git until the old Worker is deleted.
+wrangler.mcp.jsonc

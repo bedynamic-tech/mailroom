@@ -1,0 +1,21 @@
+From: Support Form <forms@example.com>
+Reply-To: Real Customer <reply-customer@example.com>
+To: support@yourdomain.com
+Subject: Screenshot attached
+Message-ID: <test-attachment-001@example.com>
+Date: Sat, 22 Aug 2026 12:00:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mailroom-test"
+
+--mailroom-test
+Content-Type: text/plain; charset=utf-8
+
+The page shows an error. I attached the console output.
+
+--mailroom-test
+Content-Type: text/plain; name="console-output.txt"
+Content-Disposition: attachment; filename="console-output.txt"
+Content-Transfer-Encoding: base64
+
+RXJyb3I6IFJlcXVlc3QgZmFpbGVkIHdpdGggc3RhdHVzIDUwMAo=
+--mailroom-test--

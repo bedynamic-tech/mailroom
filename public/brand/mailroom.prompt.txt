@@ -1,0 +1,8 @@
+Generated with the built-in image_gen tool. Resized to 256 × 256 PNG for the sidebar, preserving transparency.
+
+Use case: logo-brand
+Asset type: standalone brand symbol for Mailroom, an AI-powered email inbox, displayed next to the existing product name at 28px square.
+Primary request: Design a distinctive, polished minimalist logo merging an abstract capital A with the folded geometry of an inbox or envelope. One compact unified silhouette, an upward folded chevron over a subtly cupped lower tray, with clever generous negative space. Confident, calm, precise, contemporary productivity software identity.
+Style/medium: crisp flat vector-like graphic rendered as PNG; bold filled geometry, subtly softened corners, balanced optical weight. Monochrome near-black matching a restrained black-and-white interface.
+Composition/framing: one centered symbol on a square transparent canvas, symbol occupies about 88% of the canvas with even tight margins, strong small-size readability.
+Constraints: genuinely transparent background; standalone symbol only, no wordmark, no text, no additional letter i, no enclosing badge or square, no sparkle stars, no robot face, no gradients, no shadows, no 3D, no fine outlines, no mockup, no watermark.

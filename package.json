@@ -1,0 +1,82 @@
+{
+  "name": "mailroom",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "tsc -b",
+    "test": "node --test --experimental-strip-types tests/*.test.mjs",
+    "deploy": "npm run build && npm run db:migrate && node scripts/deploy.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local --config wrangler.dev.jsonc",
+    "db:migrate": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc",
+    "db:seed:local": "wrangler d1 execute DB --local --config wrangler.dev.jsonc --file=./scripts/seed.sql",
+    "email:test": "curl -X POST 'http://localhost:5173/cdn-cgi/handler/email?from=customer@example.com&to=support@yourdomain.com' -H 'Content-Type: message/rfc822' --data-binary @./scripts/test-email.eml",
+    "email:test:attachment": "curl -X POST 'http://localhost:5173/cdn-cgi/handler/email?from=forms@example.com&to=support@yourdomain.com' -H 'Content-Type: message/rfc822' --data-binary @./scripts/test-email-attachment.eml",
+    "email:test:reopen": "curl -X POST 'http://localhost:5173/cdn-cgi/handler/email?from=forms@example.com&to=support@yourdomain.com' -H 'Content-Type: message/rfc822' --data-binary @./scripts/test-email-reopen.eml",
+    "vapid:generate": "pushforge vapid",
+    "cf-typegen": "wrangler types"
+  },
+  "cloudflare": {
+    "bindings": {
+      "DB": {
+        "description": "Stores inboxes, conversations, messages and settings. Choose a new database for this instance; migrations run automatically during deployment."
+      },
+      "RAW": {
+        "description": "Private storage for original emails and attachments. Requires R2 to be enabled on your Cloudflare account."
+      },
+      "AI": {
+        "description": "Workers AI generates drafts and classifies inbound email. Usage is billed to your Cloudflare account."
+      },
+      "EMAIL": {
+        "description": "Outbound email. Enable Email Sending and onboard your sender domain after deployment; arbitrary recipients require Workers Paid."
+      },
+      "DRAFT_QUEUE": {
+        "description": "Runs AI drafts asynchronously, with automatic retries. Use a queue dedicated to this instance."
+      },
+      "DRAFT_DLQ": {
+        "description": "Keeps failed draft jobs after retries are exhausted. Use a separate queue dedicated to this instance."
+      },
+      "OAUTH_KV": {
+        "description": "Stores OAuth clients and tokens for the built-in MCP server at `/mcp`. Use a namespace dedicated to this instance."
+      }
+    }
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "0.10.3",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "@pushforge/builder": "^2.0.5",
+    "@tanstack/react-query": "^5.59.0",
+    "agents": "0.22.0",
+    "ai": "^7.0.70",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "hono": "^4.6.0",
+    "jose": "^6.2.10",
+    "lucide-react": "^1.33.0",
+    "postal-mime": "^2.3.0",
+    "radix-ui": "^1.6.7",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router": "^7.18.2",
+    "shadcn": "^4.18.0",
+    "tailwind-merge": "^3.6.0",
+    "tw-animate-css": "^1.4.0",
+    "workers-ai-provider": "^4.0.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.0.0",
+    "@cloudflare/workers-types": "^5.20260815.1",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0",
+    "wrangler": "4.124.0"
+  }
+}

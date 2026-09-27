@@ -1,0 +1,56 @@
+// Local-dev-only config: no `ai` / `send_email` bindings, because both force a
+// remote proxy session (blocked by Cloudflare Access on this account) and
+// neither is needed for UI iteration. Deploys use wrangler.jsonc.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mailroom",
+  "main": "src/worker/dev.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api/*",
+      "/mcp",
+      "/mcp/*",
+      "/.well-known/*",
+      "/authorize",
+      "/cdn-cgi/handler/email"
+    ]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "local-oauth"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mailroom",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "RAW",
+      "bucket_name": "mailroom-raw"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "DRAFT_QUEUE",
+        "queue": "mailroom-drafts-dev"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "mailroom-drafts-dev",
+        "max_batch_size": 5,
+        "max_batch_timeout": 1,
+        "max_retries": 1
+      }
+    ]
+  }
+}
