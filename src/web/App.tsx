@@ -264,7 +264,6 @@ function Workspace(props: {
         onOpenArchive={() => navigate("/archive")}
         onOpenContacts={() => navigate("/contacts")}
         onOpenSettings={openSettings}
-        onCompose={() => openCompose(selectedMailbox)}
       />
 
       {props.view === "contacts" ? (

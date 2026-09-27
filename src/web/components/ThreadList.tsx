@@ -202,6 +202,15 @@ export function ThreadList(props: {
               <SettingsIcon className="h-4 w-4" />
             </Button>
           )}
+          <Button
+            size="icon"
+            onClick={props.onCompose}
+            aria-label="Compose new message"
+            title="Compose"
+            className="hidden shrink-0 rounded-lg shadow-sm shadow-black/15 lg:inline-flex"
+          >
+            <SquarePen className="h-4 w-4" />
+          </Button>
 
           <div className="flex min-w-0 flex-1 items-center gap-1 lg:hidden">
             <Select
