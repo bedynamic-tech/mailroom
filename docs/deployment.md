@@ -28,7 +28,7 @@ subject to Cloudflare's quotas and billing. This is not a promise of free hostin
 
 ## 1. Deploy the web app
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/wong2/cf-mailroom)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bedynamic-tech/mailroom)
 
 1. Sign in to Cloudflare and connect GitHub when prompted. The source repository
    must be public for other users to use this button.
@@ -232,7 +232,7 @@ The button created your own repository, so upstream fixes do not arrive
 automatically. To update:
 
 ```sh
-git remote add upstream https://github.com/wong2/cf-mailroom.git
+git remote add upstream https://github.com/bedynamic-tech/mailroom.git
 git fetch upstream
 git merge upstream/main
 git push

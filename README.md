@@ -26,7 +26,7 @@ Runs entirely on Cloudflare: Workers, Email Routing, D1, R2, and Web Push.
 
 ## Deploy
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/wong2/cf-mailroom)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bedynamic-tech/mailroom)
 
 Deploy Mailroom into your own Cloudflare account, with storage and drafting
 queues provisioned for you and database migrations applied automatically.
