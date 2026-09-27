@@ -248,7 +248,7 @@ export function ThreadList(props: {
               title="Settings"
               className="-mr-1.5 shrink-0 text-muted-foreground hover:text-foreground"
             >
-              <SettingsIcon className="h-[18px] w-[18px]" />
+              <SettingsIcon className="h-5 w-5" />
             </Button>
           </div>
         </div>
