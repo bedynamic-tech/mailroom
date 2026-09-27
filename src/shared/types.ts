@@ -124,6 +124,9 @@ export interface Message {
   from_address: string;
   from_name: string | null;
   to_addresses: string;
+  cc_addresses: string;
+  /** Only populated for outbound Messages sent from Mailroom. */
+  bcc_addresses: string;
   reply_to_addresses: string;
   subject: string;
   text_body: string | null;

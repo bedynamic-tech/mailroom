@@ -74,6 +74,8 @@ class FakeDb {
         sent_by: args[7],
         actor_id: args[8],
         oauth_client_id: args[9],
+        cc_addresses: args[10],
+        bcc_addresses: args[11],
         message_id: null,
         error: null,
       });
@@ -329,4 +331,53 @@ test("an attempt id cannot be reused with different attachments", async () => {
     (error) => error instanceof ReplyIntentError && error.status === 409,
   );
   assert.equal(fixture.sends(), 1);
+});
+
+test("a Reply Attempt sends Cc and Bcc copies and keeps them bound to the attempt", async () => {
+  const fixture = makeEnv();
+  const intent = {
+    attemptId: "attempt-cc",
+    threadId: 1,
+    text: "Looping in the team",
+    cc: ["Team@Example.COM", "customer@example.com", "team@example.com"],
+    bcc: ["audit@example.com", "team@example.com"],
+  };
+
+  const first = await sendReplyAttempt(fixture.env, intent);
+  assert.equal(first.status, "sent");
+  const [sent] = fixture.sent();
+  assert.deepEqual(sent.to, ["customer@example.com"]);
+  assert.deepEqual(sent.cc, ["Team@example.com"]);
+  assert.deepEqual(sent.bcc, ["audit@example.com"]);
+  const stored = fixture.env.DB.attempts.get("attempt-cc");
+  assert.equal(stored.cc_addresses, JSON.stringify(["Team@example.com"]));
+  assert.equal(stored.bcc_addresses, JSON.stringify(["audit@example.com"]));
+
+  assert.deepEqual(await sendReplyAttempt(fixture.env, intent), first);
+  await assert.rejects(
+    sendReplyAttempt(fixture.env, { ...intent, bcc: [] }),
+    (error) => error instanceof ReplyIntentError && error.status === 409,
+  );
+  assert.equal(fixture.sends(), 1);
+});
+
+test("a Reply Attempt without copies omits Cc and Bcc from the provider request", async () => {
+  const fixture = makeEnv();
+  await sendReplyAttempt(fixture.env, { attemptId: "attempt-no-cc", threadId: 1, text: "Hi" });
+  assert.equal("cc" in fixture.sent()[0], false);
+  assert.equal("bcc" in fixture.sent()[0], false);
+});
+
+test("a Reply Attempt rejects too many combined recipients before sending", async () => {
+  const fixture = makeEnv();
+  await assert.rejects(
+    sendReplyAttempt(fixture.env, {
+      attemptId: "attempt-many",
+      threadId: 1,
+      text: "Hi",
+      cc: Array.from({ length: 50 }, (_, index) => `person${index}@example.com`),
+    }),
+    (error) => error instanceof ReplyIntentError && error.status === 400,
+  );
+  assert.equal(fixture.sends(), 0);
 });

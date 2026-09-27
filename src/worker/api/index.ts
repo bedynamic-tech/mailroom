@@ -1,6 +1,8 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { requireSameOrigin } from "./csrf.ts";
-import { composeApi } from "./compose.ts";
+import { composeApi, copyAddresses } from "./compose.ts";
+import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
 import { enqueueDraftRun } from "../agent/runs";
 import {
   AttachmentInputError,
@@ -856,6 +858,11 @@ api.post("/threads/:id/unarchive", async (c) => {
   return c.json({ ok: true });
 });
 
+const replyCopies = z.object({
+  cc: z.array(z.email().max(254)).max(MAX_RECIPIENTS_PER_MESSAGE),
+  bcc: z.array(z.email().max(254)).max(MAX_RECIPIENTS_PER_MESSAGE),
+});
+
 api.post("/threads/:id/reply", async (c) => {
   const threadId = parsePositiveId(c.req.param("id"));
   if (threadId === null) return c.json({ error: "Invalid conversation" }, 400);
@@ -863,6 +870,8 @@ api.post("/threads/:id/reply", async (c) => {
   let text = "";
   let draftId: number | undefined;
   let attemptId = "";
+  let cc: unknown[] = [];
+  let bcc: unknown[] = [];
   const attachments: OutboundAttachmentInput[] = [];
   if ((c.req.header("content-type") ?? "").includes("multipart/form-data")) {
     const form = await c.req.formData();
@@ -871,6 +880,8 @@ api.post("/threads/:id/reply", async (c) => {
     const formAttempt = form.get("attempt_id");
     text = typeof formText === "string" ? formText : "";
     attemptId = typeof formAttempt === "string" ? formAttempt : "";
+    cc = copyAddresses(form, "cc");
+    bcc = copyAddresses(form, "bcc");
     if (formDraft !== null && formDraft !== "") {
       const parsed = Number(formDraft);
       draftId = Number.isInteger(parsed) ? parsed : Number.NaN;
@@ -890,10 +901,14 @@ api.post("/threads/:id/reply", async (c) => {
       text?: string;
       draft_id?: number;
       attempt_id?: string;
+      cc?: unknown[];
+      bcc?: unknown[];
     }>();
     text = body.text ?? "";
     draftId = body.draft_id;
     attemptId = body.attempt_id ?? "";
+    cc = Array.isArray(body.cc) ? body.cc : [];
+    bcc = Array.isArray(body.bcc) ? body.bcc : [];
   }
 
   if (!text.trim() && attachments.length === 0) {
@@ -905,12 +920,22 @@ api.post("/threads/:id/reply", async (c) => {
   if (draftId !== undefined && (!Number.isInteger(draftId) || draftId <= 0)) {
     return c.json({ error: "invalid draft_id" }, 400);
   }
+  const copies = replyCopies.safeParse({ cc, bcc });
+  if (!copies.success) {
+    const field = copies.error.issues[0]?.path[0] === "bcc" ? "Bcc" : "Cc";
+    return c.json(
+      { error: `Enter valid ${field} email addresses, up to ${MAX_RECIPIENTS_PER_MESSAGE} recipients` },
+      400,
+    );
+  }
 
   try {
     const result = await sendReplyAttempt(c.env, {
       attemptId,
       threadId,
       text,
+      cc: copies.data.cc,
+      bcc: copies.data.bcc,
       attachments,
       draftId,
     });

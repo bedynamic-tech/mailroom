@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   archiveThread,
   createDraft,
   discardDraft,
+  fetchMailboxes,
   fetchThread,
   markRead,
   retryDraftRun,
@@ -11,6 +12,8 @@ import {
   unarchiveThread,
 } from "../api";
 import type { Draft, Message } from "../../shared/types";
+import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits";
+import { replyAllRecipients } from "../../shared/recipients";
 import {
   deriveAgentDraftStatus,
   type AgentDraftStatus,
@@ -33,6 +36,7 @@ import {
   XIcon,
 } from "./Icons";
 import { LinkifiedText } from "./LinkifiedText";
+import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
 
 export function ThreadView(props: {
   threadId: number;
@@ -43,6 +47,11 @@ export function ThreadView(props: {
   const queryClient = useQueryClient();
   const [replyText, setReplyText] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [replyCc, setReplyCc] = useState<string[]>([]);
+  const [replyBcc, setReplyBcc] = useState<string[]>([]);
+  // Cc/Bcc rows stay collapsed unless they hold an address or are being filled in.
+  const [addingCc, setAddingCc] = useState(false);
+  const [addingBcc, setAddingBcc] = useState(false);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
   const [failedAttemptKey, setFailedAttemptKey] = useState<string | null>(null);
   const [usedDraftId, setUsedDraftId] = useState<number | null>(null);
@@ -50,7 +59,14 @@ export function ThreadView(props: {
   const markedRead = useRef<number | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const ccInputRef = useRef<HTMLInputElement>(null);
+  const bccInputRef = useRef<HTMLInputElement>(null);
+  const ccField = useRef<RecipientInputHandle>(null);
+  const bccField = useRef<RecipientInputHandle>(null);
   const attemptIds = useRef(new Map<string, { text: string; id: string }>());
+
+  // Own Inbox addresses are never copied on Reply all.
+  const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes });
 
   const detail = useQuery({
     queryKey: ["thread", props.threadId],
@@ -77,6 +93,10 @@ export function ThreadView(props: {
   useEffect(() => {
     setReplyText("");
     setPendingFiles([]);
+    setReplyCc([]);
+    setReplyBcc([]);
+    setAddingCc(false);
+    setAddingBcc(false);
     setSendNotice(null);
     setFailedAttemptKey(null);
     setUsedDraftId(null);
@@ -105,12 +125,21 @@ export function ThreadView(props: {
       attemptKey: string;
       draftId?: number;
       files?: File[];
+      cc: string[];
+      bcc: string[];
     }) =>
-      sendReply(props.threadId, args.text, args.attemptId, args.draftId, args.files ?? []),
+      sendReply(props.threadId, args.text, args.attemptId, args.draftId, args.files ?? [], {
+        cc: args.cc,
+        bcc: args.bcc,
+      }),
     onSuccess: (result, args) => {
       if (result.status === "sent") {
         setReplyText("");
         setPendingFiles([]);
+        setReplyCc([]);
+        setReplyBcc([]);
+        setAddingCc(false);
+        setAddingBcc(false);
         setUsedDraftId(null);
       }
       setFailedAttemptKey(null);
@@ -206,6 +235,41 @@ export function ThreadView(props: {
     lastMessageDirection: thread.last_message_direction,
   });
 
+  // Replies always go to the latest inbound Message's reply target (see sendReplyAttempt).
+  const latestInbound = messages.filter((message) => message.direction === "inbound").at(-1);
+  const replyTargets = latestInbound
+    ? (() => {
+        const replyTo = parseAddressList(latestInbound.reply_to_addresses);
+        return replyTo.length ? replyTo : [latestInbound.from_address];
+      })()
+    : [];
+  const copyCapacity =
+    MAX_RECIPIENTS_PER_MESSAGE - replyTargets.length - replyCc.length - replyBcc.length;
+  const lowered = (values: string[]) => values.map((value) => value.toLowerCase());
+  const alreadyCopied = new Set(lowered([...replyCc, ...replyBcc]));
+  const replyAllMissing = latestInbound
+    ? replyAllRecipients({
+        to: parseAddressList(latestInbound.to_addresses),
+        cc: parseAddressList(latestInbound.cc_addresses),
+        replyTargets,
+        ownAddresses: [
+          thread.mailbox_address,
+          ...(mailboxes.data ?? []).map((mailbox) => mailbox.address),
+        ],
+      }).filter((address) => !alreadyCopied.has(address.toLowerCase()))
+    : [];
+
+  const showCc = addingCc || replyCc.length > 0;
+  const showBcc = addingBcc || replyBcc.length > 0;
+  const openCopyRow = (row: "cc" | "bcc") => {
+    (row === "cc" ? setAddingCc : setAddingBcc)(true);
+    requestAnimationFrame(() => (row === "cc" ? ccInputRef : bccInputRef).current?.focus());
+  };
+
+  const replyAll = () => {
+    setReplyCc((current) => [...current, ...replyAllMissing.slice(0, Math.max(0, copyCapacity))]);
+  };
+
   const attemptFor = (key: string, text: string) => {
     const existing = attemptIds.current.get(key);
     if (existing?.text === text) return existing.id;
@@ -217,11 +281,17 @@ export function ThreadView(props: {
   const submitReply = () => {
     const text = replyText.trim();
     if ((text || pendingFiles.length > 0) && !reply.isPending && !discard.isPending) {
-      const fingerprint = `${text} ${pendingFiles.map((file) => `${file.name}:${file.size}`).join(",")}`;
+      // Add any address still being typed; stop if one of them is invalid.
+      const cc = ccField.current ? ccField.current.commit() : replyCc;
+      const bcc = bccField.current ? bccField.current.commit() : replyBcc;
+      if (!cc || !bcc) return;
+      const fingerprint = `${text} ${pendingFiles.map((file) => `${file.name}:${file.size}`).join(",")} cc:${cc.join(",")} bcc:${bcc.join(",")}`;
       const attemptKey = usedDraftId === null ? "manual" : `draft-${usedDraftId}`;
       reply.mutate({
         text,
         files: pendingFiles,
+        cc,
+        bcc,
         draftId: usedDraftId ?? undefined,
         attemptId: attemptFor(attemptKey, fingerprint),
         attemptKey,
@@ -333,6 +403,44 @@ export function ThreadView(props: {
                 <span className="truncate font-medium text-foreground/80" title={thread.mailbox_address}>
                   {thread.mailbox_address}
                 </span>
+                <span className="ml-1 flex shrink-0 items-center">
+                  {!showCc && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-muted-foreground"
+                      aria-label="Add Cc recipients"
+                      disabled={reply.isPending}
+                      onClick={() => openCopyRow("cc")}
+                    >
+                      Cc
+                    </Button>
+                  )}
+                  {!showBcc && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-muted-foreground"
+                      aria-label="Add Bcc recipients"
+                      disabled={reply.isPending}
+                      onClick={() => openCopyRow("bcc")}
+                    >
+                      Bcc
+                    </Button>
+                  )}
+                  {replyAllMissing.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-muted-foreground"
+                      title={`Copy everyone on the last email: ${replyAllMissing.join(", ")}`}
+                      disabled={reply.isPending || copyCapacity <= 0}
+                      onClick={replyAll}
+                    >
+                      Reply all
+                    </Button>
+                  )}
+                </span>
               </span>
               <DraftAssist
                 status={agentStatus}
@@ -353,6 +461,51 @@ export function ThreadView(props: {
                 onStart={() => startDraft.mutate()}
               />
             </div>
+            {(showCc || showBcc) && (
+              <div className="border-b border-border/70 text-xs">
+                {showCc && (
+                  <CopyRecipientsRow label="Cc" htmlFor="reply-cc">
+                    <RecipientInput
+                      ref={ccField}
+                      inputRef={ccInputRef}
+                      id="reply-cc"
+                      label="Cc"
+                      values={replyCc}
+                      onChange={setReplyCc}
+                      capacity={copyCapacity}
+                      taken={new Set(lowered([...replyTargets, ...replyBcc]))}
+                      disabled={reply.isPending}
+                      placeholder="Add Cc recipients"
+                      onDismiss={() => setAddingCc(false)}
+                      onSubmitShortcut={submitReply}
+                    />
+                  </CopyRecipientsRow>
+                )}
+                {showBcc && (
+                  <CopyRecipientsRow label="Bcc" htmlFor="reply-bcc">
+                    <RecipientInput
+                      ref={bccField}
+                      inputRef={bccInputRef}
+                      id="reply-bcc"
+                      label="Bcc"
+                      values={replyBcc}
+                      onChange={setReplyBcc}
+                      capacity={copyCapacity}
+                      taken={new Set(lowered([...replyTargets, ...replyCc]))}
+                      disabled={reply.isPending}
+                      placeholder="Add Bcc recipients"
+                      onDismiss={() => setAddingBcc(false)}
+                      onSubmitShortcut={submitReply}
+                    />
+                  </CopyRecipientsRow>
+                )}
+                {copyCapacity <= 0 && (
+                  <p role="status" className="px-3.5 pb-2 text-muted-foreground">
+                    This reply has reached the limit of {MAX_RECIPIENTS_PER_MESSAGE} recipients.
+                  </p>
+                )}
+              </div>
+            )}
             <Textarea
               value={replyText}
               disabled={reply.isPending || discard.isPending}
@@ -480,6 +633,26 @@ export function ThreadView(props: {
   );
 }
 
+function CopyRecipientsRow(props: { label: string; htmlFor: string; children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 px-3.5">
+      <label htmlFor={props.htmlFor} className="w-8 shrink-0 py-2.5 text-muted-foreground">
+        {props.label}
+      </label>
+      {props.children}
+    </div>
+  );
+}
+
+function parseAddressList(raw: string | null | undefined): string[] {
+  try {
+    const values = JSON.parse(raw || "[]") as unknown;
+    return Array.isArray(values) ? values.filter((value): value is string => typeof value === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function MessageCard({ message }: { message: Message }) {
   const [showQuoted, setShowQuoted] = useState(false);
   const isOutbound = message.direction === "outbound";
@@ -487,6 +660,9 @@ function MessageCard({ message }: { message: Message }) {
     ? message.from_name || message.from_address
     : message.from_name || message.from_address;
   const { main, quoted } = splitQuotedTail(message.text_body ?? "");
+  const to = parseAddressList(message.to_addresses);
+  const cc = parseAddressList(message.cc_addresses);
+  const bcc = isOutbound ? parseAddressList(message.bcc_addresses) : [];
 
   return (
     <Card className="gap-0 p-4 sm:p-5">
@@ -504,8 +680,23 @@ function MessageCard({ message }: { message: Message }) {
             {isOutbound && message.sent_by === "human" && <AuthorBadge tone="human">You</AuthorBadge>}
           </div>
           <div className="mt-0.5 truncate text-xs text-muted-foreground">
-            {isOutbound ? `to ${JSON.parse(message.to_addresses || "[]").join(", ")}` : message.from_address}
+            {isOutbound ? `to ${to.join(", ")}` : message.from_address}
           </div>
+          {!isOutbound && to.length > 1 && (
+            <div className="truncate text-xs text-muted-foreground" title={to.join(", ")}>
+              to {to.join(", ")}
+            </div>
+          )}
+          {cc.length > 0 && (
+            <div className="truncate text-xs text-muted-foreground" title={cc.join(", ")}>
+              cc {cc.join(", ")}
+            </div>
+          )}
+          {bcc.length > 0 && (
+            <div className="truncate text-xs text-muted-foreground" title={bcc.join(", ")}>
+              bcc {bcc.join(", ")}
+            </div>
+          )}
         </div>
         <time
           dateTime={message.created_at}

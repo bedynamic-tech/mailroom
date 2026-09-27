@@ -43,10 +43,12 @@ function fixture(t, { fail = false } = {}) {
   return { db, sent, objects, env, post };
 }
 
-function message(overrides = {}, files = []) {
+function message(overrides = {}, files = [], copies = {}) {
   const form = new FormData();
   for (const [key, value] of Object.entries({ mailbox_id: "1", to: "person@example.com", subject: "A new conversation", text: "Hello from a human", attempt_id: crypto.randomUUID(), ...overrides })) form.set(key, value);
   for (const file of files) form.append("attachments", file);
+  for (const address of copies.cc ?? []) form.append("cc", address);
+  for (const address of copies.bcc ?? []) form.append("bcc", address);
   return form;
 }
 
@@ -132,4 +134,32 @@ test("the migration keeps MCP sending classified as agent and prevents sender-ty
   assert.equal(f.db.prepare("SELECT sent_by FROM messages").get().sent_by, "agent");
   assert.equal(f.sent[0].headers["Auto-Submitted"], "auto-generated");
   await assert.rejects(sendNewEmailAttempt(f.env, { ...intent, sentBy: "human" }), /different content/);
+});
+
+test("Web compose sends Cc and Bcc copies, records them, and binds them to the Send Attempt", async (t) => {
+  const f = fixture(t);
+  const id = crypto.randomUUID();
+  const copies = { cc: ["manager@example.com", "person@example.com", " "], bcc: ["archive@EXAMPLE.com", "manager@example.com"] };
+  const first = await f.post(message({ attempt_id: id }, [], copies));
+  assert.equal(first.status, 200);
+  const result = await first.json();
+  assert.deepEqual(f.sent[0].to, ["person@example.com"]);
+  assert.deepEqual(f.sent[0].cc, ["manager@example.com"]);
+  assert.deepEqual(f.sent[0].bcc, ["archive@example.com"]);
+  const stored = f.db.prepare("SELECT cc_addresses, bcc_addresses FROM messages").get();
+  assert.equal(stored.cc_addresses, JSON.stringify(["manager@example.com"]));
+  assert.equal(stored.bcc_addresses, JSON.stringify(["archive@example.com"]));
+  assert.deepEqual(await (await f.post(message({ attempt_id: id }, [], copies))).json(), result);
+  assert.equal((await f.post(message({ attempt_id: id }, [], { cc: copies.cc }))).status, 409);
+  assert.equal(f.sent.length, 1);
+});
+
+test("Web compose rejects invalid or excessive Cc and Bcc recipients before sending", async (t) => {
+  const f = fixture(t);
+  assert.equal((await f.post(message({}, [], { cc: ["not-an-email"] }))).status, 400);
+  assert.equal((await f.post(message({}, [], { bcc: ["a@example.com\r\nX: y"] }))).status, 400);
+  const many = Array.from({ length: 50 }, (_, index) => `person${index}@copies.example`);
+  assert.equal((await f.post(message({}, [], { cc: many }))).status, 400);
+  assert.equal(f.sent.length, 0);
+  assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM outbound_attempts").get().n, 0);
 });

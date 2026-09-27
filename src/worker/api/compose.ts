@@ -1,13 +1,15 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
-import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_TOTAL_BYTES, MAX_MESSAGE_CHARS, MAX_SUBJECT_CHARS } from "../../shared/email-limits.ts";
+import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_TOTAL_BYTES, MAX_MESSAGE_CHARS, MAX_RECIPIENTS_PER_MESSAGE, MAX_SUBJECT_CHARS } from "../../shared/email-limits.ts";
 import { AttachmentInputError } from "../email/attachments.ts";
 import { ComposeIntentError, sendNewEmailAttempt, type ComposeEnv } from "../email/compose.ts";
 
 const input = z.object({
   mailbox_id: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   to: z.email().max(254),
+  cc: z.array(z.email().max(254)).max(MAX_RECIPIENTS_PER_MESSAGE),
+  bcc: z.array(z.email().max(254)).max(MAX_RECIPIENTS_PER_MESSAGE),
   subject: z.string().trim().min(1).max(MAX_SUBJECT_CHARS).regex(/^[^\r\n]+$/),
   text: z.string().trim().max(MAX_MESSAGE_CHARS),
   attempt_id: z.uuid(),
@@ -28,6 +30,8 @@ composeApi.post("/", bodyLimit({ maxSize: 4 * 1024 * 1024 }), async (c) => {
   const parsed = input.safeParse({
     mailbox_id: form.get("mailbox_id"),
     to: typeof form.get("to") === "string" ? String(form.get("to")).trim() : form.get("to"),
+    cc: copyAddresses(form, "cc"),
+    bcc: copyAddresses(form, "bcc"),
     subject: form.get("subject"),
     text: form.get("text") ?? "",
     attempt_id: form.get("attempt_id"),
@@ -35,6 +39,7 @@ composeApi.post("/", bodyLimit({ maxSize: 4 * 1024 * 1024 }), async (c) => {
   if (!parsed.success) {
     const field = parsed.error.issues[0]?.path[0];
     const message = field === "to" ? "Enter one valid recipient email address"
+      : field === "cc" || field === "bcc" ? `Enter valid ${field === "cc" ? "Cc" : "Bcc"} email addresses, up to ${MAX_RECIPIENTS_PER_MESSAGE} recipients`
       : field === "subject" ? `Enter a subject of 1–${MAX_SUBJECT_CHARS} characters without line breaks`
       : field === "text" ? `Message text must be at most ${MAX_MESSAGE_CHARS.toLocaleString("en-US")} characters`
       : field === "mailbox_id" ? "Choose a sending inbox"
@@ -55,6 +60,8 @@ composeApi.post("/", bodyLimit({ maxSize: 4 * 1024 * 1024 }), async (c) => {
       attemptId: `web_compose_${parsed.data.attempt_id}`,
       mailboxId: parsed.data.mailbox_id,
       to: [parsed.data.to],
+      cc: parsed.data.cc,
+      bcc: parsed.data.bcc,
       subject: parsed.data.subject,
       text: parsed.data.text,
       sentBy: "human",
@@ -73,3 +80,9 @@ composeApi.post("/", bodyLimit({ maxSize: 4 * 1024 * 1024 }), async (c) => {
     throw error;
   }
 });
+
+/** Reads repeated `cc`/`bcc` form fields, ignoring blank entries. */
+export function copyAddresses(form: FormData, field: "cc" | "bcc"): unknown[] {
+  return form.getAll(field).map((value) => (typeof value === "string" ? value.trim() : value))
+    .filter((value) => value !== "");
+}

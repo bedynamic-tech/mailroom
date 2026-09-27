@@ -178,7 +178,7 @@ export async function getConversation(env: InboxDataEnv, id: number, limit: numb
     env.DB.prepare(
       `SELECT * FROM (
          SELECT id, direction, sent_by, from_address, from_name, to_addresses,
-           subject, reply_to_addresses,
+           cc_addresses, bcc_addresses, subject, reply_to_addresses,
            substr(COALESCE(text_body, ''), 1, 20000) AS text_body,
            length(COALESCE(text_body, '')) > 20000 AS text_truncated, created_at
          FROM messages WHERE thread_id = ?
@@ -193,6 +193,8 @@ export async function getConversation(env: InboxDataEnv, id: number, limit: numb
         from_address: string;
         from_name: string | null;
         to_addresses: string;
+        cc_addresses: string;
+        bcc_addresses: string;
         subject: string;
         reply_to_addresses: string;
         text_body: string | null;
@@ -282,6 +284,8 @@ export async function getConversation(env: InboxDataEnv, id: number, limit: numb
         name: message.from_name,
       },
       to: parseAddressList(message.to_addresses),
+      cc: parseAddressList(message.cc_addresses),
+      bcc: parseAddressList(message.bcc_addresses),
       reply_target:
         message.direction === "inbound"
           ? resolvedReplyTarget(message.reply_to_addresses, message.from_address)

@@ -16,6 +16,8 @@ export interface OutgoingAttachment {
 export interface OutgoingEmail {
   from: { address: string; name?: string };
   to: string[];
+  cc?: string[];
+  bcc?: string[];
   subject: string;
   text: string;
   attachments?: OutgoingAttachment[];
@@ -34,6 +36,8 @@ export interface SendEmailEnv {
     send(message: {
       from: string | { email: string; name?: string };
       to: string | Array<string | { email: string; name?: string }>;
+      cc?: string | Array<string | { email: string; name?: string }>;
+      bcc?: string | Array<string | { email: string; name?: string }>;
       subject: string;
       text?: string;
       html?: string;
@@ -63,6 +67,8 @@ export async function sendEmail(env: SendEmailEnv, mail: OutgoingEmail): Promise
       ? { email: mail.from.address, name: mail.from.name }
       : mail.from.address,
     to: mail.to,
+    ...(mail.cc?.length ? { cc: mail.cc } : {}),
+    ...(mail.bcc?.length ? { bcc: mail.bcc } : {}),
     subject: mail.subject,
     text: mail.text,
     ...(mail.attachments?.length ? { attachments: mail.attachments } : {}),
