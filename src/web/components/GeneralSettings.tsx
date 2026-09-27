@@ -10,6 +10,7 @@ import {
   fetchGeneralSettings,
   updateEmailNotifications,
 } from "../api";
+import type { EmailNotificationTemplate } from "../../shared/types";
 import {
   BrowserPushError,
   createBrowserPushSubscription,
@@ -17,6 +18,7 @@ import {
   unsubscribeCurrentBrowser,
 } from "../push-notifications";
 import { BellIcon, MailIcon } from "./Icons";
+import { EmailTemplateEditor } from "./EmailTemplateEditor";
 import { McpSettings } from "./McpSettings";
 import {
   SettingsBlock,
@@ -145,6 +147,7 @@ export function GeneralSettings(props: {
             </div>
             <EmailNotificationSetting
               savedAddress={settings.data?.email_notification_address ?? null}
+              template={settings.data?.email_notification_template ?? null}
               loading={settings.isLoading}
             />
           </SettingsPanel>
@@ -158,9 +161,11 @@ export function GeneralSettings(props: {
 
 function EmailNotificationSetting(props: {
   savedAddress: string | null;
+  template: EmailNotificationTemplate | null;
   loading: boolean;
 }) {
   const queryClient = useQueryClient();
+  const [editorOpen, setEditorOpen] = useState(false);
   const [address, setAddress] = useState(props.savedAddress ?? "");
   useEffect(() => setAddress(props.savedAddress ?? ""), [props.savedAddress]);
 
@@ -186,55 +191,76 @@ function EmailNotificationSetting(props: {
   };
 
   return (
-    <form onSubmit={onSubmit} className="border-t px-4 py-4 sm:px-5">
-      <label
-        htmlFor="email-notification-address"
-        className="flex items-center gap-2 text-[13.5px] font-medium text-foreground"
-      >
-        <MailIcon className="h-4 w-4 text-muted-foreground" />
-        Email notifications
-      </label>
-      <p className="mt-1 max-w-xl text-[13px] leading-5 text-muted-foreground">
-        {props.savedAddress
-          ? `A notice is sent to ${props.savedAddress} when any inbox receives a new email.`
-          : "Send a notice to an email address when any inbox receives a new email. It is sent from the inbox that received the email."}
-      </p>
-      <div className="mt-3 flex max-w-xl flex-wrap items-center gap-2">
-        <Input
-          id="email-notification-address"
-          type="email"
-          autoComplete="email"
-          placeholder="you@example.com"
-          value={address}
-          onChange={(event) => setAddress(event.target.value)}
-          disabled={props.loading || busy}
-          className="min-w-[14rem] flex-1"
-        />
-        <Button
-          type="submit"
-          size="sm"
-          disabled={props.loading || busy || !trimmed || unchanged}
+    <>
+      <form onSubmit={onSubmit} className="border-t px-4 py-4 sm:px-5">
+        <label
+          htmlFor="email-notification-address"
+          className="flex items-center gap-2 text-[13.5px] font-medium text-foreground"
         >
-          {save.isPending ? "Saving…" : props.savedAddress ? "Update" : "Turn on"}
-        </Button>
-        {props.savedAddress && (
+          <MailIcon className="h-4 w-4 text-muted-foreground" />
+          Email notifications
+        </label>
+        <p className="mt-1 max-w-xl text-[13px] leading-5 text-muted-foreground">
+          {props.savedAddress
+            ? `A notice is sent to ${props.savedAddress} when any inbox receives a new email.`
+            : "Send a notice to an email address when any inbox receives a new email."}
+        </p>
+        <div className="mt-3 flex max-w-xl flex-wrap items-center gap-2">
+          <Input
+            id="email-notification-address"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            disabled={props.loading || busy}
+            className="min-w-[14rem] flex-1"
+          />
+          <Button
+            type="submit"
+            size="sm"
+            disabled={props.loading || busy || !trimmed || unchanged}
+          >
+            {save.isPending ? "Saving…" : props.savedAddress ? "Update" : "Turn on"}
+          </Button>
+          {props.savedAddress && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => turnOff.mutate()}
+              disabled={busy}
+            >
+              {turnOff.isPending ? "Turning off…" : "Turn off"}
+            </Button>
+          )}
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
-            onClick={() => turnOff.mutate()}
-            disabled={busy}
+            onClick={() => setEditorOpen(true)}
+            disabled={!props.template}
           >
-            {turnOff.isPending ? "Turning off…" : "Turn off"}
+            Customize email
           </Button>
+        </div>
+        {error && (
+          <p className="mt-2 text-xs leading-5 text-destructive" role="alert">
+            {error.message || "Couldn’t update email notifications. Try again."}
+          </p>
         )}
-      </div>
-      {error && (
-        <p className="mt-2 text-xs leading-5 text-destructive" role="alert">
-          {error.message || "Couldn’t update email notifications. Try again."}
-        </p>
+      </form>
+      {/* Outside the form: React events bubble through portals, so a nested
+          submit would also save the address. */}
+      {props.template && (
+        <EmailTemplateEditor
+          open={editorOpen}
+          onOpenChange={setEditorOpen}
+          template={props.template}
+          recipient={props.savedAddress}
+        />
       )}
-    </form>
+    </>
   );
 }
 

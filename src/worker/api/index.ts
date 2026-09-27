@@ -13,7 +13,17 @@ import {
   purgeInboxObjects,
 } from "../inbox/delete";
 import { validatePushSubscription } from "../notifications/push";
-import { normalizeNotificationAddress } from "../notifications/email";
+import {
+  effectiveTemplate,
+  normalizeNotificationAddress,
+  validateTemplate,
+  type StoredNotificationTemplate,
+} from "../notifications/email";
+import {
+  DEFAULT_NOTIFICATION_BODY,
+  DEFAULT_NOTIFICATION_FROM_NAME,
+  DEFAULT_NOTIFICATION_SUBJECT,
+} from "../../shared/notification-template";
 import type {
   Attachment,
   BrowserPushSubscription,
@@ -35,21 +45,36 @@ api.route("/compose", composeApi);
 api.get("/settings/general", async (c) => {
   const [settings, subscriptions] = await Promise.all([
     c.env.DB.prepare(
-      `SELECT browser_notifications_enabled, email_notification_address
+      `SELECT browser_notifications_enabled, email_notification_address,
+              email_notification_from_name, email_notification_from_mailbox_id,
+              email_notification_subject, email_notification_body
        FROM global_settings WHERE id = 1`,
-    ).first<{ browser_notifications_enabled: number; email_notification_address: string | null }>(),
+    ).first<
+      StoredNotificationTemplate & {
+        browser_notifications_enabled: number;
+        email_notification_address: string | null;
+        email_notification_from_mailbox_id: number | null;
+      }
+    >(),
     c.env.DB.prepare("SELECT COUNT(*) AS count FROM push_subscriptions")
       .first<{ count: number }>(),
   ]);
   const configured = Boolean(
     c.env.VAPID_PUBLIC_KEY && c.env.VAPID_PRIVATE_JWK && c.env.VAPID_SUBJECT,
   );
+  const template = effectiveTemplate(settings);
   const result: GeneralSettings = {
     browser_notifications_enabled: Boolean(settings?.browser_notifications_enabled),
     browser_notifications_configured: configured,
     push_subscription_count: Number(subscriptions?.count ?? 0),
     vapid_public_key: configured ? c.env.VAPID_PUBLIC_KEY! : null,
     email_notification_address: settings?.email_notification_address ?? null,
+    email_notification_template: {
+      from_name: template.fromName,
+      from_mailbox_id: settings?.email_notification_from_mailbox_id ?? null,
+      subject: template.subject,
+      body: template.body,
+    },
   };
   return c.json(result);
 });
@@ -126,6 +151,48 @@ api.put("/settings/email-notifications", async (c) => {
      WHERE id = 1`,
   )
     .bind(address, new URL(c.req.url).origin)
+    .run();
+  return c.json({ ok: true });
+});
+
+api.put("/settings/email-notification-template", async (c) => {
+  const body = await c.req.json<{
+    from_name?: unknown;
+    from_mailbox_id?: unknown;
+    subject?: unknown;
+    body?: unknown;
+  }>().catch(() => null);
+  const fromName = typeof body?.from_name === "string" ? body.from_name.trim() : body?.from_name;
+  const error = validateTemplate({ fromName, subject: body?.subject, body: body?.body });
+  if (error) return c.json({ error }, 400);
+
+  const fromMailboxId = body?.from_mailbox_id ?? null;
+  if (fromMailboxId !== null) {
+    if (typeof fromMailboxId !== "number" || !Number.isSafeInteger(fromMailboxId)) {
+      return c.json({ error: "Choose an inbox to send from" }, 400);
+    }
+    const mailbox = await c.env.DB.prepare("SELECT id FROM mailboxes WHERE id = ?")
+      .bind(fromMailboxId)
+      .first();
+    if (!mailbox) return c.json({ error: "That inbox no longer exists" }, 400);
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE global_settings
+     SET email_notification_from_name = ?,
+         email_notification_from_mailbox_id = ?,
+         email_notification_subject = ?,
+         email_notification_body = ?,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE id = 1`,
+  )
+    .bind(
+      // Fields left at the default stay NULL so they follow future default changes.
+      fromName === DEFAULT_NOTIFICATION_FROM_NAME ? null : fromName,
+      fromMailboxId,
+      body!.subject === DEFAULT_NOTIFICATION_SUBJECT ? null : body!.subject,
+      body!.body === DEFAULT_NOTIFICATION_BODY ? null : body!.body,
+    )
     .run();
   return c.json({ ok: true });
 });

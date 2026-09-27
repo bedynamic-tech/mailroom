@@ -4,7 +4,12 @@ import {
   buildEmailNotification,
   normalizeNotificationAddress,
   notifyNewEmailByEmail,
+  validateTemplate,
 } from "../src/worker/notifications/email.ts";
+import {
+  renderNotification,
+  unknownPlaceholders,
+} from "../src/shared/notification-template.ts";
 
 const input = {
   threadId: 42,
@@ -43,7 +48,60 @@ test("omits the link when no origin is known and falls back on empty fields", ()
   assert.doesNotMatch(content.text, /Open conversation/);
 });
 
-function fakeEnv({ address, inboxes = [] }) {
+const values = {
+  sender_name: "Alice",
+  sender_email: "alice@customer.test",
+  subject: "Refund",
+  preview: "Please help",
+  inbox: "support@example.com",
+  link: "",
+};
+
+test("renders placeholders, tolerates spacing, and keeps unknown ones visible", () => {
+  const rendered = renderNotification(
+    { fromName: "{{ inbox }} bot", subject: "[{{inbox}}]\n{{subject}}", body: "Hi {{sender_name}} {{nope}}" },
+    values,
+  );
+  assert.equal(rendered.fromName, "support@example.com bot");
+  assert.equal(rendered.subject, "[support@example.com] Refund");
+  assert.equal(rendered.body, "Hi Alice {{nope}}");
+});
+
+test("drops body lines whose placeholders are all empty", () => {
+  const rendered = renderNotification(
+    { fromName: "", subject: "x", body: "Top\n\nLink: {{link}}\n\nFrom {{sender_name}} {{link}}\nEnd" },
+    values,
+  );
+  assert.equal(rendered.body, "Top\n\nFrom Alice \nEnd");
+});
+
+test("lists unknown placeholders once each", () => {
+  assert.deepEqual(unknownPlaceholders("{{subject}} {{foo}} {{ foo }} {{bar}}"), ["foo", "bar"]);
+});
+
+test("validates templates before saving", () => {
+  const ok = { fromName: "Mailroom", subject: "{{subject}}", body: "{{preview}}" };
+  assert.equal(validateTemplate(ok), null);
+  assert.match(validateTemplate({ ...ok, subject: "  " }), /Subject can't be empty/);
+  assert.match(validateTemplate({ ...ok, body: "" }), /Body can't be empty/);
+  assert.match(validateTemplate({ ...ok, fromName: "Bad <name>" }), /Sender name/);
+  assert.match(validateTemplate({ ...ok, body: "{{sendr_name}}" }), /Unknown placeholder: \{\{sendr_name\}\}/);
+  assert.match(validateTemplate({ ...ok, body: 5 }), /required/);
+  assert.match(validateTemplate({ ...ok, body: "x".repeat(5001) }), /5000 characters/);
+});
+
+test("applies a custom template", () => {
+  const content = buildEmailNotification(input, null, {
+    fromName: "Alerts",
+    subject: "[{{inbox}}] {{subject}}",
+    body: "{{sender_email}} wrote:\n{{preview}}",
+  });
+  assert.equal(content.fromName, "Alerts");
+  assert.equal(content.subject, "[support@example.com] Refund request");
+  assert.equal(content.text, "alice@customer.test wrote:\nHi there, I would like a refund.");
+});
+
+function fakeEnv({ address, inboxes = [], template = {}, fromMailbox = null }) {
   const sent = [];
   return {
     sent,
@@ -62,7 +120,20 @@ function fakeEnv({ address, inboxes = [] }) {
           },
           async first() {
             if (sql.includes("global_settings")) {
-              return { email_notification_address: address, email_notification_origin: "https://mail.example.com" };
+              return {
+                email_notification_address: address,
+                email_notification_origin: "https://mail.example.com",
+                email_notification_from_name: null,
+                email_notification_from_mailbox_id: fromMailbox?.id ?? null,
+                email_notification_subject: null,
+                email_notification_body: null,
+                ...template,
+              };
+            }
+            if (sql.includes("WHERE id = ?")) {
+              return fromMailbox && this.args[0] === fromMailbox.id && !fromMailbox.deleted
+                ? { address: fromMailbox.address }
+                : null;
             }
             return this.args.some((value) => inboxes.includes(value)) ? { id: 1 } : null;
           },
@@ -99,4 +170,30 @@ test("never notifies about mail that could loop", async () => {
   const toInbox = fakeEnv({ address: "me@example.org", inboxes: ["me@example.org"] });
   await notifyNewEmailByEmail(toInbox, input);
   assert.equal(toInbox.sent.length, 0);
+});
+
+test("sends with the saved sender name, inbox, subject and body", async () => {
+  const env = fakeEnv({
+    address: "me@example.org",
+    fromMailbox: { id: 9, address: "alerts@example.com" },
+    template: {
+      email_notification_from_name: "Support Alerts",
+      email_notification_subject: "{{subject}}",
+      email_notification_body: "{{link}}",
+    },
+  });
+  await notifyNewEmailByEmail(env, input);
+  assert.deepEqual(env.sent[0].from, { email: "alerts@example.com", name: "Support Alerts" });
+  assert.equal(env.sent[0].subject, "Refund request");
+  assert.equal(env.sent[0].text, "https://mail.example.com/inbox/42");
+});
+
+test("falls back to the receiving inbox when the chosen inbox was deleted, and omits an empty name", async () => {
+  const env = fakeEnv({
+    address: "me@example.org",
+    fromMailbox: { id: 9, address: "alerts@example.com", deleted: true },
+    template: { email_notification_from_name: "" },
+  });
+  await notifyNewEmailByEmail(env, input);
+  assert.equal(env.sent[0].from, "support@example.com");
 });

@@ -158,9 +158,13 @@ switch off removes all stored subscriptions.
 
 Email notifications are also off by default. Enter an address under
 **Settings → General** to receive a short notice (sender, subject, preview and
-a link to the conversation) whenever any inbox receives a new email. The notice
-is sent through Email Sending from the inbox that received the email, so
-delivering to arbitrary external addresses requires Workers Paid. The address
+a link to the conversation) whenever any inbox receives a new email. Choose
+**Customize email** to edit the sender name, the inbox it is sent from, the
+subject and the body, using placeholders such as `{{sender_name}}`,
+`{{sender_email}}`, `{{subject}}`, `{{preview}}`, `{{inbox}}` and `{{link}}`,
+with a live preview. The notice is sent through Email Sending (by default from
+the inbox that received the email), so delivering to arbitrary external
+addresses requires Workers Paid. The address
 cannot be one of the workspace's own inboxes, and mail from the notification
 address or from an inbox never triggers a notice, so forwards and
 auto-responders cannot loop.

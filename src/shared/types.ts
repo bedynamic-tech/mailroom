@@ -22,6 +22,15 @@ export interface GeneralSettings {
   push_subscription_count: number;
   vapid_public_key: string | null;
   email_notification_address: string | null;
+  email_notification_template: EmailNotificationTemplate;
+}
+
+export interface EmailNotificationTemplate {
+  from_name: string;
+  /** Inbox to send from; null sends from the Inbox that received the email. */
+  from_mailbox_id: number | null;
+  subject: string;
+  body: string;
 }
 
 export interface BrowserPushSubscription {
