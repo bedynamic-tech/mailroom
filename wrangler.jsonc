@@ -8,6 +8,8 @@
   // Publish the workers.dev hostname and put Cloudflare Access on this Worker.
   // Preview URLs are separate hostnames, so keep them off.
   "workers_dev": true,
+  "routes": [
+  { "pattern": "mailroom.bedynamic.tech", "custom_domain": true },
   "preview_urls": false,
   // Preserve per-instance WEB_ACCESS_TEAM_DOMAIN and WEB_ACCESS_AUD from
   // Worker Settings > Variables and Secrets. Missing values deny all API access.
