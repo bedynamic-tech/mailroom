@@ -69,7 +69,7 @@ A file or inline resource carried by one Message and available to people for ins
 _Avoid_: Upload, raw MIME
 
 **Conversation**:
-The ordered email exchange grouped under one customer request.
+The ordered email exchange grouped under one customer request. An archived Conversation can be permanently deleted, one at a time, in bulk, or all at once with "Empty archive"; this removes its Messages, Attachments, drafts, Draft Runs, Reply and Send Attempts and stored email objects, while Contacts stay. Only archived Conversations with no email still sending can be deleted.
 _Avoid_: Ticket, chat
 
 **Browser Notifications**:

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   archiveThread,
   createDraft,
+  deleteThread,
   discardDraft,
   fetchMailboxes,
   fetchThread,
@@ -33,8 +34,10 @@ import {
   SendIcon,
   SparklesIcon,
   TagIcon,
+  TrashIcon,
   XIcon,
 } from "./Icons";
+import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
 import { LinkifiedText } from "./LinkifiedText";
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
 
@@ -55,6 +58,7 @@ export function ThreadView(props: {
   const [sendNotice, setSendNotice] = useState<string | null>(null);
   const [failedAttemptKey, setFailedAttemptKey] = useState<string | null>(null);
   const [usedDraftId, setUsedDraftId] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const seenDraftIds = useRef(new Set<number>());
   const markedRead = useRef<number | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
@@ -168,6 +172,17 @@ export function ThreadView(props: {
       action === "archive" ? archiveThread(props.threadId) : unarchiveThread(props.threadId),
     onSuccess: () => {
       invalidateAll();
+      props.onMoved();
+    },
+  });
+
+  const removeThread = useMutation({
+    mutationFn: () => deleteThread(props.threadId),
+    onSuccess: () => {
+      setConfirmDelete(false);
+      queryClient.removeQueries({ queryKey: ["thread", props.threadId] });
+      queryClient.invalidateQueries({ queryKey: ["threads"] });
+      queryClient.invalidateQueries({ queryKey: ["mailboxes"] });
       props.onMoved();
     },
   });
@@ -358,18 +373,43 @@ export function ThreadView(props: {
           </div>
         </div>
         {thread.status === "archived" ? (
-          <Button
-            variant="outline"
-            onClick={() => moveThread.mutate("unarchive")}
-            disabled={moveThread.isPending}
-            aria-label="Move conversation to inbox"
-            className="shrink-0"
-          >
-            <InboxIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">
-              {moveThread.isPending ? "Moving…" : "Move to inbox"}
-            </span>
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              onClick={() => moveThread.mutate("unarchive")}
+              disabled={moveThread.isPending || removeThread.isPending}
+              aria-label="Move conversation to inbox"
+              className="shrink-0"
+            >
+              <InboxIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">
+                {moveThread.isPending ? "Moving…" : "Move to inbox"}
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                removeThread.reset();
+                setConfirmDelete(true);
+              }}
+              disabled={moveThread.isPending || removeThread.isPending}
+              aria-label="Delete conversation permanently"
+              className="shrink-0 text-destructive hover:text-destructive"
+            >
+              <TrashIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Delete</span>
+            </Button>
+            <DeleteConversationsDialog
+              open={confirmDelete}
+              title="Delete this conversation?"
+              description="This permanently deletes its messages, attachments, and drafts. This can’t be undone."
+              confirmLabel="Delete conversation"
+              pending={removeThread.isPending}
+              error={removeThread.error}
+              onConfirm={() => removeThread.mutate()}
+              onOpenChange={setConfirmDelete}
+            />
+          </>
         ) : (
           <Button
             variant="outline"
