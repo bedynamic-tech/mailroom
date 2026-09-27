@@ -24,6 +24,8 @@ export interface GeneralSettings {
   email_notifications_enabled: boolean;
   email_notification_address: string | null;
   email_notification_template: EmailNotificationTemplate;
+  /** Create a Contact for each new inbound sender whose name can be parsed. */
+  auto_create_contacts: boolean;
 }
 
 export interface EmailNotificationTemplate {
@@ -182,4 +184,49 @@ export interface ReplyAttemptResult {
 
 export interface ComposeAttemptResult extends ReplyAttemptResult {
   conversation_id: number | null;
+}
+
+export interface Contact {
+  id: number;
+  address: string;
+  name: string | null;
+  company: string | null;
+  phone: string | null;
+  notes: string | null;
+  /** When mail from this address last arrived; null for Contacts added by hand. */
+  last_seen_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContactInput {
+  address: string;
+  name?: string | null;
+  company?: string | null;
+  phone?: string | null;
+  notes?: string | null;
+}
+
+export interface ContactConversation {
+  id: number;
+  mailbox_id: number;
+  mailbox_address: string;
+  subject: string;
+  status: ThreadSummary["status"];
+  last_message_at: string;
+}
+
+export interface ContactDetail {
+  contact: Contact;
+  conversation_count: number;
+  conversations: ContactConversation[];
+}
+
+export interface ContactImportResult {
+  created: number;
+  /** Existing Contacts the import matched by address. */
+  updated: number;
+  skipped: number;
+  /** The first few skipped entries and why. */
+  errors: Array<{ address: string; error: string }>;
 }

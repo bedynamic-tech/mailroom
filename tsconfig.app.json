@@ -14,6 +14,7 @@
     "composite": true,
     "skipLibCheck": true,
     "isolatedModules": true,
+    "allowImportingTsExtensions": true,
     "types": ["vite/client"]
   },
   "include": ["src/web", "src/shared", "src/components", "src/lib"]

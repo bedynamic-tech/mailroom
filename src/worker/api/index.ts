@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { requireSameOrigin } from "./csrf.ts";
 import { composeApi, copyAddresses } from "./compose.ts";
+import { contactsApi } from "./contacts.ts";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
 import { enqueueDraftRun } from "../agent/runs";
 import {
@@ -44,13 +45,14 @@ import type {
 export const api = new Hono<{ Bindings: Env }>();
 api.use("*", requireSameOrigin);
 api.route("/compose", composeApi);
+api.route("/contacts", contactsApi);
 
 api.get("/settings/general", async (c) => {
   const [settings, subscriptions] = await Promise.all([
     c.env.DB.prepare(
       `SELECT browser_notifications_enabled, email_notifications_enabled, email_notification_address,
               email_notification_from_name, email_notification_from_mailbox_id,
-              email_notification_subject, email_notification_body
+              email_notification_subject, email_notification_body, auto_create_contacts
        FROM global_settings WHERE id = 1`,
     ).first<
       StoredNotificationTemplate & {
@@ -58,6 +60,7 @@ api.get("/settings/general", async (c) => {
         email_notifications_enabled: number;
         email_notification_address: string | null;
         email_notification_from_mailbox_id: number | null;
+        auto_create_contacts: number;
       }
     >(),
     c.env.DB.prepare("SELECT COUNT(*) AS count FROM push_subscriptions")
@@ -80,6 +83,7 @@ api.get("/settings/general", async (c) => {
       subject: template.subject,
       body: template.body,
     },
+    auto_create_contacts: Boolean(settings?.auto_create_contacts ?? 1),
   };
   return c.json(result);
 });
@@ -218,6 +222,22 @@ api.post("/settings/email-notifications/test", async (c) => {
     console.error("Test email notification failed", { error: message });
     return c.json({ error: `Couldn’t send the test: ${message}` }, 502);
   }
+});
+
+api.put("/settings/contacts", async (c) => {
+  const body = await c.req.json<{ auto_create?: unknown }>().catch(() => null);
+  if (typeof body?.auto_create !== "boolean") {
+    return c.json({ error: "auto_create must be true or false" }, 400);
+  }
+  await c.env.DB.prepare(
+    `UPDATE global_settings
+     SET auto_create_contacts = ?,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE id = 1`,
+  )
+    .bind(body.auto_create ? 1 : 0)
+    .run();
+  return c.json({ ok: true });
 });
 
 api.put("/settings/email-notifications/enabled", async (c) => {

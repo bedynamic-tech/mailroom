@@ -160,3 +160,14 @@ export function ExternalLinkIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function ContactsIcon(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props}>
+      <circle cx="9" cy="8.5" r="3.5" />
+      <path d="M2.75 19.5a6.25 6.25 0 0 1 12.5 0" />
+      <path d="M15.5 5.25a3.5 3.5 0 0 1 0 6.5" />
+      <path d="M18 14a6.25 6.25 0 0 1 3.25 5.5" />
+    </svg>
+  );
+}

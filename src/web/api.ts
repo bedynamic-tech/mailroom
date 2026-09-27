@@ -1,6 +1,10 @@
 import type {
   BrowserPushSubscription,
   ComposeAttemptResult,
+  Contact,
+  ContactDetail,
+  ContactImportResult,
+  ContactInput,
   Domain,
   EmailNotificationTemplate,
   GeneralSettings,
@@ -25,6 +29,8 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code?: string,
     readonly hint?: AccessHint,
+    /** The existing record's id when a create conflicts with one (409). */
+    readonly existingId?: number,
   ) {
     super(message);
   }
@@ -43,14 +49,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, init);
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
-    let body: { error?: string; code?: string; hint?: AccessHint } = {};
+    let body: { error?: string; code?: string; hint?: AccessHint; id?: number } = {};
     try {
       body = await res.json();
       if (body.error) message = body.error;
     } catch {
       // Keep the status-based fallback for non-JSON responses.
     }
-    throw new ApiError(message, res.status, body.code, body.hint);
+    throw new ApiError(message, res.status, body.code, body.hint, body.id);
   }
   return res.json() as Promise<T>;
 }
@@ -127,6 +133,13 @@ export const updateEmailNotificationTemplate = (template: EmailNotificationTempl
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(template),
+  });
+
+export const setAutoCreateContacts = (autoCreate: boolean) =>
+  request<{ ok: true }>("/settings/contacts", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ auto_create: autoCreate }),
   });
 
 export const fetchDomains = () => request<Domain[]>("/domains");
@@ -290,3 +303,52 @@ export const retryDraftRun = (id: number) =>
 
 export const createDraft = (threadId: number) =>
   request<{ ok: true; run_id: number }>(`/threads/${threadId}/draft`, { method: "POST" });
+
+export const CONTACT_PAGE_SIZE = 100;
+
+export interface ContactCursor {
+  at: string;
+  id: number;
+}
+
+export const fetchContacts = (
+  q: string,
+  cursor: ContactCursor | null = null,
+  limit?: number,
+) => {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (limit) params.set("limit", String(limit));
+  if (cursor) {
+    params.set("before_at", cursor.at);
+    params.set("before_id", String(cursor.id));
+  }
+  const search = params.toString();
+  return request<Contact[]>(`/contacts${search ? `?${search}` : ""}`);
+};
+
+export const fetchContact = (id: number) => request<ContactDetail>(`/contacts/${id}`);
+
+export const createContact = (input: ContactInput) =>
+  request<Contact>("/contacts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+export const updateContact = (id: number, input: Omit<ContactInput, "address">) =>
+  request<Contact>(`/contacts/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+export const deleteContact = (id: number) =>
+  request<{ ok: true }>(`/contacts/${id}`, { method: "DELETE" });
+
+export const importContacts = (contacts: ContactInput[], overwrite: boolean) =>
+  request<ContactImportResult>("/contacts/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contacts, overwrite }),
+  });

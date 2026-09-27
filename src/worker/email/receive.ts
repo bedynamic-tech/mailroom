@@ -2,6 +2,7 @@ import PostalMime, { type Attachment, type Email } from "postal-mime";
 import { enqueueDraftRun } from "../agent/runs";
 import { splitQuotedTail } from "../../shared/quote";
 import { labelNewThread } from "./label";
+import { recordSender } from "../contacts/contacts";
 import { notifyNewEmail } from "../notifications/push";
 import { notifyNewEmailByEmail } from "../notifications/email";
 import {
@@ -86,6 +87,21 @@ export async function receiveEmail(
       });
 
   await storeAttachments(env, mailbox.id, stored.messageId, parsed.attachments);
+
+  if (sender && !isAutoSubmitted(parsed)) {
+    ctx.waitUntil(
+      recordSender(env, {
+        address: sender,
+        name: parsed.from && "name" in parsed.from ? parsed.from.name : null,
+        seenAt: now,
+      }).catch((error) =>
+        console.error("Contact update failed", {
+          threadId: stored.threadId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      ),
+    );
+  }
 
   if (existingThreadId === null) {
     ctx.waitUntil(

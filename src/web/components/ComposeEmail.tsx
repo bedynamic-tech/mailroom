@@ -9,7 +9,9 @@ import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_TOTAL_BYTES, MAX_MESSAGE_CH
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
 import { PaperclipIcon, SendIcon, XIcon } from "./Icons";
 
-const ComposeContext = createContext<(mailboxId: number | null) => void>(() => {});
+type OpenCompose = (mailboxId: number | null, options?: { to?: string }) => void;
+
+const ComposeContext = createContext<OpenCompose>(() => {});
 export const useCompose = () => useContext(ComposeContext);
 
 /** Extends the inbox's existing Geist/neutral controls with a focused letter editor.
@@ -154,7 +156,13 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   const setup = () => { close(); navigate("/settings/inboxes"); };
 
   return (
-    <ComposeContext.Provider value={(id) => { setPreferredMailbox(id); setOpen(true); }}>
+    <ComposeContext.Provider value={(id, options) => {
+      setPreferredMailbox(id);
+      // Prefill the recipient only when it would not disturb a draft in progress.
+      const address = options?.to;
+      if (address && !locked && to.length === 0 && !takenBy(cc, bcc).has(address.toLowerCase())) setTo([address]);
+      setOpen(true);
+    }}>
       {children}
       <Dialog open={open} onOpenChange={(value) => { if (!value) close(); }}>
         <DialogContent
