@@ -15,6 +15,7 @@ import {
   type StagedAttachment,
 } from "./attachments.ts";
 import { sendEmail, type SendEmailEnv } from "./send.ts";
+import { normalizeSenderName, senderFrom } from "../../shared/sender-name.ts";
 import { claimDailySendBudget } from "./send-budget.ts";
 
 export interface ComposeEnv extends SendEmailEnv {
@@ -88,12 +89,17 @@ export async function sendNewEmailAttempt(
   }
 
   const inbox = await env.DB.prepare(
-    `SELECT m.id, m.address, d.status AS domain_status
+    `SELECT m.id, m.address, m.display_name, d.status AS domain_status
      FROM mailboxes m LEFT JOIN domains d ON d.id = m.domain_id
      WHERE m.id = ?`,
   )
     .bind(normalized.mailboxId)
-    .first<{ id: number; address: string; domain_status: "pending" | "active" | null }>();
+    .first<{
+      id: number;
+      address: string;
+      display_name?: string | null;
+      domain_status: "pending" | "active" | null;
+    }>();
   if (!inbox) throw new ComposeIntentError("Inbox not found", 404);
   if (inbox.domain_status !== "active") {
     throw new ComposeIntentError("Inbox domain is not ready for outbound sending", 409);
@@ -196,7 +202,7 @@ export async function sendNewEmailAttempt(
   if (!messageId) {
     try {
       ({ messageId } = await sendEmail(env, {
-        from: { address: inbox.address },
+        from: senderFrom(inbox.address, inbox.display_name),
         to: normalized.to,
         cc: normalized.cc,
         bcc: normalized.bcc,
@@ -240,12 +246,13 @@ export async function sendNewEmailAttempt(
          (thread_id, message_id, references_ids, direction, sent_by,
           from_address, from_name, to_addresses, reply_to_addresses,
           subject, text_body, created_at, cc_addresses, bcc_addresses)
-       VALUES (?, ?, '[]', 'outbound', ?, ?, NULL, ?, '[]', ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, '[]', 'outbound', ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?)`,
     ).bind(
       conversationId,
       messageId,
       normalized.sentBy ?? "agent",
       inbox.address,
+      normalizeSenderName(inbox.display_name) || null,
       JSON.stringify(normalized.to),
       normalized.subject,
       normalized.text,

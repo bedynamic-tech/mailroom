@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Label, Mailbox, Playbook } from "../../shared/types";
+import { MAX_SENDER_NAME_LENGTH, normalizeSenderName } from "../../shared/sender-name";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -103,6 +104,7 @@ export function AgentSettings(props: {
 }) {
   const queryClient = useQueryClient();
   const [baseInstructions, setBaseInstructions] = useState("");
+  const [senderName, setSenderName] = useState("");
   const [editor, setEditor] = useState<PlaybookEditorState | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<number | null>(null);
   const [labelEditor, setLabelEditor] = useState<LabelEditorState | null>(null);
@@ -121,6 +123,7 @@ export function AgentSettings(props: {
 
   useEffect(() => {
     setBaseInstructions(mailbox?.agent_instructions ?? "");
+    setSenderName(mailbox?.display_name ?? "");
     setDeleteConfirmation(null);
     setLabelDeleteConfirmation(null);
     setDeleteInboxOpen(false);
@@ -176,6 +179,12 @@ export function AgentSettings(props: {
   const saveInstructions = useMutation({
     mutationFn: () =>
       updateMailbox(selectedMailboxId!, { agent_instructions: baseInstructions.trim() }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mailboxes"] }),
+  });
+
+  const saveSenderName = useMutation({
+    mutationFn: () =>
+      updateMailbox(selectedMailboxId!, { display_name: normalizeSenderName(senderName) || null }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mailboxes"] }),
   });
 
@@ -273,6 +282,10 @@ export function AgentSettings(props: {
     },
   });
 
+  const senderNameDirty =
+    normalizeSenderName(senderName) !== normalizeSenderName(mailbox?.display_name);
+  const senderNamePreview = normalizeSenderName(senderName);
+
   const instructionsDirty =
     baseInstructions.trim() !== (mailbox?.agent_instructions ?? "").trim();
 
@@ -353,6 +366,59 @@ export function AgentSettings(props: {
 
         {mailbox ? (
           <>
+            <SettingsBlock
+              id="sender-name-heading"
+              title="Sender name"
+              description="The name recipients see on email sent from this inbox. Leave it empty to show only the address."
+            >
+              <SettingsPanel>
+                <form
+                  className="px-4 py-4 sm:px-5"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (senderNameDirty) saveSenderName.mutate();
+                  }}
+                >
+                  <div className="flex max-w-xl flex-wrap items-center gap-2">
+                    <Input
+                      id="sender-name"
+                      aria-labelledby="sender-name-heading"
+                      aria-describedby="sender-name-preview"
+                      placeholder="Jane Doe from Acme"
+                      maxLength={MAX_SENDER_NAME_LENGTH}
+                      value={senderName}
+                      onChange={(event) => setSenderName(event.target.value)}
+                      disabled={saveSenderName.isPending}
+                      className="min-w-[14rem] flex-1"
+                    />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={saveSenderName.isPending || !senderNameDirty}
+                    >
+                      {saveSenderName.isPending ? "Saving…" : "Save"}
+                    </Button>
+                  </div>
+                  <p
+                    id="sender-name-preview"
+                    className="mt-2 truncate text-xs text-muted-foreground"
+                    aria-live="polite"
+                  >
+                    {saveSenderName.isError ? (
+                      <span className="text-destructive">Couldn’t save the sender name. Try again.</span>
+                    ) : (
+                      <>
+                        From:{" "}
+                        {senderNamePreview
+                          ? `${senderNamePreview} <${mailbox.address}>`
+                          : mailbox.address}
+                      </>
+                    )}
+                  </p>
+                </form>
+              </SettingsPanel>
+            </SettingsBlock>
+
             <SettingsBlock id="agent-drafting-heading" title="AI drafting">
               <SettingsPanel>
                 <div className="flex items-start gap-4 px-4 py-4 sm:px-5">

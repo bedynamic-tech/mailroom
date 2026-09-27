@@ -13,6 +13,7 @@ import {
   type StagedAttachment,
 } from "./attachments.ts";
 import { sendEmail, type SendEmailEnv } from "./send.ts";
+import { normalizeSenderName, senderFrom } from "../../shared/sender-name.ts";
 import { claimDailySendBudget } from "./send-budget.ts";
 
 export interface ReplyEnv extends SendEmailEnv {
@@ -75,11 +76,18 @@ export async function sendReplyAttempt(
   }
 
   const thread = await env.DB.prepare(
-    `SELECT t.id, t.mailbox_id, t.subject, m.address AS mailbox_address
+    `SELECT t.id, t.mailbox_id, t.subject, m.address AS mailbox_address,
+       m.display_name AS mailbox_display_name
      FROM threads t JOIN mailboxes m ON m.id = t.mailbox_id WHERE t.id = ?`,
   )
     .bind(intent.threadId)
-    .first<{ id: number; mailbox_id: number; subject: string; mailbox_address: string }>();
+    .first<{
+      id: number;
+      mailbox_id: number;
+      subject: string;
+      mailbox_address: string;
+      mailbox_display_name?: string | null;
+    }>();
   if (!thread) throw new ReplyIntentError("Conversation not found", 404);
 
   const lastInbound = await env.DB.prepare(
@@ -224,7 +232,7 @@ export async function sendReplyAttempt(
   if (!messageId) {
     try {
       ({ messageId } = await sendEmail(env, {
-        from: { address: thread.mailbox_address },
+        from: senderFrom(thread.mailbox_address, thread.mailbox_display_name),
         to: recipients,
         cc: copies.cc,
         bcc: copies.bcc,
@@ -292,7 +300,7 @@ export async function sendReplyAttempt(
       JSON.stringify(references),
       intent.sentBy ?? (intent.draftId ? "agent" : "human"),
       thread.mailbox_address,
-      null,
+      normalizeSenderName(thread.mailbox_display_name) || null,
       JSON.stringify(recipients),
       subject,
       intent.text.trim(),
