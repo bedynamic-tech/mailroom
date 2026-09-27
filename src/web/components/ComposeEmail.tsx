@@ -175,13 +175,13 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
       <Dialog open={open} onOpenChange={(value) => { if (!value) close(); }}>
         <DialogContent
           showCloseButton={false}
-          className="flex max-h-[calc(100dvh_-_2rem)] max-w-[calc(100vw_-_2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+          className="inset-0 flex h-dvh max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none p-0 ring-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[calc(100dvh_-_2rem)] sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:ring-1"
           onOpenAutoFocus={(event) => {
             if (toRef.current && !toRef.current.matches(":disabled")) { event.preventDefault(); toRef.current.focus(); }
           }}
           onPointerDownOutside={(event) => event.preventDefault()}
         >
-          <header className="flex shrink-0 items-center justify-between border-b px-5 py-4">
+          <header className="flex shrink-0 items-center justify-between border-b py-3 pr-2 pl-4 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5 sm:py-4">
             <DialogTitle>New message</DialogTitle>
             <DialogDescription className="sr-only">Write a new email. Closing keeps your draft until you leave or reload this page.</DialogDescription>
             <Button type="button" variant="ghost" size="icon" onClick={close} disabled={sending} aria-label="Close and keep draft" title="Close and keep draft">
@@ -191,23 +191,23 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
           <form ref={formRef} className="flex min-h-0 flex-1 flex-col" onSubmit={(event) => { event.preventDefault(); void send(); }} onKeyDown={(event) => {
             if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void send(); }
           }}>
-            <div className="min-h-0 flex-1 overflow-y-auto px-5">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-5">
               {loading ? <p className="py-4 text-sm text-muted-foreground" role="status">Loading your inboxes…</p> : loadError ? (
                 <div className="py-4 text-sm" role="alert">Couldn’t load your sending inboxes. <Button type="button" variant="link" onClick={() => { void mailboxes.refetch(); void domains.refetch(); }}>Try again</Button></div>
               ) : available.length === 0 ? (
                 <div className="py-4 text-sm"><p>Set up an inbox and activate its domain before sending.</p><Button type="button" variant="link" className="px-0" onClick={setup}>Set up an inbox</Button></div>
               ) : null}
               <fieldset disabled={locked || loading || loadError || available.length === 0} className="min-w-0 disabled:opacity-60">
-                <div className="flex min-h-12 items-center gap-3 border-b">
-                  <label htmlFor="compose-from" className="w-14 shrink-0 text-sm text-muted-foreground">From</label>
+                <div className="flex min-h-12 items-center gap-2 border-b sm:gap-3">
+                  <label htmlFor="compose-from" className="shrink-0 sm:w-14 text-sm text-muted-foreground">From</label>
                   <select id="compose-from" value={mailboxId} onChange={(event) => setMailboxId(event.target.value)} required className="min-w-0 flex-1 rounded-md bg-transparent py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <option value="" disabled>Choose an inbox</option>
                     {available.map((mailbox) => <option key={mailbox.id} value={mailbox.id}>{mailbox.address}</option>)}
                   </select>
                 </div>
-                <div className="flex min-h-12 items-start gap-3 border-b">
-                  <label htmlFor="compose-to" className="w-14 shrink-0 py-3.5 text-sm text-muted-foreground">To</label>
-                  <RecipientInput ref={toField} inputRef={toRef} id="compose-to" label="To" values={to} onChange={setTo} capacity={Math.min(1 - to.length, remaining)} taken={takenBy(cc, bcc)} placeholder="recipient@example.com" className="px-2.5 py-1.5" />
+                <div className="flex min-h-12 items-start gap-2 border-b sm:gap-3">
+                  <label htmlFor="compose-to" className="shrink-0 sm:w-14 py-3.5 text-sm text-muted-foreground">To</label>
+                  <RecipientInput ref={toField} inputRef={toRef} id="compose-to" label="To" values={to} onChange={setTo} capacity={Math.min(1 - to.length, remaining)} taken={takenBy(cc, bcc)} placeholder="recipient@example.com" className="py-1.5 sm:px-2.5" />
                   {(!showCc || !showBcc) && (
                     <span className="flex shrink-0 items-center py-2.5">
                       {!showCc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Cc recipients" onClick={() => { setAddingCc(true); requestAnimationFrame(() => ccRef.current?.focus()); }}>Cc</Button>}
@@ -216,15 +216,15 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                   )}
                 </div>
                 {showCc && (
-                  <div className="flex min-h-12 items-start gap-3 border-b">
-                    <label htmlFor="compose-cc" className="w-14 shrink-0 py-3.5 text-sm text-muted-foreground">Cc</label>
-                    <RecipientInput ref={ccField} inputRef={ccRef} id="compose-cc" label="Cc" values={cc} onChange={setCc} capacity={copyCapacity} taken={takenBy(to, bcc)} placeholder="Add Cc recipients" onDismiss={() => setAddingCc(false)} className="px-2.5 py-1.5" />
+                  <div className="flex min-h-12 items-start gap-2 border-b sm:gap-3">
+                    <label htmlFor="compose-cc" className="shrink-0 sm:w-14 py-3.5 text-sm text-muted-foreground">Cc</label>
+                    <RecipientInput ref={ccField} inputRef={ccRef} id="compose-cc" label="Cc" values={cc} onChange={setCc} capacity={copyCapacity} taken={takenBy(to, bcc)} placeholder="Add Cc recipients" onDismiss={() => setAddingCc(false)} className="py-1.5 sm:px-2.5" />
                   </div>
                 )}
                 {showBcc && (
-                  <div className="flex min-h-12 items-start gap-3 border-b">
-                    <label htmlFor="compose-bcc" className="w-14 shrink-0 py-3.5 text-sm text-muted-foreground">Bcc</label>
-                    <RecipientInput ref={bccField} inputRef={bccRef} id="compose-bcc" label="Bcc" values={bcc} onChange={setBcc} capacity={copyCapacity} taken={takenBy(to, cc)} placeholder="Add Bcc recipients" onDismiss={() => setAddingBcc(false)} className="px-2.5 py-1.5" />
+                  <div className="flex min-h-12 items-start gap-2 border-b sm:gap-3">
+                    <label htmlFor="compose-bcc" className="shrink-0 sm:w-14 py-3.5 text-sm text-muted-foreground">Bcc</label>
+                    <RecipientInput ref={bccField} inputRef={bccRef} id="compose-bcc" label="Bcc" values={bcc} onChange={setBcc} capacity={copyCapacity} taken={takenBy(to, cc)} placeholder="Add Bcc recipients" onDismiss={() => setAddingBcc(false)} className="py-1.5 sm:px-2.5" />
                   </div>
                 )}
                 {copyCapacity <= 0 && (
@@ -232,13 +232,13 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                     This message has reached the limit of {MAX_RECIPIENTS_PER_MESSAGE} recipients.
                   </p>
                 )}
-                <div className="flex min-h-12 items-center gap-3 border-b">
-                  <label htmlFor="compose-subject" className="w-14 shrink-0 text-sm text-muted-foreground">Subject</label>
-                  <Input id="compose-subject" required maxLength={MAX_SUBJECT_CHARS} placeholder="Add a subject" value={subject} onChange={(event) => setSubject(event.target.value)} className="min-w-0 border-0 shadow-none" />
+                <div className="flex min-h-12 items-center gap-2 border-b sm:gap-3">
+                  <label htmlFor="compose-subject" className="shrink-0 sm:w-14 text-sm text-muted-foreground">Subject</label>
+                  <Input id="compose-subject" required maxLength={MAX_SUBJECT_CHARS} placeholder="Add a subject" value={subject} onChange={(event) => setSubject(event.target.value)} className="min-w-0 border-0 px-0 shadow-none max-sm:focus-visible:ring-0 sm:px-2.5" />
                 </div>
-                <RichTextEditor id="compose-body" ariaLabel="Message" value={html} onChange={setHtml} variant="bare" placeholder="Write your message…" className="mt-1" contentClassName="min-h-44 px-2 sm:min-h-64" />
+                <RichTextEditor id="compose-body" ariaLabel="Message" value={html} onChange={setHtml} variant="bare" placeholder="Write your message…" className="mt-1" contentClassName="min-h-44 px-0 sm:min-h-64 sm:px-2" />
                 {sender?.effective_signature_html && (
-                  <div className="mb-4 px-2 text-muted-foreground">
+                  <div className="mb-4 text-muted-foreground sm:px-2">
                     <p className="mb-1 text-xs">Signature added when sent</p>
                     <RichTextPreview html={sender.effective_signature_html} />
                   </div>
@@ -254,7 +254,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
               {fileError && <p role="alert" className="mb-3 text-sm text-destructive">{fileError}</p>}
               {notice && <p role="alert" className={`mb-4 text-sm leading-5 ${uncertain ? "text-muted-foreground" : "text-destructive"}`}>{notice}</p>}
             </div>
-            <footer className="shrink-0 border-t bg-muted/30 px-5 py-4">
+            <footer className="shrink-0 border-t bg-muted/30 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-4">
               {confirmDiscard ? (
                 <div role="alert" className="flex flex-wrap items-center gap-2"><p className="mr-auto text-sm">Discard this unsent message?</p><Button type="button" variant="outline" onClick={() => setConfirmDiscard(false)}>Keep writing</Button><Button type="button" variant="destructive" onClick={() => { reset(); setOpen(false); }}>Discard message</Button></div>
               ) : (
