@@ -8,6 +8,7 @@ import {
   disableEmailNotifications,
   enableBrowserNotifications,
   fetchGeneralSettings,
+  sendTestEmailNotification,
   updateEmailNotifications,
 } from "../api";
 import type { EmailNotificationTemplate } from "../../shared/types";
@@ -180,6 +181,8 @@ function EmailNotificationSetting(props: {
     onSettled: refresh,
   });
 
+  const sendTest = useMutation({ mutationFn: sendTestEmailNotification });
+
   const busy = save.isPending || turnOff.isPending;
   const trimmed = address.trim();
   const unchanged = trimmed.toLowerCase() === (props.savedAddress ?? "");
@@ -243,7 +246,29 @@ function EmailNotificationSetting(props: {
           >
             Customize email
           </Button>
+          {props.savedAddress && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => sendTest.mutate()}
+              disabled={busy || sendTest.isPending}
+            >
+              {sendTest.isPending ? "Sending…" : "Send test"}
+            </Button>
+          )}
         </div>
+        {sendTest.isSuccess && (
+          <p className="mt-2 text-xs leading-5 text-muted-foreground" role="status">
+            Test sent from {sendTest.data.from} to {sendTest.data.to}. If it doesn’t arrive, check
+            spam and your Cloudflare Email Sending setup.
+          </p>
+        )}
+        {sendTest.error && (
+          <p className="mt-2 text-xs leading-5 text-destructive" role="alert">
+            {sendTest.error.message}
+          </p>
+        )}
         {error && (
           <p className="mt-2 text-xs leading-5 text-destructive" role="alert">
             {error.message || "Couldn’t update email notifications. Try again."}

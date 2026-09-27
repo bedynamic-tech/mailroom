@@ -4,6 +4,7 @@ import {
   buildEmailNotification,
   normalizeNotificationAddress,
   notifyNewEmailByEmail,
+  sendTestEmailNotification,
   validateTemplate,
 } from "../src/worker/notifications/email.ts";
 import {
@@ -101,12 +102,13 @@ test("applies a custom template", () => {
   assert.equal(content.text, "alice@customer.test wrote:\nHi there, I would like a refund.");
 });
 
-function fakeEnv({ address, inboxes = [], template = {}, fromMailbox = null }) {
+function fakeEnv({ address, inboxes = [], template = {}, fromMailbox = null, sendError = null }) {
   const sent = [];
   return {
     sent,
     EMAIL: {
       async send(message) {
+        if (sendError) throw new Error(sendError);
         sent.push(message);
         return { messageId: "id@example.com" };
       },
@@ -130,6 +132,7 @@ function fakeEnv({ address, inboxes = [], template = {}, fromMailbox = null }) {
                 ...template,
               };
             }
+            if (sql.includes("ORDER BY address")) return { address: "support@example.com" };
             if (sql.includes("WHERE id = ?")) {
               return fromMailbox && this.args[0] === fromMailbox.id && !fromMailbox.deleted
                 ? { address: fromMailbox.address }
@@ -196,4 +199,32 @@ test("falls back to the receiving inbox when the chosen inbox was deleted, and o
   });
   await notifyNewEmailByEmail(env, input);
   assert.equal(env.sent[0].from, "support@example.com");
+});
+
+test("reports why a notice was skipped", async () => {
+  assert.deepEqual(await notifyNewEmailByEmail(fakeEnv({ address: null }), input), {
+    status: "skipped",
+    reason: "off",
+  });
+  assert.deepEqual(
+    await notifyNewEmailByEmail(fakeEnv({ address: "alice@customer.test" }), input),
+    { status: "skipped", reason: "from_recipient" },
+  );
+  assert.deepEqual(
+    await notifyNewEmailByEmail(fakeEnv({ address: "me@example.org" }), input),
+    { status: "sent", from: "support@example.com", to: "me@example.org" },
+  );
+});
+
+test("sends a test notice without a conversation link", async () => {
+  const env = fakeEnv({ address: "me@example.org" });
+  assert.equal((await sendTestEmailNotification(env)).status, "sent");
+  assert.deepEqual(env.sent[0].to, ["me@example.org"]);
+  assert.match(env.sent[0].subject, /Test notification from Mailroom/);
+  assert.doesNotMatch(env.sent[0].text, /Open conversation/);
+});
+
+test("surfaces provider errors from a test send", async () => {
+  const env = fakeEnv({ address: "me@example.org", sendError: "destination address not verified" });
+  await assert.rejects(sendTestEmailNotification(env), /destination address not verified/);
 });

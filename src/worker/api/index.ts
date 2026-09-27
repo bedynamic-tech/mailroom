@@ -16,6 +16,7 @@ import { validatePushSubscription } from "../notifications/push";
 import {
   effectiveTemplate,
   normalizeNotificationAddress,
+  sendTestEmailNotification,
   validateTemplate,
   type StoredNotificationTemplate,
 } from "../notifications/email";
@@ -195,6 +196,20 @@ api.put("/settings/email-notification-template", async (c) => {
     )
     .run();
   return c.json({ ok: true });
+});
+
+api.post("/settings/email-notifications/test", async (c) => {
+  try {
+    const result = await sendTestEmailNotification(c.env);
+    if (result.status !== "sent") {
+      return c.json({ error: "Turn on email notifications before sending a test" }, 400);
+    }
+    return c.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown error";
+    console.error("Test email notification failed", { error: message });
+    return c.json({ error: `Couldn’t send the test: ${message}` }, 502);
+  }
 });
 
 api.delete("/settings/email-notifications", async (c) => {

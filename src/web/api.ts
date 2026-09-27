@@ -109,6 +109,11 @@ export const updateEmailNotifications = (address: string) =>
 export const disableEmailNotifications = () =>
   request<{ ok: true }>("/settings/email-notifications", { method: "DELETE" });
 
+export const sendTestEmailNotification = () =>
+  request<{ status: "sent"; from: string; to: string }>("/settings/email-notifications/test", {
+    method: "POST",
+  });
+
 export const updateEmailNotificationTemplate = (template: EmailNotificationTemplate) =>
   request<{ ok: true }>("/settings/email-notification-template", {
     method: "PUT",

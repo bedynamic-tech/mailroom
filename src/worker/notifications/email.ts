@@ -105,36 +105,75 @@ export function buildEmailNotification(
   return { fromName: rendered.fromName, subject: rendered.subject, text: rendered.body };
 }
 
-export async function notifyNewEmailByEmail(
-  env: SendEmailEnv & { DB: D1Database },
-  input: EmailNotificationInput,
-): Promise<void> {
-  const settings = await env.DB.prepare(
+interface NotificationSettings extends StoredNotificationTemplate {
+  email_notification_address: string | null;
+  email_notification_origin: string | null;
+  email_notification_from_mailbox_id: number | null;
+}
+
+export type EmailNotificationResult =
+  | { status: "sent"; from: string; to: string }
+  | { status: "skipped"; reason: "off" | "from_recipient" | "internal_address" };
+
+async function loadSettings(env: { DB: D1Database }): Promise<NotificationSettings | null> {
+  return env.DB.prepare(
     `SELECT email_notification_address, email_notification_origin,
             email_notification_from_name, email_notification_from_mailbox_id,
             email_notification_subject, email_notification_body
      FROM global_settings WHERE id = 1`,
-  ).first<
-    StoredNotificationTemplate & {
-      email_notification_address: string | null;
-      email_notification_origin: string | null;
-      email_notification_from_mailbox_id: number | null;
-    }
-  >();
+  ).first<NotificationSettings>();
+}
+
+export async function notifyNewEmailByEmail(
+  env: SendEmailEnv & { DB: D1Database },
+  input: EmailNotificationInput,
+): Promise<EmailNotificationResult> {
+  const settings = await loadSettings(env);
   const recipient = settings?.email_notification_address;
-  if (!recipient) return;
+  if (!settings || !recipient) return { status: "skipped", reason: "off" };
 
   // Never notify about mail from the notification address itself or from one
   // of our own Inboxes: an auto-responder or forward would otherwise loop.
   const sender = input.senderAddress.trim().toLowerCase();
-  if (sender === recipient) return;
+  if (sender === recipient) return skipped("from_recipient", input);
   const internal = await env.DB.prepare(
     "SELECT id FROM mailboxes WHERE address IN (?, ?) LIMIT 1",
   )
     .bind(sender, recipient)
     .first();
-  if (internal) return;
+  if (internal) return skipped("internal_address", input);
 
+  return deliver(env, settings, recipient, input);
+}
+
+/** Sends a sample notice to the saved address, surfacing any provider error to the caller. */
+export async function sendTestEmailNotification(
+  env: SendEmailEnv & { DB: D1Database },
+): Promise<EmailNotificationResult> {
+  const settings = await loadSettings(env);
+  const recipient = settings?.email_notification_address;
+  if (!settings || !recipient) return { status: "skipped", reason: "off" };
+
+  const inbox = await env.DB.prepare("SELECT address FROM mailboxes ORDER BY address LIMIT 1")
+    .first<{ address: string }>();
+  if (!inbox) throw new Error("Add an inbox before sending a test notification");
+
+  return deliver(env, settings, recipient, {
+    threadId: 0,
+    inboxAddress: inbox.address,
+    senderName: "Alice Customer",
+    senderAddress: "alice@example.com",
+    subject: "Test notification from Mailroom",
+    preview: "This is a test of your email notification settings. New emails will look like this.",
+  });
+}
+
+async function deliver(
+  env: SendEmailEnv & { DB: D1Database },
+  settings: NotificationSettings,
+  recipient: string,
+  input: EmailNotificationInput,
+): Promise<EmailNotificationResult> {
   // A chosen sending Inbox that was since deleted falls back to the receiving Inbox.
   let fromAddress = input.inboxAddress;
   if (settings.email_notification_from_mailbox_id !== null) {
@@ -146,7 +185,7 @@ export async function notifyNewEmailByEmail(
 
   const content = buildEmailNotification(
     input,
-    settings.email_notification_origin,
+    input.threadId > 0 ? settings.email_notification_origin : null,
     effectiveTemplate(settings),
   );
   await sendEmail(env, {
@@ -158,4 +197,13 @@ export async function notifyNewEmailByEmail(
     text: content.text,
     autoSubmitted: "auto-generated",
   });
+  return { status: "sent", from: fromAddress, to: recipient };
+}
+
+function skipped(
+  reason: "from_recipient" | "internal_address",
+  input: EmailNotificationInput,
+): EmailNotificationResult {
+  console.log("Email notification skipped", { threadId: input.threadId, reason });
+  return { status: "skipped", reason };
 }
