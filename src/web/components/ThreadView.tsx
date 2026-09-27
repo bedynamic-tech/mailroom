@@ -229,8 +229,8 @@ export function ThreadView(props: {
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <InboxIcon className="h-[18px] w-[18px]" />
           </span>
-          <p className="mt-3 text-[13px] font-medium text-foreground">Couldn’t open this conversation</p>
-          <p className="mt-1 text-[12.5px] text-muted-foreground">
+          <p className="mt-3 text-sm font-medium text-foreground">Couldn’t open this conversation</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             It may have been archived or deleted, or the connection dropped.
           </p>
           <Button variant="outline" onClick={() => detail.refetch()} className="mt-4">
@@ -345,7 +345,7 @@ export function ThreadView(props: {
         </Button>
         <div className="min-w-0 flex-1">
           <h1
-            className="truncate text-[15px] font-semibold tracking-[-0.015em] text-foreground"
+            className="truncate text-base font-semibold tracking-[-0.015em] text-foreground"
             title={thread.subject || undefined}
           >
             {thread.subject || "(no subject)"}
@@ -362,7 +362,7 @@ export function ThreadView(props: {
                   <Badge
                     key={label.id}
                     variant="outline"
-                    className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-[11px] font-normal text-foreground/75"
+                    className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-xs font-normal text-foreground/75"
                   >
                     <TagIcon className="h-3 w-3 text-muted-foreground" />
                     {label.name}
@@ -562,7 +562,7 @@ export function ThreadView(props: {
               placeholder="Write a reply…"
               rows={3}
               aria-label="Reply"
-              className="max-h-[min(30dvh,200px)] min-h-[84px] resize-none overflow-y-auto overscroll-contain rounded-none border-0 bg-transparent px-3.5 py-3 text-base leading-6 shadow-none focus-visible:ring-0 md:text-sm"
+              className="max-h-[min(30dvh,200px)] min-h-[84px] resize-none overflow-y-auto overscroll-contain rounded-none border-0 bg-transparent px-3.5 py-3 text-sm leading-6 shadow-none focus-visible:ring-0"
             />
             {pendingFiles.length > 0 && (
               <div className="flex flex-wrap gap-1.5 px-3.5 pb-1" aria-label="Attachments to send">
@@ -711,36 +711,36 @@ function MessageCard({ message }: { message: Message }) {
           email={message.from_address}
           label={displayName}
           fallback={message.sent_by === "agent" ? <SparklesIcon className="h-4 w-4" /> : undefined}
-          className={`h-9 w-9 text-[13px] ${isOutbound ? "bg-muted text-foreground/70" : ""}`}
+          className={`h-9 w-9 text-sm ${isOutbound ? "bg-muted text-foreground/70" : ""}`}
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-[15px] font-semibold text-foreground md:text-[13.5px]">{displayName}</span>
+            <span className="truncate text-sm font-semibold text-foreground">{displayName}</span>
             {message.sent_by === "agent" && <AuthorBadge tone="agent">Agent</AuthorBadge>}
             {isOutbound && message.sent_by === "human" && <AuthorBadge tone="human">You</AuthorBadge>}
           </div>
-          <div className="mt-0.5 truncate text-[13px] text-muted-foreground md:text-xs">
+          <div className="mt-0.5 truncate text-xs text-muted-foreground">
             {isOutbound ? `to ${to.join(", ")}` : message.from_address}
           </div>
           {!isOutbound && to.length > 1 && (
-            <div className="truncate text-[13px] text-muted-foreground md:text-xs" title={to.join(", ")}>
+            <div className="truncate text-xs text-muted-foreground" title={to.join(", ")}>
               to {to.join(", ")}
             </div>
           )}
           {cc.length > 0 && (
-            <div className="truncate text-[13px] text-muted-foreground md:text-xs" title={cc.join(", ")}>
+            <div className="truncate text-xs text-muted-foreground" title={cc.join(", ")}>
               cc {cc.join(", ")}
             </div>
           )}
           {bcc.length > 0 && (
-            <div className="truncate text-[13px] text-muted-foreground md:text-xs" title={bcc.join(", ")}>
+            <div className="truncate text-xs text-muted-foreground" title={bcc.join(", ")}>
               bcc {bcc.join(", ")}
             </div>
           )}
         </div>
         <time
           dateTime={message.created_at}
-          className="mt-0.5 shrink-0 text-[13px] tabular-nums text-muted-foreground md:text-xs"
+          className="mt-0.5 shrink-0 text-xs tabular-nums text-muted-foreground"
           title={new Date(message.created_at).toLocaleString()}
         >
           {formatTime(message.created_at)}
@@ -754,7 +754,7 @@ function MessageCard({ message }: { message: Message }) {
           sender={displayName}
         />
       ) : (
-        <div className="max-w-[72ch] break-words text-base leading-6 whitespace-pre-wrap text-foreground md:text-sm">
+        <div className="max-w-[72ch] break-words text-sm leading-6 whitespace-pre-wrap text-foreground touch:text-base">
           <LinkifiedText text={main} />
         </div>
       )}
@@ -765,7 +765,7 @@ function MessageCard({ message }: { message: Message }) {
               key={attachment.id}
               href={`/api/attachments/${attachment.id}`}
               download={attachment.filename || undefined}
-              className="inline-flex max-w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-[13px] text-foreground md:text-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="inline-flex max-w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <PaperclipIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="min-w-0 truncate">{attachment.filename || "Attachment"}</span>
@@ -786,7 +786,7 @@ function MessageCard({ message }: { message: Message }) {
             {showQuoted ? "Hide quoted text" : "Show quoted text"}
           </Button>
           {showQuoted && (
-            <div className="mt-2 break-words border-l border-border pl-3 text-[15px] leading-relaxed whitespace-pre-wrap text-muted-foreground md:text-[13px]">
+            <div className="mt-2 break-words border-l border-border pl-3 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
               <LinkifiedText text={quoted} />
             </div>
           )}
@@ -898,7 +898,7 @@ const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigat
 
 function Kbd(props: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border bg-muted/50 px-1 font-sans text-[11px] font-medium text-muted-foreground">
+    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border bg-muted/50 px-1 font-sans text-xs font-medium text-muted-foreground">
       {props.children}
     </kbd>
   );
@@ -908,7 +908,7 @@ function AuthorBadge(props: { tone: "agent" | "human"; children: React.ReactNode
   return (
     <Badge
       variant={props.tone === "agent" ? "outline" : "secondary"}
-      className="h-5 rounded-md px-1.5 text-[11px] font-medium"
+      className="h-5 rounded-md px-1.5 text-xs font-medium"
     >
       {props.children}
     </Badge>

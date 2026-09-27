@@ -17,8 +17,8 @@ export function AccessSetup(props: { error: ApiError; onRetry: () => void; retry
   return (
     <div className="flex h-dvh min-h-[560px] justify-center overflow-y-auto bg-canvas px-4 py-10 text-foreground md:py-16">
       <div className="w-full max-w-[620px]">
-        <h1 className="text-[20px] font-semibold tracking-tight">Finish securing Mailroom</h1>
-        <p className="mt-2 max-w-xl text-[13.5px] leading-6 text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Finish securing Mailroom</h1>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
           Mail stays locked until Cloudflare Access protects this Worker.
         </p>
 
@@ -77,16 +77,16 @@ function Step(props: {
     >
       <div className="flex items-center gap-3">
         <span
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold ${done ? "bg-foreground text-background" : "border text-foreground"}`}
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${done ? "bg-foreground text-background" : "border text-foreground"}`}
         >
           {done ? "✓" : props.n}
         </span>
-        <h2 className={`text-[14px] font-medium ${done ? "text-muted-foreground" : ""}`}>
+        <h2 className={`text-sm font-medium ${done ? "text-muted-foreground" : ""}`}>
           {props.title}
         </h2>
       </div>
       {!done && (
-        <div className="mt-3 pl-9 text-[13px] leading-6 text-muted-foreground [&_strong]:font-medium [&_strong]:text-foreground">
+        <div className="mt-3 pl-9 text-sm leading-6 text-muted-foreground [&_strong]:font-medium [&_strong]:text-foreground">
           {props.children}
         </div>
       )}

@@ -25,7 +25,7 @@ export function SettingsHeader(props: {
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </Button>
-        <h1 className="text-[15px] font-semibold tracking-[-0.015em] text-foreground">Settings</h1>
+        <h1 className="text-base font-semibold tracking-[-0.015em] text-foreground">Settings</h1>
       </div>
       <nav aria-label="Settings sections" className="-mb-px flex gap-5">
         <SettingsTab active={props.active === "general"} onClick={props.onOpenGeneral}>
@@ -52,7 +52,7 @@ function SettingsTab(props: { active: boolean; onClick: () => void; children: Re
       onClick={props.onClick}
       aria-current={props.active ? "page" : undefined}
       className={cn(
-        "relative rounded-t-sm pb-2.5 text-[13px] outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+        "relative rounded-t-sm pb-2.5 text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
         "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:transition-colors",
         props.active
           ? "font-medium text-foreground after:bg-foreground"
@@ -87,7 +87,7 @@ export function SettingsBlock(props: {
             {props.title}
           </h2>
           {props.description && (
-            <p className="mt-1 max-w-xl text-[13px] leading-5 text-muted-foreground">
+            <p className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">
               {props.description}
             </p>
           )}

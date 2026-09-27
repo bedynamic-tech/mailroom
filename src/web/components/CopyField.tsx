@@ -11,10 +11,10 @@ export function CopyField(props: { label?: string; value: string; placeholder?: 
   return (
     <div className="flex min-w-0 items-center gap-2 rounded-lg border bg-canvas py-1 pl-3 pr-1">
       {props.label && (
-        <span className="shrink-0 font-mono text-[12px] text-muted-foreground">{props.label}</span>
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">{props.label}</span>
       )}
       <code
-        className={`min-w-0 flex-1 truncate font-mono text-[12.5px] ${props.placeholder ? "text-muted-foreground italic" : "text-foreground"}`}
+        className={`min-w-0 flex-1 truncate font-mono text-xs ${props.placeholder ? "text-muted-foreground italic" : "text-foreground"}`}
         title={props.value}
       >
         {props.value}

@@ -81,7 +81,7 @@ export function Contacts(props: {
         }`}
       >
         <header className="border-b px-4 pt-3.5 pb-3">
-          <div className="mb-3 flex h-8 items-center gap-2">
+          <div className="mb-3 flex h-8 items-center gap-2 touch:h-10">
             <Button
               variant="ghost"
               size="icon"
@@ -91,7 +91,7 @@ export function Contacts(props: {
             >
               <ArrowLeftIcon className="h-5 w-5" />
             </Button>
-            <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.015em] text-foreground">
+            <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.015em] text-foreground">
               Contacts
             </h1>
             <Button variant="outline" size="sm" onClick={props.onNew}>
@@ -112,7 +112,7 @@ export function Contacts(props: {
               }}
               placeholder="Search by name, email or company"
               aria-label="Search contacts"
-              className="h-10 w-full bg-muted/50 pr-9 pl-8.5 text-base focus-visible:bg-background md:h-9 md:text-[13px]"
+              className="h-10 w-full bg-muted/50 pr-9 pl-8.5 text-sm focus-visible:bg-background md:h-9"
             />
             {search && (
               <Button
@@ -187,8 +187,8 @@ export function Contacts(props: {
             <span className="flex h-11 w-11 items-center justify-center rounded-full border bg-background text-muted-foreground">
               <ContactsIcon className="h-5 w-5" />
             </span>
-            <p className="mt-3 text-[13px] font-medium text-foreground">No contact selected</p>
-            <p className="mt-1 max-w-64 text-[12.5px] leading-5 text-muted-foreground">
+            <p className="mt-3 text-sm font-medium text-foreground">No contact selected</p>
+            <p className="mt-1 max-w-64 text-xs leading-5 text-muted-foreground">
               Choose one from the list to see their details and conversations.
             </p>
           </div>
@@ -213,7 +213,7 @@ function ContactRow(props: { contact: Contact; selected: boolean; onClick: () =>
       <EmailAvatar email={contact.address} label={title} className="h-8 w-8 text-xs" />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
             {title}
           </span>
           {contact.last_seen_at && (
@@ -226,7 +226,7 @@ function ContactRow(props: { contact: Contact; selected: boolean; onClick: () =>
             </time>
           )}
         </span>
-        <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground">
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
           {[contact.name ? contact.address : null, contact.company].filter(Boolean).join(" · ") ||
             "No details yet"}
         </span>
@@ -383,8 +383,8 @@ function ContactDetails(props: {
       <div className="flex items-center gap-3">
         <EmailAvatar email={contact.address} label={title} className="h-11 w-11 text-base" />
         <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold text-foreground">{title}</p>
-          <p className="truncate text-[13px] text-muted-foreground">{contact.address}</p>
+          <p className="truncate text-base font-semibold text-foreground">{title}</p>
+          <p className="truncate text-sm text-muted-foreground">{contact.address}</p>
         </div>
       </div>
 
@@ -411,7 +411,7 @@ function ContactDetails(props: {
             </Button>
           )}
           {!dirty && save.isSuccess && (
-            <span role="status" className="text-[13px] text-muted-foreground">Saved</span>
+            <span role="status" className="text-sm text-muted-foreground">Saved</span>
           )}
         </div>
       </form>
@@ -426,7 +426,7 @@ function ContactDetails(props: {
           )}
         </h2>
         {detail.data.conversations.length === 0 ? (
-          <p className="mt-2 text-[13px] text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             No email from this address yet.
           </p>
         ) : (
@@ -441,7 +441,7 @@ function ContactDetails(props: {
                   className="flex w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-inset"
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] text-foreground">
+                    <span className="block truncate text-sm text-foreground">
                       {conversation.subject || "(no subject)"}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
@@ -451,7 +451,7 @@ function ContactDetails(props: {
                   {conversation.status === "archived" && (
                     <Badge
                       variant="outline"
-                      className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-[11px] font-normal text-muted-foreground"
+                      className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-xs font-normal text-muted-foreground"
                     >
                       <ArchiveIcon className="h-3 w-3" />
                       Archived
@@ -474,7 +474,7 @@ function ContactDetails(props: {
         <h2 id="contact-delete" className="sr-only">Delete contact</h2>
         {confirmDelete ? (
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-[13px] text-foreground">
+            <p className="text-sm text-foreground">
               Delete this contact? Their conversations stay; if they email again, they’re added back.
             </p>
             <Button
@@ -566,7 +566,7 @@ function DetailShell(props: {
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </Button>
-        <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.015em] text-foreground">
+        <h2 className="min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.015em] text-foreground">
           {props.title}
         </h2>
         {props.actions}
@@ -581,7 +581,7 @@ function DetailShell(props: {
 function Field(props: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="text-[13px] font-medium text-foreground">{props.label}</span>
+      <span className="text-sm font-medium text-foreground">{props.label}</span>
       <span className="mt-1.5 block">{props.children}</span>
     </label>
   );
@@ -593,9 +593,9 @@ function ListState(props: { title: string; detail?: string }) {
       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <ContactsIcon className="h-[18px] w-[18px]" />
       </span>
-      <p className="mt-3 text-[13px] font-medium text-foreground">{props.title}</p>
+      <p className="mt-3 text-sm font-medium text-foreground">{props.title}</p>
       {props.detail && (
-        <p className="mt-1 max-w-60 text-[12.5px] leading-5 text-muted-foreground">{props.detail}</p>
+        <p className="mt-1 max-w-60 text-xs leading-5 text-muted-foreground">{props.detail}</p>
       )}
     </div>
   );

@@ -427,11 +427,11 @@ export function AgentSettings(props: {
                   <div className="min-w-0 flex-1">
                     <label
                       htmlFor="agent-drafting"
-                      className="text-[13.5px] font-medium text-foreground"
+                      className="text-sm font-medium text-foreground"
                     >
                       Draft replies to new messages
                     </label>
-                    <p className="mt-1 max-w-xl text-[13px] leading-5 text-muted-foreground">
+                    <p className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">
                       Create a draft for new customer messages. Nothing is sent without your approval.
                     </p>
                     {toggleDrafting.isError && (
@@ -471,7 +471,7 @@ export function AgentSettings(props: {
                   rows={4}
                   aria-labelledby="base-instructions-heading"
                   placeholder="Describe the product, the agent's role, voice, general rules, and signature…"
-                  className="max-h-[60dvh] min-h-32 resize-y rounded-none border-0 bg-transparent px-4 py-3.5 text-sm leading-6 shadow-none focus-visible:ring-0 sm:px-5 md:text-sm"
+                  className="max-h-[60dvh] min-h-32 resize-y rounded-none border-0 bg-transparent px-4 py-3.5 text-sm leading-6 shadow-none focus-visible:ring-0 sm:px-5"
                 />
                 <div className="flex items-center justify-between gap-3 border-t bg-muted/30 px-4 py-2.5 sm:px-5">
                   <p className="min-w-0 text-xs text-muted-foreground" aria-live="polite">
@@ -576,8 +576,8 @@ export function AgentSettings(props: {
               <SettingsPanel className="border-destructive/25">
                 <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                   <div className="min-w-0">
-                    <p className="text-[13.5px] font-medium text-foreground">Delete inbox</p>
-                    <p className="mt-1 break-words text-[13px] leading-5 text-muted-foreground">
+                    <p className="text-sm font-medium text-foreground">Delete inbox</p>
+                    <p className="mt-1 break-words text-sm leading-5 text-muted-foreground">
                       Permanently deletes {mailbox.address} and all of its conversations.
                     </p>
                   </div>
@@ -603,8 +603,8 @@ export function AgentSettings(props: {
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 <SparklesIcon className="h-[18px] w-[18px]" />
               </span>
-              <p className="mt-3 text-[13px] font-medium text-foreground">No inbox to configure</p>
-              <p className="mt-1 text-[12.5px] text-muted-foreground">
+              <p className="mt-3 text-sm font-medium text-foreground">No inbox to configure</p>
+              <p className="mt-1 text-xs text-muted-foreground">
                 Add an inbox before configuring the agent.
               </p>
               <Button className="mt-4" onClick={openMailboxEditor}>
@@ -965,7 +965,7 @@ function PlaybookRow(props: {
       title={props.playbook.name}
       badge={
         !enabled && (
-          <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-[11px] font-medium text-muted-foreground">
+          <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-xs font-medium text-muted-foreground">
             Disabled
           </Badge>
         )
@@ -1013,10 +1013,10 @@ function ListRow(props: {
       <span className="flex h-6 shrink-0 items-center">{props.leading}</span>
       <div className={`min-w-0 flex-1 transition-opacity ${props.muted ? "opacity-60" : ""}`}>
         <div className="flex min-h-6 flex-wrap items-center gap-2">
-          <h3 className="text-[13.5px] font-medium text-foreground">{props.title}</h3>
+          <h3 className="text-sm font-medium text-foreground">{props.title}</h3>
           {props.badge}
         </div>
-        <p className="mt-0.5 line-clamp-2 text-[13px] leading-5 text-muted-foreground">
+        <p className="mt-0.5 line-clamp-2 text-sm leading-5 text-muted-foreground">
           {props.description}
         </p>
         {props.detail && (
@@ -1068,7 +1068,7 @@ function ListMessage(props: { icon?: React.ReactNode; tone?: "error"; children: 
   return (
     <div
       role={props.tone === "error" ? "alert" : undefined}
-      className={`flex items-center gap-3 px-4 py-4 text-[13px] sm:px-5 ${
+      className={`flex items-center gap-3 px-4 py-4 text-sm sm:px-5 ${
         props.tone === "error" ? "bg-destructive/5 text-destructive" : "text-muted-foreground"
       }`}
     >
@@ -1167,7 +1167,7 @@ function PlaybookEditor(props: {
           </Field>
 
           <label className="flex cursor-pointer items-center justify-between rounded-lg border bg-muted/40 px-3.5 py-3">
-            <span className="text-[13px] font-medium text-foreground">Enabled</span>
+            <span className="text-sm font-medium text-foreground">Enabled</span>
             <Switch
               checked={props.state.enabled}
               onCheckedChange={(enabled) => update({ enabled })}
@@ -1203,7 +1203,7 @@ function PlaybookEditor(props: {
 function Field(props: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-[13px] font-medium text-foreground">{props.label}</span>
+      <span className="text-sm font-medium text-foreground">{props.label}</span>
       <span className="mt-1.5 block">{props.children}</span>
     </label>
   );
