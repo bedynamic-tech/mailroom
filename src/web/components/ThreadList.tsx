@@ -175,9 +175,9 @@ export function ThreadList(props: {
       }`}
     >
       <header className="border-b px-4 pt-3.5 pb-2.5">
-        <div className="mb-3 flex h-8 items-center justify-between gap-3">
+        <div className="mb-3 flex h-8 items-center justify-between gap-3 touch:h-10">
           <div className="hidden min-w-0 flex-1 items-baseline gap-2 lg:flex">
-            <h1 className="truncate text-[15px] font-semibold tracking-[-0.015em] text-foreground">
+            <h1 className="truncate text-base font-semibold tracking-[-0.015em] text-foreground">
               {props.title}
             </h1>
             <span className="relative h-3.5 w-3.5 shrink-0 self-center" role="status" aria-live="polite">
@@ -224,7 +224,7 @@ export function ThreadList(props: {
               }
             >
               <SelectTrigger
-                className="-ml-2 mr-auto h-8 min-w-0 border-transparent px-2 text-[15px] font-semibold shadow-none hover:bg-muted"
+                className="-ml-2 mr-auto h-8 min-w-0 border-transparent px-2 text-base font-semibold shadow-none hover:bg-muted"
                 aria-label="Choose inbox"
               >
                 <SelectValue placeholder="All inboxes" />
@@ -269,7 +269,7 @@ export function ThreadList(props: {
                 }}
                 placeholder="Search conversations"
                 aria-label="Search conversations"
-                className="h-10 w-full bg-muted/50 pr-9 pl-8.5 text-base focus-visible:bg-background md:h-9 md:text-[13px]"
+                className="h-10 w-full bg-muted/50 pr-9 pl-8.5 text-sm focus-visible:bg-background md:h-9"
               />
               {props.search ? (
                 <Button
@@ -282,13 +282,13 @@ export function ThreadList(props: {
                   <XIcon className="h-3.5 w-3.5" />
                 </Button>
               ) : (
-                <kbd className="pointer-events-none absolute top-1/2 right-2 hidden h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded border bg-background px-1 font-sans text-[11px] text-muted-foreground sm:flex">
+                <kbd className="pointer-events-none absolute top-1/2 right-2 hidden h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded border bg-background px-1 font-sans text-xs text-muted-foreground sm:flex">
                   /
                 </kbd>
               )}
             </div>
 
-            <div className="mt-2.5 flex h-8 items-center gap-2 sm:gap-3">
+            <div className="mt-2.5 flex h-8 items-center gap-2 sm:gap-3 touch:h-10">
               {visibleThreads.length > 0 && (
                 <span className="flex w-8 shrink-0 justify-center">
                   <Checkbox
@@ -302,7 +302,7 @@ export function ThreadList(props: {
               )}
               {selectionMode ? (
                 <>
-                  <span className="shrink-0 whitespace-nowrap text-[13px] font-medium tabular-nums text-foreground">
+                  <span className="shrink-0 whitespace-nowrap text-sm font-medium tabular-nums text-foreground">
                     {checkedCount} selected
                   </span>
                   <span className="ml-auto flex items-center gap-0.5">
@@ -375,7 +375,7 @@ export function ThreadList(props: {
                     onValueChange={(value) => props.onFilter(value as ThreadFilter)}
                     className="gap-0"
                   >
-                    <TabsList aria-label="Conversation filter" className="h-7!">
+                    <TabsList aria-label="Conversation filter" className="h-7! touch:h-9!">
                       <FilterTab value="all" label="All" />
                       <FilterTab value="unread" label="Unread" count={props.unreadCount ?? undefined} />
                     </TabsList>
@@ -549,7 +549,7 @@ export function ThreadList(props: {
 
 function FilterTab(props: { value: ThreadFilter; label: string; count?: number }) {
   return (
-    <TabsTrigger value={props.value} className="px-2 text-sm sm:px-2.5 md:text-[13px]">
+    <TabsTrigger value={props.value} className="px-2 text-sm sm:px-2.5">
       {props.label}
       {props.count ? (
         <span className="text-xs tabular-nums text-muted-foreground">{props.count}</span>
@@ -610,7 +610,7 @@ function ThreadRow(props: {
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             <span
-              className={`min-w-0 flex-1 truncate text-[15px] md:text-[13px] ${
+              className={`min-w-0 flex-1 truncate text-sm ${
                 unread ? "font-semibold text-foreground" : "font-medium text-foreground/75"
               }`}
             >
@@ -618,7 +618,7 @@ function ThreadRow(props: {
             </span>
             <time
               dateTime={thread.last_message_at}
-              className={`shrink-0 text-[13px] tabular-nums md:text-xs ${
+              className={`shrink-0 text-xs tabular-nums ${
                 unread ? "font-medium text-foreground" : "text-muted-foreground"
               }`}
             >
@@ -626,13 +626,13 @@ function ThreadRow(props: {
             </time>
           </span>
           <span
-            className={`mt-0.5 block truncate text-[15px] md:text-[13px] ${
+            className={`mt-0.5 block truncate text-sm ${
               unread ? "font-medium text-foreground" : "text-foreground/75"
             }`}
           >
             {thread.subject || "(no subject)"}
           </span>
-          <span className="mt-0.5 block truncate text-sm leading-5 text-muted-foreground md:text-[12.5px]">
+          <span className="mt-0.5 block truncate text-sm leading-5 text-muted-foreground">
             {thread.snippet}
           </span>
 
@@ -641,7 +641,7 @@ function ThreadRow(props: {
               {showArchivedBadge && (
                 <Badge
                   variant="outline"
-                  className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-xs font-normal text-muted-foreground md:text-[11px]"
+                  className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-xs font-normal text-muted-foreground"
                 >
                   <ArchiveIcon className="h-3 w-3" />
                   Archived
@@ -651,19 +651,19 @@ function ThreadRow(props: {
                 <Badge
                   key={label.id}
                   variant="outline"
-                  className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-xs font-normal text-foreground/75 md:text-[11px]"
+                  className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-xs font-normal text-foreground/75"
                 >
                   <TagIcon className="h-3 w-3 text-muted-foreground" />
                   {label.name}
                 </Badge>
               ))}
               {props.showMailbox && (
-                <span className="min-w-0 truncate text-xs text-muted-foreground md:text-[11.5px]">
+                <span className="min-w-0 truncate text-xs text-muted-foreground">
                   {thread.mailbox_address}
                 </span>
               )}
               {hasDraft && (
-                <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground md:text-[11px]">
+                <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                   <SparklesIcon className="h-3 w-3" />
                   Draft
                 </span>
@@ -695,9 +695,9 @@ function ListState(props: { title: string; detail?: string }) {
       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <InboxIcon className="h-[18px] w-[18px]" />
       </span>
-      <p className="mt-3 text-[13px] font-medium text-foreground">{props.title}</p>
+      <p className="mt-3 text-sm font-medium text-foreground">{props.title}</p>
       {props.detail && (
-        <p className="mt-1 max-w-60 text-[12.5px] leading-5 text-muted-foreground">{props.detail}</p>
+        <p className="mt-1 max-w-60 text-xs leading-5 text-muted-foreground">{props.detail}</p>
       )}
     </div>
   );

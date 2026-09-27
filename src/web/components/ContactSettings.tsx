@@ -70,13 +70,13 @@ export function ContactSettings(props: {
               <div className="min-w-0 flex-1">
                 <label
                   htmlFor="auto-create-contacts"
-                  className="text-[13.5px] font-medium text-foreground"
+                  className="text-sm font-medium text-foreground"
                 >
                   Automatically create new contacts
                 </label>
                 <p
                   id="auto-create-contacts-description"
-                  className="mt-1 max-w-xl text-[13px] leading-5 text-muted-foreground"
+                  className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground"
                 >
                   Adds a contact for each new sender whose name appears in their email. Senders
                   without a name, automated mail and your own inboxes are skipped. Existing
@@ -196,18 +196,18 @@ function ContactImport(props: { onOpenContacts: () => void }) {
           )}
 
           {fileError && (
-            <p role="alert" className="mt-3 text-[13px] leading-5 text-destructive">
+            <p role="alert" className="mt-3 text-sm leading-5 text-destructive">
               {fileError}
             </p>
           )}
 
           {file && (
             <div>
-              <p className="text-[13.5px] font-medium text-foreground">
+              <p className="text-sm font-medium text-foreground">
                 {count(file.parsed.contacts.length, "contact")} found in {file.name}
               </p>
               {ignored > 0 && (
-                <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
+                <p className="mt-1 text-sm leading-5 text-muted-foreground">
                   {[
                     file.parsed.skipped > 0 &&
                       `${count(file.parsed.skipped, "entry", "entries")} without an email address`,
@@ -220,7 +220,7 @@ function ContactImport(props: { onOpenContacts: () => void }) {
                 </p>
               )}
 
-              <ul className="mt-3 overflow-hidden rounded-lg border text-[13px]">
+              <ul className="mt-3 overflow-hidden rounded-lg border text-sm">
                 {file.parsed.contacts.slice(0, 5).map((contact) => (
                   <li
                     key={contact.address}
@@ -251,7 +251,7 @@ function ContactImport(props: { onOpenContacts: () => void }) {
                   onCheckedChange={(checked) => setOverwrite(checked === true)}
                   className="mt-0.5"
                 />
-                <label htmlFor="contact-import-overwrite" className="text-[13px] leading-5">
+                <label htmlFor="contact-import-overwrite" className="text-sm leading-5">
                   <span className="font-medium text-foreground">
                     Replace details of existing contacts
                   </span>
@@ -283,7 +283,7 @@ function ContactImport(props: { onOpenContacts: () => void }) {
           )}
 
           {run.isError && (
-            <p role="alert" className="mt-3 text-[13px] leading-5 text-destructive">
+            <p role="alert" className="mt-3 text-sm leading-5 text-destructive">
               {run.error instanceof Error ? run.error.message : "The import failed."}
               {progress > 0 &&
                 ` ${count(progress, "contact")} ${progress === 1 ? "was" : "were"} imported before it stopped; importing the file again is safe.`}
@@ -291,13 +291,13 @@ function ContactImport(props: { onOpenContacts: () => void }) {
           )}
 
           {run.isSuccess && (
-            <div role="status" className="mt-3 text-[13px] leading-5">
+            <div role="status" className="mt-3 text-sm leading-5">
               <p className="text-foreground">
                 Added {count(run.data.created, "new contact")}
                 {run.data.updated > 0 &&
                   ` and ${overwrite ? "updated" : "matched"} ${count(run.data.updated, "existing contact")}`}
                 .{" "}
-                <Button variant="link" className="h-auto p-0 text-[13px]" onClick={props.onOpenContacts}>
+                <Button variant="link" className="h-auto p-0 text-sm" onClick={props.onOpenContacts}>
                   View contacts
                 </Button>
               </p>

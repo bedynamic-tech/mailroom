@@ -165,7 +165,7 @@ export function RecipientInput(props: {
             {props.values.map((address, index) => (
               <span
                 key={address}
-                className="inline-flex max-w-full items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-0.5 pl-2 text-sm text-foreground md:text-xs"
+                className="inline-flex max-w-full items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-0.5 pl-2 text-xs text-foreground"
               >
                 <span className="min-w-0 truncate" title={address}>{address}</span>
                 <button
@@ -250,7 +250,7 @@ export function RecipientInput(props: {
                   setFocused(false);
                   if (add(draftRef.current)?.length === 0) props.onDismiss?.();
                 }}
-                className="h-7 min-w-[12ch] flex-1 bg-transparent text-base text-foreground md:h-6 md:text-sm outline-none placeholder:text-muted-foreground"
+                className="h-7 min-w-[12ch] flex-1 bg-transparent text-sm text-foreground md:h-6 outline-none placeholder:text-muted-foreground"
               />
             )}
           </div>
@@ -287,14 +287,14 @@ export function RecipientInput(props: {
                   <EmailAvatar
                     email={contact.address}
                     label={contact.name ?? contact.address}
-                    className="h-6 w-6 text-[11px]"
+                    className="h-6 w-6 text-xs"
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] text-foreground md:text-[13px]">
+                    <span className="block truncate text-sm text-foreground">
                       {contact.name ?? contact.address}
                     </span>
                     {(contact.name || contact.company) && (
-                      <span className="block truncate text-[13px] text-muted-foreground md:text-xs">
+                      <span className="block truncate text-xs text-muted-foreground">
                         {contact.name ? contact.address : ""}
                         {contact.name && contact.company ? " · " : ""}
                         {contact.company ?? ""}

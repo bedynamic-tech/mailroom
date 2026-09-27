@@ -45,7 +45,7 @@ export function McpSettings() {
         </div>
 
         {status.data === false && (
-          <div className="border-t px-4 py-4 text-[13px] leading-6 text-muted-foreground sm:px-5 [&_strong]:font-medium [&_strong]:text-foreground">
+          <div className="border-t px-4 py-4 text-sm leading-6 text-muted-foreground sm:px-5 [&_strong]:font-medium [&_strong]:text-foreground">
             <p>
               Access is blocking MCP clients. In{" "}
               <DashLink href={ACCESS_APPLICATIONS_URL}>Access applications</DashLink>, add a

@@ -390,16 +390,16 @@ function EmptyReadingPane(props: { empty: boolean }) {
       <span className="flex h-11 w-11 items-center justify-center rounded-full border bg-background text-muted-foreground">
         <InboxIcon className="h-5 w-5" />
       </span>
-      <p className="mt-3 text-[13px] font-medium text-foreground">
+      <p className="mt-3 text-sm font-medium text-foreground">
         {props.empty ? "Nothing here yet" : "No conversation selected"}
       </p>
-      <p className="mt-1 max-w-64 text-[12.5px] leading-5 text-muted-foreground">
+      <p className="mt-1 max-w-64 text-xs leading-5 text-muted-foreground">
         {props.empty ? (
           "New email sent to your inboxes will appear in the list."
         ) : (
           <>
             Choose one from the list, or press{" "}
-            <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border bg-background px-1 align-[1px] font-sans text-[11px] font-medium">
+            <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border bg-background px-1 align-[1px] font-sans text-xs font-medium">
               /
             </kbd>{" "}
             to search.

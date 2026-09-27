@@ -5,6 +5,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Phones and touch screens: the same breakpoint the field-size rule below
+   uses, so text and hit targets grow together. */
+@custom-variant touch {
+  @media (max-width: 767px), (pointer: coarse) {
+    @slot;
+  }
+}
+
 @layer base {
   html {
     color-scheme: light;
@@ -64,6 +72,18 @@
   select,
   [contenteditable="true"] {
     font-size: 16px;
+  }
+}
+
+/* One type scale for the whole app. Components use text-xs / text-sm /
+   text-base rather than pixel values, and the scale steps up on touch
+   screens so every label, row and button grows by the same amount. */
+@media (max-width: 767px), (pointer: coarse) {
+  :root {
+    --text-xs: 0.8125rem;
+    --text-xs--line-height: calc(1.125 / 0.8125);
+    --text-sm: 0.9375rem;
+    --text-sm--line-height: calc(1.375 / 0.9375);
   }
 }
 

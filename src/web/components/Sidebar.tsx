@@ -94,7 +94,7 @@ function SidebarItem(props: {
       title={props.label}
       aria-current={props.active ? "page" : undefined}
       className={cn(
-        "group flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[13px] outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+        "group flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
         props.active
           ? "bg-sidebar-accent font-medium text-foreground"
           : "text-foreground/80 hover:bg-sidebar-accent/60 hover:text-foreground",

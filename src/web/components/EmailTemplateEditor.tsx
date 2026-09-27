@@ -203,7 +203,7 @@ export function EmailTemplateEditor(props: {
                   maxLength={NOTIFICATION_LIMITS.body}
                   onChange={(event) => setBody(event.target.value)}
                   onFocus={() => setActiveField("body")}
-                  className="min-h-56 font-mono text-[13px] md:text-[13px]"
+                  className="min-h-56 font-mono text-sm"
                   required
                 />
               </EditorField>
@@ -233,7 +233,7 @@ export function EmailTemplateEditor(props: {
             <div className="min-w-0">
               <p className="text-xs font-medium text-muted-foreground">Preview with sample email</p>
               <div className="mt-2 overflow-hidden rounded-lg border bg-background">
-                <dl className="space-y-1 border-b px-3 py-2.5 text-[13px]">
+                <dl className="space-y-1 border-b px-3 py-2.5 text-sm">
                   <PreviewRow label="From">
                     {preview.fromName ? `${preview.fromName} <${previewFromAddress}>` : previewFromAddress}
                   </PreviewRow>
@@ -242,7 +242,7 @@ export function EmailTemplateEditor(props: {
                     <span className="font-medium">{preview.subject}</span>
                   </PreviewRow>
                 </dl>
-                <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap break-words px-3 py-3 font-sans text-[13px] leading-5 text-foreground">
+                <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap break-words px-3 py-3 font-sans text-sm leading-5 text-foreground">
                   {preview.body}
                 </pre>
               </div>
@@ -288,7 +288,7 @@ function toSelectValue(mailboxId: number | null): string {
 function EditorField(props: { label: string; htmlFor: string; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-1.5">
-      <label htmlFor={props.htmlFor} className="text-[13px] font-medium text-foreground">
+      <label htmlFor={props.htmlFor} className="text-sm font-medium text-foreground">
         {props.label}
       </label>
       {props.children}

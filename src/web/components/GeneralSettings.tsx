@@ -103,12 +103,12 @@ export function GeneralSettings(props: {
               <div className="min-w-0 flex-1">
                 <label
                   htmlFor="browser-notifications"
-                  className="flex items-center gap-2 text-[13.5px] font-medium text-foreground"
+                  className="flex items-center gap-2 text-sm font-medium text-foreground"
                 >
                   <BellIcon className="h-4 w-4 text-muted-foreground" />
                   Browser notifications
                 </label>
-                <p className="mt-1 max-w-xl text-[13px] leading-5 text-muted-foreground">
+                <p className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">
                   {notificationDescription({
                     configured,
                     supported,
@@ -185,8 +185,8 @@ function AppSettings() {
             className="h-10 w-10 shrink-0 rounded-[10px] border"
           />
           <div className="min-w-0 flex-1">
-            <p className="text-[13.5px] font-medium text-foreground">Mailroom app</p>
-            <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">
+            <p className="text-sm font-medium text-foreground">Mailroom app</p>
+            <p className="mt-0.5 text-sm leading-5 text-muted-foreground">
               {install.installed
                 ? "Installed on this device."
                 : install.canPrompt
@@ -248,12 +248,12 @@ function EmailNotificationSetting(props: {
           <div className="min-w-0 flex-1">
             <label
               htmlFor="email-notifications"
-              className="flex items-center gap-2 text-[13.5px] font-medium text-foreground"
+              className="flex items-center gap-2 text-sm font-medium text-foreground"
             >
               <MailIcon className="h-4 w-4 text-muted-foreground" />
               Email notifications
             </label>
-            <p className="mt-1 max-w-xl text-[13px] leading-5 text-muted-foreground">
+            <p className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">
               {!props.savedAddress
                 ? "Add an email address to get a notice when any inbox receives a new email."
                 : props.enabled
