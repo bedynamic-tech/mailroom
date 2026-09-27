@@ -20,6 +20,7 @@ import { EmailAvatar } from "./EmailAvatar";
 import {
   ArchiveIcon,
   InboxIcon,
+  MenuIcon,
   SearchIcon,
   SettingsIcon,
   SparklesIcon,
@@ -39,7 +40,6 @@ export function ThreadList(props: {
   title: string;
   selected: number | null;
   selectedMailbox: number | null;
-  scope: ThreadScope;
   archive: boolean;
   unreadCount: number | null;
   showMailboxChip: boolean;
@@ -57,8 +57,7 @@ export function ThreadList(props: {
   onSearch: (q: string) => void;
   onFilter: (filter: ThreadFilter) => void;
   onSelectLabel: (id: number | null) => void;
-  onSelectScope: (scope: ThreadScope) => void;
-  onOpenSettings: () => void;
+  onOpenMenu: () => void;
   onCompose: () => void;
   onOpenMailboxSettings: (id: number) => void;
   onSelect: (id: number) => void;
@@ -212,44 +211,20 @@ export function ThreadList(props: {
             <SquarePen className="h-4 w-4" />
           </Button>
 
-          <div className="flex min-w-0 flex-1 items-center gap-1 lg:hidden">
-            <Select
-              value={String(props.scope)}
-              onValueChange={(value) =>
-                props.onSelectScope(
-                  value === "all" || value === "archive" || value === "contacts"
-                    ? value
-                    : Number(value),
-                )
-              }
-            >
-              <SelectTrigger
-                className="-ml-2 mr-auto h-8 min-w-0 border-transparent px-2 text-base font-semibold shadow-none hover:bg-muted"
-                aria-label="Choose inbox"
-              >
-                <SelectValue placeholder="All inboxes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All inboxes</SelectItem>
-                {props.mailboxes.map((mailbox) => (
-                  <SelectItem key={mailbox.id} value={String(mailbox.id)}>
-                    {mailbox.address}
-                  </SelectItem>
-                ))}
-                <SelectItem value="archive">Archive</SelectItem>
-                <SelectItem value="contacts">Contacts</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex min-w-0 flex-1 items-center gap-2 lg:hidden">
             <Button
               variant="ghost"
               size="icon"
-              onClick={props.onOpenSettings}
-              aria-label="Open settings"
-              title="Settings"
-              className="-mr-1.5 shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={props.onOpenMenu}
+              aria-label="Open navigation"
+              title="Menu"
+              className="-ml-1.5 shrink-0 text-muted-foreground hover:text-foreground"
             >
-              <SettingsIcon className="h-5 w-5" />
+              <MenuIcon className="h-5 w-5" />
             </Button>
+            <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.015em] text-foreground">
+              {props.title}
+            </h1>
           </div>
         </div>
 

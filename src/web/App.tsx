@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useRef } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   Navigate,
@@ -26,8 +26,8 @@ import { ContactSettings } from "./components/ContactSettings";
 import { GeneralSettings } from "./components/GeneralSettings";
 import { ComposeEmailProvider, useCompose } from "./components/ComposeEmail";
 import { InboxIcon } from "./components/Icons";
-import { Sidebar } from "./components/Sidebar";
-import { ThreadList, type ThreadFilter, type ThreadScope } from "./components/ThreadList";
+import { MobileSidebar, Sidebar } from "./components/Sidebar";
+import { ThreadList, type ThreadFilter } from "./components/ThreadList";
 import { ThreadView } from "./components/ThreadView";
 import { useUnreadBadge } from "./pwa";
 
@@ -87,6 +87,7 @@ function Workspace(props: {
   const params = useParams<{ mailboxId?: string; threadId?: string; contactId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const autoSelectedScope = useRef<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const routeMailboxId = parseId(params.mailboxId);
   const selectedMailbox =
@@ -195,14 +196,18 @@ function Workspace(props: {
     navigate(id === null ? "/inbox" : `/mailboxes/${id}`);
   };
 
-  const selectScope = (scope: ThreadScope) => {
-    if (scope === "archive") navigate("/archive");
-    else if (scope === "contacts") navigate("/contacts");
-    else selectMailbox(scope === "all" ? null : scope);
-  };
-
   const openSettings = () => {
     navigate("/settings/general");
+  };
+
+  const sidebarNav = {
+    mailboxes: mailboxes.data ?? [],
+    selected: selectedMailbox,
+    activeView: props.view,
+    onSelect: selectMailbox,
+    onOpenArchive: () => navigate("/archive"),
+    onOpenContacts: () => navigate("/contacts"),
+    onOpenSettings: openSettings,
   };
 
   const openInboxSettings = () => {
@@ -258,15 +263,8 @@ function Workspace(props: {
 
   return (
     <div className="flex h-dvh min-h-[560px] overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-foreground">
-      <Sidebar
-        mailboxes={mailboxes.data ?? []}
-        selected={selectedMailbox}
-        activeView={props.view}
-        onSelect={selectMailbox}
-        onOpenArchive={() => navigate("/archive")}
-        onOpenContacts={() => navigate("/contacts")}
-        onOpenSettings={openSettings}
-      />
+      <Sidebar {...sidebarNav} />
+      <MobileSidebar {...sidebarNav} open={menuOpen} onOpenChange={setMenuOpen} />
 
       {props.view === "contacts" ? (
         <main className="min-w-0 flex-1 overflow-hidden">
@@ -336,7 +334,6 @@ function Workspace(props: {
             title={selectedMailboxName}
             selected={selectedThread}
             selectedMailbox={selectedMailbox}
-            scope={isArchive ? "archive" : (selectedMailbox ?? "all")}
             archive={isArchive}
             unreadCount={!isArchive && !deferredSearch && activeLabel === null ? scopeUnread : null}
             showMailboxChip={selectedMailbox === null}
@@ -354,8 +351,7 @@ function Workspace(props: {
             onSearch={(query) => updateQuery("q", query)}
             onFilter={(nextFilter) => updateQuery("filter", nextFilter, "all")}
             onSelectLabel={(id) => updateQuery("label", id === null ? "" : String(id))}
-            onSelectScope={selectScope}
-            onOpenSettings={openSettings}
+            onOpenMenu={() => setMenuOpen(true)}
             onCompose={() => openCompose(selectedMailbox)}
             onOpenMailboxSettings={(id) => navigate(`/settings/inboxes/${id}`)}
             onSelect={(id) =>
