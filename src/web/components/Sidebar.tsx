@@ -63,23 +63,18 @@ export function Sidebar(props: {
           collapsed && peeking && "shadow-xl",
         )}
       >
-        <div className={cn("flex h-14 shrink-0 items-center gap-2.5", compact ? "pr-2 pl-1.5" : "pr-2 pl-4")}>
-          {compact ? (
-            <SidebarToggle collapsed onClick={toggleCollapsed} />
-          ) : (
-            <>
-              <img
-                src="/brand/mailroom.png"
-                alt=""
-                width={20}
-                height={20}
-                className="h-5 w-5 shrink-0 object-contain"
-              />
-              <p className="min-w-0 flex-1 truncate text-sm font-semibold tracking-[-0.01em] whitespace-nowrap text-foreground">
-                Mailroom
-              </p>
-              <SidebarToggle collapsed={collapsed} onClick={toggleCollapsed} />
-            </>
+        <div className="flex h-14 shrink-0 items-center gap-2.5 px-4">
+          <img
+            src="/brand/mailroom.png"
+            alt=""
+            width={20}
+            height={20}
+            className="h-5 w-5 shrink-0 object-contain"
+          />
+          {!compact && (
+            <p className="min-w-0 truncate text-sm font-semibold tracking-[-0.01em] whitespace-nowrap text-foreground">
+              Mailroom
+            </p>
           )}
         </div>
 
@@ -129,7 +124,15 @@ export function Sidebar(props: {
           </div>
         </nav>
 
-        <div className="shrink-0 border-t px-2 py-2">
+        <div className="shrink-0 space-y-px border-t px-2 py-2">
+          <SidebarItem
+            label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            icon={<SidebarIcon className="h-4 w-4" />}
+            unread={0}
+            compact={compact}
+            active={false}
+            onClick={toggleCollapsed}
+          />
           <SidebarItem
             label="Settings"
             icon={<SettingsIcon className="h-4 w-4" />}
@@ -142,22 +145,6 @@ export function Sidebar(props: {
         </div>
       </div>
     </aside>
-  );
-}
-
-function SidebarToggle(props: { collapsed: boolean; onClick: () => void }) {
-  const label = props.collapsed ? "Expand sidebar" : "Collapse sidebar";
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      title={label}
-      aria-label={label}
-      aria-expanded={!props.collapsed}
-      className="flex h-8 w-10 shrink-0 items-center rounded-md px-3 text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent/60 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-    >
-      <SidebarIcon className="h-4 w-4" />
-    </button>
   );
 }
 
