@@ -170,7 +170,7 @@ export function ThreadList(props: {
 
   return (
     <section
-      className={`w-full shrink-0 flex-col bg-background md:w-[368px] md:border-r xl:w-[400px] ${
+      className={`relative w-full shrink-0 flex-col bg-background md:w-[368px] md:border-r xl:w-[400px] ${
         props.detailsOpen ? "hidden md:flex" : "flex"
       }`}
     >
@@ -231,16 +231,6 @@ export function ThreadList(props: {
                 <SelectItem value="contacts">Contacts</SelectItem>
               </SelectContent>
             </Select>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={props.onCompose}
-              aria-label="Compose new message"
-              title="Compose"
-              className="shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <SquarePen className="h-[18px] w-[18px]" />
-            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -518,7 +508,7 @@ export function ThreadList(props: {
         ))}
 
         {props.hasMore && !props.loading && (
-          <div className="flex justify-center px-4 py-4">
+          <div className="flex justify-center px-4 pt-4 pb-24 lg:pb-4">
             <Button
               variant="ghost"
               size="sm"
@@ -530,7 +520,20 @@ export function ThreadList(props: {
             </Button>
           </div>
         )}
+        {/* Keeps the last row clear of the floating compose button. */}
+        {!props.hasMore && <div aria-hidden="true" className="h-24 lg:hidden" />}
       </div>
+
+      {!selectionMode && (
+        <Button
+          onClick={props.onCompose}
+          aria-label="Compose new message"
+          title="Compose"
+          className="absolute right-4 bottom-4 z-10 h-14 w-14 rounded-2xl shadow-lg shadow-black/15 lg:hidden [&_svg:not([class*='size-'])]:size-5"
+        >
+          <SquarePen />
+        </Button>
+      )}
     </section>
   );
 }
