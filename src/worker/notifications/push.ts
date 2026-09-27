@@ -88,6 +88,12 @@ export async function notifyNewEmail(
   if (results.length === 0) return;
 
   const payload = buildNewEmailNotification(input);
+  const unread = await env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM threads WHERE is_read = 0 AND status != 'archived'",
+  )
+    .first<{ count: number }>()
+    .then((row) => row?.count ?? null)
+    .catch(() => null);
   const deadEndpoints: string[] = [];
 
   await Promise.all(
@@ -105,7 +111,8 @@ export async function notifyNewEmail(
               title: payload.title,
               body: payload.body,
               tag: payload.tag,
-              data: { url: payload.data.url },
+              // The installed app shows this total as its OS badge.
+              data: unread === null ? { url: payload.data.url } : { url: payload.data.url, unread },
             },
             adminContact,
             options: {

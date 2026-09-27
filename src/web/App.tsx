@@ -28,6 +28,7 @@ import { InboxIcon } from "./components/Icons";
 import { Sidebar } from "./components/Sidebar";
 import { ThreadList, type ThreadFilter, type ThreadScope } from "./components/ThreadList";
 import { ThreadView } from "./components/ThreadView";
+import { useUnreadBadge } from "./pwa";
 
 type WorkspaceView = "inbox" | "archive" | "contacts" | "settings";
 type SettingsSection = "general" | "inboxes" | "contacts";
@@ -106,6 +107,9 @@ function Workspace(props: {
     retry: (failureCount, error) => !accessSetupError(error) && failureCount < 3,
   });
   const labels = useQuery({ queryKey: ["labels"], queryFn: () => fetchLabels() });
+  useUnreadBadge(
+    mailboxes.data ? mailboxes.data.reduce((sum, mailbox) => sum + mailbox.unread_count, 0) : null,
+  );
   const threadQuery = {
     mailboxId: selectedMailbox,
     labelId: activeLabel,
@@ -251,7 +255,7 @@ function Workspace(props: {
   }
 
   return (
-    <div className="flex h-dvh min-h-[560px] overflow-hidden bg-background text-foreground">
+    <div className="flex h-dvh min-h-[560px] overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-foreground">
       <Sidebar
         mailboxes={mailboxes.data ?? []}
         selected={selectedMailbox}

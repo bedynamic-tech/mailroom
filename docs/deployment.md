@@ -201,6 +201,20 @@ Run deployments for a given instance sequentially, especially its first deploy,
 so two initial builds cannot generate different key pairs simultaneously.
 `npm run vapid:generate` remains available for manual setup or local development.
 
+### Installing the app
+
+Mailroom is an installable web app. In Chrome or Edge, use **Install app** in
+the address bar or **Settings → General → App**; in Safari on macOS use
+**File → Add to Dock**; on iPhone and iPad tap **Share → Add to Home Screen**.
+The installed app opens in its own window, shows the unread total on its icon
+where the OS supports badges, and delivers browser notifications through the
+operating system. On iPhone and iPad, Web Push only works from the Home Screen
+app, so enable notifications after opening it from there.
+
+The manifest and service worker are served behind the same Access application
+as the web app; no Bypass rule is needed. The service worker caches only the
+app shell and hashed build assets, never API responses or email content.
+
 ## Updates
 
 Commit changes to the connected repository's production branch (normally `main`)

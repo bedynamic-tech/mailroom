@@ -17,7 +17,17 @@
   body {
     margin: 0;
     min-width: 320px;
+    -webkit-tap-highlight-color: transparent;
     @apply bg-background text-foreground;
+  }
+
+  /* The installed app has no browser chrome to reload from, so keep the
+     window itself from rubber-banding; inner lists still scroll. */
+  @media (display-mode: standalone) {
+    html,
+    body {
+      overscroll-behavior: none;
+    }
   }
 
   button,
