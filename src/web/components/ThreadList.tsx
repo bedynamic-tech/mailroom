@@ -228,190 +228,188 @@ export function ThreadList(props: {
           </div>
         </div>
 
-        {!props.emptyInbox && (
-          <>
-            <div className="relative">
-              <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                ref={searchRef}
-                value={props.search}
-                onChange={(event) => props.onSearch(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    props.onSearch("");
-                    event.currentTarget.blur();
-                  }
-                }}
-                placeholder="Search conversations"
-                aria-label="Search conversations"
-                className="h-10 w-full bg-muted/50 pr-9 pl-8.5 text-sm focus-visible:bg-background md:h-9"
-              />
-              {props.search ? (
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={() => props.onSearch("")}
-                  className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground"
-                  aria-label="Clear search"
-                >
-                  <XIcon className="h-3.5 w-3.5" />
-                </Button>
-              ) : (
-                <kbd className="pointer-events-none absolute top-1/2 right-2 hidden h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded border bg-background px-1 font-sans text-xs text-muted-foreground sm:flex">
-                  /
-                </kbd>
-              )}
-            </div>
+        <>
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              ref={searchRef}
+              value={props.search}
+              onChange={(event) => props.onSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  props.onSearch("");
+                  event.currentTarget.blur();
+                }
+              }}
+              placeholder="Search conversations"
+              aria-label="Search conversations"
+              className="h-10 w-full bg-muted/50 pr-9 pl-8.5 text-sm focus-visible:bg-background md:h-9"
+            />
+            {props.search ? (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => props.onSearch("")}
+                className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground"
+                aria-label="Clear search"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <kbd className="pointer-events-none absolute top-1/2 right-2 hidden h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded border bg-background px-1 font-sans text-xs text-muted-foreground sm:flex">
+                /
+              </kbd>
+            )}
+          </div>
 
-            <div className="mt-2.5 flex h-8 items-center gap-2 sm:gap-3 touch:h-10">
-              {visibleThreads.length > 0 && (
-                <span className="flex w-8 shrink-0 justify-center">
-                  <Checkbox
-                    checked={allChecked ? true : selectionMode ? "indeterminate" : false}
-                    onCheckedChange={(value) =>
-                      setChecked(value === true ? new Set(visibleThreads.map((t) => t.id)) : new Set())
-                    }
-                    aria-label={allChecked ? "Deselect all conversations" : "Select all conversations"}
-                  />
+          <div className="mt-2.5 flex h-8 items-center gap-2 sm:gap-3 touch:h-10">
+            {visibleThreads.length > 0 && (
+              <span className="flex w-8 shrink-0 justify-center">
+                <Checkbox
+                  checked={allChecked ? true : selectionMode ? "indeterminate" : false}
+                  onCheckedChange={(value) =>
+                    setChecked(value === true ? new Set(visibleThreads.map((t) => t.id)) : new Set())
+                  }
+                  aria-label={allChecked ? "Deselect all conversations" : "Select all conversations"}
+                />
+              </span>
+            )}
+            {selectionMode ? (
+              <>
+                <span className="shrink-0 whitespace-nowrap text-sm font-medium tabular-nums text-foreground">
+                  {checkedCount} selected
                 </span>
-              )}
-              {selectionMode ? (
-                <>
-                  <span className="shrink-0 whitespace-nowrap text-sm font-medium tabular-nums text-foreground">
-                    {checkedCount} selected
-                  </span>
-                  <span className="ml-auto flex items-center gap-0.5">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={bulkUpdate.isPending}
-                      onClick={() => bulkUpdate.mutate({ ids: [...checked], action: "read" })}
-                    >
-                      Mark read
-                    </Button>
-                    {props.archive && checkedAllArchived && (
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        disabled={bulkUpdate.isPending || deletePending}
-                        onClick={() => {
-                          deleteChecked.reset();
-                          setConfirmDelete("selected");
-                        }}
-                        aria-label="Delete selected conversations permanently"
-                        title="Delete permanently"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <TrashIcon className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={bulkUpdate.isPending}
-                      onClick={() =>
-                        bulkUpdate.mutate({
-                          ids: [...checked],
-                          action: checkedAllArchived ? "unarchive" : "archive",
-                        })
-                      }
-                      aria-label={checkedAllArchived ? "Move to inbox" : "Archive"}
-                      title={checkedAllArchived ? "Move to inbox" : undefined}
-                    >
-                      {checkedAllArchived ? (
-                        <>
-                          <InboxIcon className="h-3.5 w-3.5" />
-                          <span className={props.archive ? "sr-only" : undefined}>
-                            Move to inbox
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <ArchiveIcon className="h-3.5 w-3.5" />
-                          Archive
-                        </>
-                      )}
-                    </Button>
+                <span className="ml-auto flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={bulkUpdate.isPending}
+                    onClick={() => bulkUpdate.mutate({ ids: [...checked], action: "read" })}
+                  >
+                    Mark read
+                  </Button>
+                  {props.archive && checkedAllArchived && (
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => setChecked(new Set())}
-                      aria-label="Clear selection"
-                      className="text-muted-foreground"
-                    >
-                      <XIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Tabs
-                    value={props.filter}
-                    onValueChange={(value) => props.onFilter(value as ThreadFilter)}
-                    className="gap-0"
-                  >
-                    <TabsList aria-label="Conversation filter" className="h-7! touch:h-9!">
-                      <FilterTab value="all" label="All" />
-                      <FilterTab value="unread" label="Unread" count={props.unreadCount ?? undefined} />
-                    </TabsList>
-                  </Tabs>
-
-                  {showLabelFilter && (
-                    <Select
-                      value={props.activeLabel === null ? "all" : String(props.activeLabel)}
-                      onValueChange={(value) =>
-                        props.onSelectLabel(value === "all" ? null : Number(value))
-                      }
-                    >
-                      <SelectTrigger
-                        size="sm"
-                        aria-label="Filter by label"
-                        className={`ml-auto min-w-0 max-w-[45%] gap-1.5 text-xs ${
-                          props.activeLabel !== null
-                            ? "border-foreground/25 bg-accent text-foreground"
-                            : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
-                      >
-                        <TagIcon className="h-3.5 w-3.5" />
-                        <span className="min-w-0 truncate">
-                          {props.activeLabel === null ? "Label" : <SelectValue placeholder="Label" />}
-                        </span>
-                      </SelectTrigger>
-                      <SelectContent align="end" position="popper">
-                        <SelectItem value="all">All labels</SelectItem>
-                        {availableLabels.map((label) => (
-                          <SelectItem key={label.id} value={String(label.id)}>
-                            {props.selectedMailbox === null
-                              ? `${label.name} · ${mailboxAddress.get(label.mailbox_id) ?? ""}`
-                              : label.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-
-                  {props.archive && visibleThreads.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={deletePending}
+                      disabled={bulkUpdate.isPending || deletePending}
                       onClick={() => {
-                        clearArchive.reset();
-                        setConfirmDelete("all");
+                        deleteChecked.reset();
+                        setConfirmDelete("selected");
                       }}
-                      className={`shrink-0 text-destructive hover:text-destructive ${
-                        showLabelFilter ? "" : "ml-auto"
-                      }`}
+                      aria-label="Delete selected conversations permanently"
+                      title="Delete permanently"
+                      className="text-destructive hover:text-destructive"
                     >
                       <TrashIcon className="h-3.5 w-3.5" />
-                      Empty archive
                     </Button>
                   )}
-                </>
-              )}
-            </div>
-          </>
-        )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={bulkUpdate.isPending}
+                    onClick={() =>
+                      bulkUpdate.mutate({
+                        ids: [...checked],
+                        action: checkedAllArchived ? "unarchive" : "archive",
+                      })
+                    }
+                    aria-label={checkedAllArchived ? "Move to inbox" : "Archive"}
+                    title={checkedAllArchived ? "Move to inbox" : undefined}
+                  >
+                    {checkedAllArchived ? (
+                      <>
+                        <InboxIcon className="h-3.5 w-3.5" />
+                        <span className={props.archive ? "sr-only" : undefined}>
+                          Move to inbox
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <ArchiveIcon className="h-3.5 w-3.5" />
+                        Archive
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setChecked(new Set())}
+                    aria-label="Clear selection"
+                    className="text-muted-foreground"
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </Button>
+                </span>
+              </>
+            ) : (
+              <>
+                <Tabs
+                  value={props.filter}
+                  onValueChange={(value) => props.onFilter(value as ThreadFilter)}
+                  className="gap-0"
+                >
+                  <TabsList aria-label="Conversation filter" className="h-7! touch:h-9!">
+                    <FilterTab value="all" label="All" />
+                    <FilterTab value="unread" label="Unread" count={props.unreadCount ?? undefined} />
+                  </TabsList>
+                </Tabs>
+
+                {showLabelFilter && (
+                  <Select
+                    value={props.activeLabel === null ? "all" : String(props.activeLabel)}
+                    onValueChange={(value) =>
+                      props.onSelectLabel(value === "all" ? null : Number(value))
+                    }
+                  >
+                    <SelectTrigger
+                      size="sm"
+                      aria-label="Filter by label"
+                      className={`ml-auto min-w-0 max-w-[45%] gap-1.5 text-xs ${
+                        props.activeLabel !== null
+                          ? "border-foreground/25 bg-accent text-foreground"
+                          : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      <TagIcon className="h-3.5 w-3.5" />
+                      <span className="min-w-0 truncate">
+                        {props.activeLabel === null ? "Label" : <SelectValue placeholder="Label" />}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent align="end" position="popper">
+                      <SelectItem value="all">All labels</SelectItem>
+                      {availableLabels.map((label) => (
+                        <SelectItem key={label.id} value={String(label.id)}>
+                          {props.selectedMailbox === null
+                            ? `${label.name} · ${mailboxAddress.get(label.mailbox_id) ?? ""}`
+                            : label.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {props.archive && visibleThreads.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={deletePending}
+                    onClick={() => {
+                      clearArchive.reset();
+                      setConfirmDelete("all");
+                    }}
+                    className={`shrink-0 text-destructive hover:text-destructive ${
+                      showLabelFilter ? "" : "ml-auto"
+                    }`}
+                  >
+                    <TrashIcon className="h-3.5 w-3.5" />
+                    Empty archive
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </>
       </header>
 
       <DeleteConversationsDialog
