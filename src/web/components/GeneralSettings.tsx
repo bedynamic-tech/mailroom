@@ -9,6 +9,7 @@ import {
   fetchGeneralSettings,
   sendTestEmailNotification,
   setEmailNotificationsEnabled,
+  updateDefaultSignature,
   updateEmailNotifications,
 } from "../api";
 import type { EmailNotificationTemplate } from "../../shared/types";
@@ -21,6 +22,8 @@ import {
 import { isIosBrowser, useInstallState } from "../pwa";
 import { BellIcon, MailIcon } from "./Icons";
 import { EmailTemplateEditor } from "./EmailTemplateEditor";
+import { RichTextEditor } from "./RichTextEditor";
+import { normalizeSignature } from "../../shared/signature";
 import {
   SettingsBlock,
   SettingsHeader,
@@ -163,9 +166,93 @@ export function GeneralSettings(props: {
           </SettingsPanel>
         </SettingsBlock>
 
+        <DefaultSignatureSetting
+          savedHtml={settings.data?.default_signature_html ?? null}
+          loading={settings.isLoading}
+          onOpenInboxes={props.onOpenInboxes}
+        />
+
         <AppSettings />
       </SettingsPage>
     </div>
+  );
+}
+
+function DefaultSignatureSetting(props: {
+  savedHtml: string | null;
+  loading: boolean;
+  onOpenInboxes: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [html, setHtml] = useState(props.savedHtml ?? "");
+  useEffect(() => setHtml(props.savedHtml ?? ""), [props.savedHtml]);
+
+  const save = useMutation({
+    mutationFn: () => updateDefaultSignature(normalizeSignature(html)),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["settings", "general"] }),
+        queryClient.invalidateQueries({ queryKey: ["mailboxes"] }),
+      ]);
+    },
+  });
+
+  const dirty = normalizeSignature(html) !== (props.savedHtml ?? null);
+
+  return (
+    <SettingsBlock
+      id="default-signature-heading"
+      title="Default signature"
+      description={
+        <>
+          Added to replies and new email from every inbox that uses the default. An inbox can
+          use its own signature or none in{" "}
+          <button
+            type="button"
+            onClick={props.onOpenInboxes}
+            className="rounded-sm text-foreground underline underline-offset-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Inbox settings
+          </button>
+          .
+        </>
+      }
+    >
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (dirty) save.mutate();
+        }}
+      >
+        <RichTextEditor
+          id="default-signature"
+          value={html}
+          onChange={(value) => {
+            setHtml(value);
+            save.reset();
+          }}
+          disabled={props.loading || save.isPending}
+          placeholder="Jane Doe, Support Lead at Acme"
+          ariaLabelledBy="default-signature-heading"
+        />
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="min-w-0 text-xs text-muted-foreground" aria-live="polite">
+            {save.isError ? (
+              <span className="text-destructive">
+                {save.error instanceof Error ? save.error.message : "Couldn’t save the signature."}
+              </span>
+            ) : dirty ? (
+              "Unsaved changes"
+            ) : save.isSuccess ? (
+              "Signature saved"
+            ) : null}
+          </p>
+          <Button type="submit" size="sm" disabled={props.loading || save.isPending || !dirty}>
+            {save.isPending ? "Saving…" : "Save signature"}
+          </Button>
+        </div>
+      </form>
+    </SettingsBlock>
   );
 }
 

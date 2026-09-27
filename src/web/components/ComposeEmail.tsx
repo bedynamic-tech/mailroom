@@ -8,6 +8,8 @@ import { composeEmail, ComposeRequestError, fetchDomains, fetchMailboxes } from 
 import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_TOTAL_BYTES, MAX_MESSAGE_CHARS, MAX_RECIPIENTS_PER_MESSAGE, MAX_SUBJECT_CHARS } from "../../shared/email-limits";
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
 import { PaperclipIcon, SendIcon, XIcon } from "./Icons";
+import { RichTextEditor, RichTextPreview } from "./RichTextEditor";
+import { isBlankRichText, richTextToPlainText, sanitizeRichText } from "../../shared/rich-text";
 
 type OpenCompose = (mailboxId: number | null, options?: { to?: string }) => void;
 
@@ -31,7 +33,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   const [addingCc, setAddingCc] = useState(false);
   const [addingBcc, setAddingBcc] = useState(false);
   const [subject, setSubject] = useState("");
-  const [text, setText] = useState("");
+  const [html, setHtml] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [uncertain, setUncertain] = useState(false);
@@ -51,7 +53,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes, enabled: open });
   const domains = useQuery({ queryKey: ["domains"], queryFn: fetchDomains, enabled: open });
-  const hasDraft = Boolean(to.length || cc.length || bcc.length || subject || text || files.length);
+  const hasDraft = Boolean(to.length || cc.length || bcc.length || subject || !isBlankRichText(html) || files.length);
   const showCc = addingCc || cc.length > 0;
   const showBcc = addingBcc || bcc.length > 0;
   const remaining = MAX_RECIPIENTS_PER_MESSAGE - to.length - cc.length - bcc.length;
@@ -62,7 +64,8 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   const locked = sending || uncertain;
   const activeDomains = new Set(domains.data?.filter((domain) => domain.status === "active").map((domain) => domain.name.toLowerCase()));
   const available = (mailboxes.data ?? []).filter((mailbox) => activeDomains.has(mailbox.address.split("@")[1]?.toLowerCase()));
-  const ready = available.some((mailbox) => String(mailbox.id) === mailboxId);
+  const sender = available.find((mailbox) => String(mailbox.id) === mailboxId);
+  const ready = Boolean(sender);
   const loading = mailboxes.isLoading || domains.isLoading;
   const loadError = mailboxes.isError || domains.isError;
 
@@ -83,7 +86,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   }, [hasDraft]);
 
   const reset = () => {
-    setTo([]); setCc([]); setBcc([]); setAddingCc(false); setAddingBcc(false); setSubject(""); setText(""); setFiles([]);
+    setTo([]); setCc([]); setBcc([]); setAddingCc(false); setAddingBcc(false); setSubject(""); setHtml(""); setFiles([]);
     setNotice(null); setFileError(null); setFailed(false); setUncertain(false);
     setConfirmDiscard(false); attempt.current = null;
   };
@@ -104,13 +107,18 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!formRef.current?.reportValidity()) return;
-      if (!text.trim() && files.length === 0) {
+      if (isBlankRichText(html) && files.length === 0) {
         setNotice("Write a message or attach a file before sending.");
+        return;
+      }
+      if (richTextToPlainText(html).length > MAX_MESSAGE_CHARS) {
+        setNotice(`Keep the message under ${MAX_MESSAGE_CHARS.toLocaleString("en-US")} characters.`);
         return;
       }
     }
     if (!attempt.current) {
-      attempt.current = { mailboxId: Number(mailboxId), to: recipients.to[0]!, cc: recipients.cc, bcc: recipients.bcc, subject: subject.trim(), text: text.trim(), files: [...files], attemptId: crypto.randomUUID() };
+      const body = isBlankRichText(html) ? "" : sanitizeRichText(html);
+      attempt.current = { mailboxId: Number(mailboxId), to: recipients.to[0]!, cc: recipients.cc, bcc: recipients.bcc, subject: subject.trim(), text: body ? richTextToPlainText(body) : "", html: body || undefined, files: [...files], attemptId: crypto.randomUUID() };
     }
     inFlight.current = true;
     setSending(true); setNotice(null); setFailed(false);
@@ -228,8 +236,13 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                   <label htmlFor="compose-subject" className="w-14 shrink-0 text-sm text-muted-foreground">Subject</label>
                   <Input id="compose-subject" required maxLength={MAX_SUBJECT_CHARS} placeholder="Add a subject" value={subject} onChange={(event) => setSubject(event.target.value)} className="min-w-0 border-0 shadow-none" />
                 </div>
-                <label htmlFor="compose-body" className="sr-only">Message</label>
-                <textarea id="compose-body" value={text} onChange={(event) => setText(event.target.value)} maxLength={MAX_MESSAGE_CHARS} placeholder="Write your message…" className="mt-3 min-h-44 w-full resize-y rounded-md bg-transparent px-2 py-2 text-sm leading-6 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring sm:min-h-64" />
+                <RichTextEditor id="compose-body" ariaLabel="Message" value={html} onChange={setHtml} variant="bare" placeholder="Write your message…" className="mt-1" contentClassName="min-h-44 px-2 sm:min-h-64" />
+                {sender?.effective_signature_html && (
+                  <div className="mb-4 px-2 text-muted-foreground">
+                    <p className="mb-1 text-xs">Signature added when sent</p>
+                    <RichTextPreview html={sender.effective_signature_html} />
+                  </div>
+                )}
               </fieldset>
               {files.length > 0 && <ul aria-label="Attachments" className="mb-4 space-y-1.5">{files.map((file, index) => (
                 <li key={`${file.name}-${index}`} className="flex min-w-0 items-center gap-2 rounded-md bg-muted px-3 py-1.5 text-xs">

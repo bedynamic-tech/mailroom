@@ -80,6 +80,8 @@ export async function composeEmail(input: {
   bcc: string[];
   subject: string;
   text: string;
+  /** Rich-text body; the server derives the plain-text part from it. */
+  html?: string;
   files: File[];
   attemptId: string;
 }): Promise<ComposeAttemptResult> {
@@ -90,6 +92,7 @@ export async function composeEmail(input: {
   for (const address of input.bcc) form.append("bcc", address);
   form.set("subject", input.subject);
   form.set("text", input.text);
+  if (input.html) form.set("html", input.html);
   form.set("attempt_id", input.attemptId);
   for (const file of input.files) form.append("attachments", file, file.name);
   const response = await fetch("/api/compose", { method: "POST", body: form });
@@ -146,6 +149,13 @@ export const setAutoCreateContacts = (autoCreate: boolean) =>
     body: JSON.stringify({ auto_create: autoCreate }),
   });
 
+export const updateDefaultSignature = (html: string | null) =>
+  request<{ ok: true; html: string | null }>("/settings/default-signature", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ html }),
+  });
+
 export const fetchDomains = () => request<Domain[]>("/domains");
 
 export const createDomain = (input: { name: string }) =>
@@ -167,7 +177,12 @@ export const createMailbox = (input: { local_part: string; domain_id: number }) 
 
 export const updateMailbox = (
   id: number,
-  input: Partial<Pick<Mailbox, "agent_mode" | "agent_instructions" | "display_name">>,
+  input: Partial<
+    Pick<
+      Mailbox,
+      "agent_mode" | "agent_instructions" | "display_name" | "signature_mode" | "signature_html"
+    >
+  >,
 ) =>
   request<{ ok: true }>(`/mailboxes/${id}`, {
     method: "PATCH",
@@ -292,9 +307,11 @@ export const sendReply = (
   draftId?: number,
   attachments: File[] = [],
   copies: { cc: string[]; bcc: string[] } = { cc: [], bcc: [] },
+  html?: string,
 ) => {
   const form = new FormData();
   form.set("text", text);
+  if (html) form.set("html", html);
   form.set("attempt_id", attemptId);
   for (const address of copies.cc) form.append("cc", address);
   for (const address of copies.bcc) form.append("bcc", address);

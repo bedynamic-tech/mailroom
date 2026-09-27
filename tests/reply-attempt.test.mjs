@@ -27,7 +27,9 @@ class FakeDb {
   messageAttachments = [];
   allowBudget = true;
   displayName = null;
+  signature = null;
   messages = [];
+  messageBodies = [];
 
   prepare(sql) {
     return new FakeStatement(this, sql);
@@ -42,6 +44,9 @@ class FakeDb {
         subject: "Help",
         mailbox_address: "support@example.com",
         mailbox_display_name: this.displayName,
+        mailbox_signature_mode: this.signature?.mode ?? "default",
+        mailbox_signature_html: this.signature?.html ?? null,
+        default_signature_html: this.signature?.fallback ?? null,
       };
     }
     if (sql.includes("SELECT id, message_id, from_address")) {
@@ -84,11 +89,14 @@ class FakeDb {
         oauth_client_id: args[9],
         cc_addresses: args[10],
         bcc_addresses: args[11],
+        signature_html: args[12],
+        html_body: args[13],
         message_id: null,
         error: null,
       });
     } else if (sql.includes("INSERT INTO messages")) {
       this.messages.push({ from_address: args[5], from_name: args[6] });
+      this.messageBodies.push({ text_body: args[9], html_body: args[13] });
     } else if (sql.includes("INSERT INTO attachments")) {
       this.messageAttachments.push({
         filename: args[0],
@@ -406,4 +414,24 @@ test("a Reply Attempt rejects too many combined recipients before sending", asyn
     (error) => error instanceof ReplyIntentError && error.status === 400,
   );
   assert.equal(fixture.sends(), 0);
+});
+
+test("a reply appends the inbox signature and sends rich text", async () => {
+  const fixture = makeEnv();
+  fixture.env.DB.signature = { mode: "custom", html: "<b>Jane</b>", fallback: null };
+
+  await sendReplyAttempt(fixture.env, {
+    attemptId: "attempt-signed",
+    threadId: 1,
+    text: "ignored",
+    html: "<p><i>Thanks</i> for writing</p>",
+  });
+
+  const sent = fixture.sent()[0];
+  assert.equal(sent.text, "Thanks for writing\n\n-- \nJane");
+  assert.match(sent.html, /<p><i>Thanks<\/i> for writing<\/p>.*<b>Jane<\/b>/);
+  const attempt = fixture.env.DB.attempts.get("attempt-signed");
+  assert.equal(attempt.signature_html, "<b>Jane</b>");
+  assert.equal(attempt.html_body, "<p><i>Thanks</i> for writing</p>");
+  assert.deepEqual(fixture.env.DB.messageBodies[0], { text_body: sent.text, html_body: sent.html });
 });

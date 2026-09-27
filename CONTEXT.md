@@ -8,6 +8,14 @@ Mailroom is a shared email workspace where people and agents handle customer con
 A manually registered customer-facing email address under one ready Domain, with its own agent configuration and collection of conversations. The address is its sole identity; mail sent to an unregistered address is not part of the workspace. An Inbox may carry a Sender Name (for example "Jane Doe from Acme") that recipients see in the From header of every reply and new email it sends; without one, mail shows only the address.
 _Avoid_: Mailbox, account, inbox account
 
+**Signature**:
+Rich text (bold, italic, links, lists) appended to every reply and new email an Inbox sends, whether written by a person, an approved Agent Draft or the MCP Server. The workspace has one default Signature; each Inbox uses the default, its own Signature, or none. Plain-text recipients see it after a "-- " line. A Reply or Send Attempt keeps the Signature it was created with, so a retry sends the same email. Rule Forwards and Email Notifications carry no Signature.
+_Avoid_: Footer, sign-off
+
+**Rich Text**:
+The formatting people use when writing replies, new emails and Signatures: bold, italic, underline, strikethrough, links and lists. It is stored and sent as allowlisted HTML, with the plain-text part derived from it so both always match. Agent Drafts are plain text and become rich text once edited.
+_Avoid_: RTF, HTML email, formatted mail
+
 **Domain**:
 The shared email namespace inferred from an Inbox address. It becomes ready after inbound routing and outbound sending are configured; one ready Domain can support multiple Inboxes.
 _Avoid_: Mailbox domain, sending domain

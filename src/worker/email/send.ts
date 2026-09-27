@@ -20,6 +20,8 @@ export interface OutgoingEmail {
   bcc?: string[];
   subject: string;
   text: string;
+  /** Optional HTML alternative, sent alongside `text`. */
+  html?: string;
   attachments?: OutgoingAttachment[];
   /** RFC Message-ID of the message being replied to */
   inReplyTo?: string;
@@ -81,6 +83,7 @@ export async function sendEmail(env: SendEmailEnv, mail: OutgoingEmail): Promise
     ...(mail.bcc?.length ? { bcc: mail.bcc } : {}),
     subject: mail.subject,
     text: mail.text,
+    ...(mail.html ? { html: mail.html } : {}),
     ...(mail.attachments?.length ? { attachments: mail.attachments } : {}),
     ...(mail.replyTo ? { replyTo: mail.replyTo } : {}),
     headers,

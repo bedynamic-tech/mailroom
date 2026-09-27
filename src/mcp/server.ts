@@ -17,6 +17,7 @@ import {
 } from "../worker/inbox/conversations.ts";
 import { entityId, parseEntityId } from "../shared/entity-ids.ts";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../shared/email-limits.ts";
+import { MAX_RICH_TEXT_HTML_LENGTH } from "../shared/rich-text.ts";
 import type { McpIdentity } from "./auth-types.ts";
 
 export interface McpEnv extends InboxDataEnv, SendEmailEnv {
@@ -84,6 +85,13 @@ const attachmentsInput = z
   .max(MAX_ATTACHMENTS_PER_MESSAGE)
   .optional()
   .describe("Optional file attachments. Combined size must stay under 3 MB.");
+const htmlBodyInput = z
+  .string()
+  .max(MAX_RICH_TEXT_HTML_LENGTH)
+  .optional()
+  .describe(
+    "Optional rich-text body as simple HTML (b, i, u, a href, ul/ol/li, p, br). Unsupported markup is removed and the plain-text part is derived from it, so text is ignored when html is set.",
+  );
 
 const copyRecipientsInput = z
   .array(z.email().max(254))
@@ -254,7 +262,7 @@ export function createMailroomServer(env: McpEnv, identity: McpIdentity): McpSer
     {
       title: "Reply to conversation",
       description:
-        "Immediately send a plain-text reply to one reviewed inbound Message, optionally with Cc/Bcc recipients and file attachments. Requires the exact Message id and reply_target returned by get_conversation; the call fails if the Conversation or recipient changed. The server records the outbound Message and its attachments in the Web inbox and prevents duplicate sends with idempotency_key.",
+        "Immediately send a reply (plain text, or rich text via html) to one reviewed inbound Message, optionally with Cc/Bcc recipients and file attachments. Requires the exact Message id and reply_target returned by get_conversation; the call fails if the Conversation or recipient changed. The Inbox's email signature, if one is set, is appended automatically, so do not write one. The server records the outbound Message and its attachments in the Web inbox and prevents duplicate sends with idempotency_key.",
       inputSchema: z.object({
         conversation_id: z.string().describe("A Conversation id returned by search_conversations."),
         reply_to_message_id: z.string().describe("The latest inbound Message id returned by get_conversation."),
@@ -262,6 +270,7 @@ export function createMailroomServer(env: McpEnv, identity: McpIdentity): McpSer
         cc: copyRecipientsInput.describe("Optional Cc recipients, visible to everyone on the reply. To reply all, include the inbound Message's other to and cc addresses, excluding the Inbox address."),
         bcc: copyRecipientsInput.describe("Optional Bcc recipients, hidden from the other recipients."),
         text: z.string().trim().max(100_000).default(""),
+        html: htmlBodyInput,
         attachments: attachmentsInput,
         idempotency_key: idempotencyKey,
       }),
@@ -273,7 +282,7 @@ export function createMailroomServer(env: McpEnv, identity: McpIdentity): McpSer
         openWorldHint: true,
       },
     },
-    async ({ conversation_id, reply_to_message_id, expected_recipients, cc, bcc, text, attachments, idempotency_key }) =>
+    async ({ conversation_id, reply_to_message_id, expected_recipients, cc, bcc, text, html, attachments, idempotency_key }) =>
       toolCall(async () => {
         const conversationId = requireEntityId("conversation", conversation_id);
         const inboundMessageId = requireEntityId("message", reply_to_message_id);
@@ -281,6 +290,7 @@ export function createMailroomServer(env: McpEnv, identity: McpIdentity): McpSer
           attemptId: await durableAttemptId("mcp_reply", identity.sub, idempotency_key),
           threadId: conversationId,
           text,
+          html,
           cc,
           bcc,
           attachments: decodeAttachments(attachments),
@@ -299,7 +309,7 @@ export function createMailroomServer(env: McpEnv, identity: McpIdentity): McpSer
     {
       title: "Send email",
       description:
-        "Immediately send a new plain-text email from a registered Inbox, optionally with Cc/Bcc recipients and file attachments. The sent Message, its attachments, and a new Conversation are recorded in the Web inbox. This has an external side effect; use a stable idempotency_key so retries never send duplicates.",
+        "Immediately send a new email (plain text, or rich text via html) from a registered Inbox, optionally with Cc/Bcc recipients and file attachments. The Inbox's email signature, if one is set, is appended automatically, so do not write one. The sent Message, its attachments, and a new Conversation are recorded in the Web inbox. This has an external side effect; use a stable idempotency_key so retries never send duplicates.",
       inputSchema: z.object({
         inbox_id: z.string().describe("The sending Inbox id returned by list_inboxes."),
         to: z.array(z.email()).length(1).describe("Exactly one recipient address."),
@@ -307,6 +317,7 @@ export function createMailroomServer(env: McpEnv, identity: McpIdentity): McpSer
         bcc: copyRecipientsInput.describe("Optional Bcc recipients, hidden from the other recipients."),
         subject: z.string().trim().min(1).max(500),
         text: z.string().trim().max(100_000).default(""),
+        html: htmlBodyInput,
         attachments: attachmentsInput,
         idempotency_key: idempotencyKey,
       }),
@@ -318,7 +329,7 @@ export function createMailroomServer(env: McpEnv, identity: McpIdentity): McpSer
         openWorldHint: true,
       },
     },
-    async ({ inbox_id, to, cc, bcc, subject, text, attachments, idempotency_key }) =>
+    async ({ inbox_id, to, cc, bcc, subject, text, html, attachments, idempotency_key }) =>
       toolCall(async () => {
         const inboxId = requireEntityId("inbox", inbox_id);
         const result = await sendNewEmailAttempt(env, {
@@ -329,6 +340,7 @@ export function createMailroomServer(env: McpEnv, identity: McpIdentity): McpSer
           bcc,
           subject,
           text,
+          html,
           attachments: decodeAttachments(attachments),
           actorId: identity.sub,
           dailySendLimit: dailySendLimit(env),

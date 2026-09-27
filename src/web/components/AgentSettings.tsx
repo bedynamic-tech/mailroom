@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Label, Mailbox, Playbook } from "../../shared/types";
 import { MAX_SENDER_NAME_LENGTH, normalizeSenderName } from "../../shared/sender-name";
+import { normalizeSignature, type SignatureMode } from "../../shared/signature";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +34,7 @@ import {
   deleteMailbox,
   deletePlaybook,
   fetchDomains,
+  fetchGeneralSettings,
   fetchLabels,
   fetchPlaybooks,
   updateLabel,
@@ -47,6 +49,7 @@ import {
   TagIcon,
   TrashIcon,
 } from "./Icons";
+import { RichTextEditor, RichTextPreview } from "./RichTextEditor";
 import {
   SettingsBlock,
   SettingsHeader,
@@ -108,6 +111,8 @@ export function AgentSettings(props: {
   const queryClient = useQueryClient();
   const [baseInstructions, setBaseInstructions] = useState("");
   const [senderName, setSenderName] = useState("");
+  const [signatureMode, setSignatureMode] = useState<SignatureMode>("default");
+  const [signatureHtml, setSignatureHtml] = useState("");
   const [editor, setEditor] = useState<PlaybookEditorState | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<number | null>(null);
   const [labelEditor, setLabelEditor] = useState<LabelEditorState | null>(null);
@@ -127,6 +132,8 @@ export function AgentSettings(props: {
   useEffect(() => {
     setBaseInstructions(mailbox?.agent_instructions ?? "");
     setSenderName(mailbox?.display_name ?? "");
+    setSignatureMode(mailbox?.signature_mode ?? "default");
+    setSignatureHtml(mailbox?.signature_html ?? "");
     setDeleteConfirmation(null);
     setLabelDeleteConfirmation(null);
     setDeleteInboxOpen(false);
@@ -149,6 +156,12 @@ export function AgentSettings(props: {
     queryKey: ["domains"],
     queryFn: fetchDomains,
   });
+
+  const generalSettings = useQuery({
+    queryKey: ["settings", "general"],
+    queryFn: fetchGeneralSettings,
+  });
+  const defaultSignature = generalSettings.data?.default_signature_html ?? null;
 
   const addMailbox = useMutation({
     mutationFn: (input: { localPart: string; domainId: number }) =>
@@ -188,6 +201,15 @@ export function AgentSettings(props: {
   const saveSenderName = useMutation({
     mutationFn: () =>
       updateMailbox(selectedMailboxId!, { display_name: normalizeSenderName(senderName) || null }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mailboxes"] }),
+  });
+
+  const saveSignature = useMutation({
+    mutationFn: () =>
+      updateMailbox(selectedMailboxId!, {
+        signature_mode: signatureMode,
+        ...(signatureMode === "custom" ? { signature_html: normalizeSignature(signatureHtml) } : {}),
+      }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mailboxes"] }),
   });
 
@@ -288,6 +310,20 @@ export function AgentSettings(props: {
   const senderNameDirty =
     normalizeSenderName(senderName) !== normalizeSenderName(mailbox?.display_name);
   const senderNamePreview = normalizeSenderName(senderName);
+
+  const signatureDirty =
+    signatureMode !== (mailbox?.signature_mode ?? "default") ||
+    (signatureMode === "custom" &&
+      normalizeSignature(signatureHtml) !== (mailbox?.signature_html ?? null));
+
+  const chooseSignatureMode = (mode: SignatureMode) => {
+    saveSignature.reset();
+    setSignatureMode(mode);
+    // Start a new custom signature from the default rather than a blank page.
+    if (mode === "custom" && !normalizeSignature(signatureHtml) && defaultSignature) {
+      setSignatureHtml(defaultSignature);
+    }
+  };
 
   const instructionsDirty =
     baseInstructions.trim() !== (mailbox?.agent_instructions ?? "").trim();
@@ -425,6 +461,95 @@ export function AgentSettings(props: {
               </SettingsPanel>
             </SettingsBlock>
 
+            <SettingsBlock
+              id="signature-heading"
+              title="Signature"
+              description="Added to replies and new email sent from this inbox."
+            >
+              <SettingsPanel>
+                <form
+                  className="space-y-3 px-4 py-4 sm:px-5"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (signatureDirty) saveSignature.mutate();
+                  }}
+                >
+                  <div className="max-w-sm">
+                    <Select
+                      value={signatureMode}
+                      onValueChange={(value) => chooseSignatureMode(value as SignatureMode)}
+                      disabled={saveSignature.isPending}
+                    >
+                      <SelectTrigger aria-labelledby="signature-heading" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Use the default signature</SelectItem>
+                        <SelectItem value="custom">Use a signature for this inbox</SelectItem>
+                        <SelectItem value="none">No signature</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {signatureMode === "custom" && (
+                    <RichTextEditor
+                      id="inbox-signature"
+                      value={signatureHtml}
+                      onChange={(value) => {
+                        setSignatureHtml(value);
+                        saveSignature.reset();
+                      }}
+                      disabled={saveSignature.isPending}
+                      placeholder={`Jane Doe, ${mailbox.address}`}
+                      ariaLabelledBy="signature-heading"
+                    />
+                  )}
+
+                  {signatureMode === "default" &&
+                    (defaultSignature ? (
+                      <div className="rounded-lg border bg-muted/30 px-4 py-3">
+                        <RichTextPreview html={defaultSignature} className="text-foreground" />
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No default signature yet.{" "}
+                        <button
+                          type="button"
+                          onClick={props.onOpenGeneral}
+                          className="rounded-sm text-foreground underline underline-offset-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                        >
+                          Set one in General settings
+                        </button>
+                        .
+                      </p>
+                    ))}
+
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="min-w-0 text-xs text-muted-foreground" aria-live="polite">
+                      {saveSignature.isError ? (
+                        <span className="text-destructive">
+                          {saveSignature.error instanceof Error
+                            ? saveSignature.error.message
+                            : "Couldn’t save the signature."}
+                        </span>
+                      ) : signatureDirty ? (
+                        "Unsaved changes"
+                      ) : saveSignature.isSuccess ? (
+                        "Signature saved"
+                      ) : null}
+                    </p>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={saveSignature.isPending || !signatureDirty}
+                    >
+                      {saveSignature.isPending ? "Saving…" : "Save signature"}
+                    </Button>
+                  </div>
+                </form>
+              </SettingsPanel>
+            </SettingsBlock>
+
             <SettingsBlock id="agent-drafting-heading" title="AI drafting">
               <SettingsPanel>
                 <div className="flex items-start gap-4 px-4 py-4 sm:px-5">
@@ -474,7 +599,7 @@ export function AgentSettings(props: {
                   onChange={(event) => setBaseInstructions(event.target.value)}
                   rows={4}
                   aria-labelledby="base-instructions-heading"
-                  placeholder="Describe the product, the agent's role, voice, general rules, and signature…"
+                  placeholder="Describe the product, the agent's role, voice, and general rules…"
                   className="max-h-[60dvh] min-h-32 resize-y rounded-none border-0 bg-transparent px-4 py-3.5 text-sm leading-6 shadow-none focus-visible:ring-0 sm:px-5"
                 />
                 <div className="flex items-center justify-between gap-3 border-t bg-muted/30 px-4 py-2.5 sm:px-5">

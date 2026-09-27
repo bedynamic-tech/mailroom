@@ -23,7 +23,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { formatTime, splitQuotedTail } from "../lib";
 import { EmailAvatar } from "./EmailAvatar";
 import { EmailHtmlBody } from "./EmailHtmlBody";
@@ -43,6 +42,13 @@ import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
 import { BlockSenderDialog } from "./BlockSenderDialog";
 import { LinkifiedText } from "./LinkifiedText";
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
+import { RichTextEditor, richTextSummary } from "./RichTextEditor";
+import {
+  isBlankRichText,
+  plainTextToHtml,
+  richTextToPlainText,
+  sanitizeRichText,
+} from "../../shared/rich-text";
 
 export function ThreadView(props: {
   threadId: number;
@@ -129,6 +135,7 @@ export function ThreadView(props: {
   const reply = useMutation({
     mutationFn: (args: {
       text: string;
+      html: string;
       attemptId: string;
       attemptKey: string;
       draftId?: number;
@@ -136,10 +143,15 @@ export function ThreadView(props: {
       cc: string[];
       bcc: string[];
     }) =>
-      sendReply(props.threadId, args.text, args.attemptId, args.draftId, args.files ?? [], {
-        cc: args.cc,
-        bcc: args.bcc,
-      }),
+      sendReply(
+        props.threadId,
+        args.text,
+        args.attemptId,
+        args.draftId,
+        args.files ?? [],
+        { cc: args.cc, bcc: args.bcc },
+        args.html,
+      ),
     onSuccess: (result, args) => {
       if (result.status === "sent") {
         setReplyText("");
@@ -208,8 +220,8 @@ export function ThreadView(props: {
     // Consider each draft once: polling must not restore text the user cleared
     // or replace a reply they were already writing when the draft arrived.
     seenDraftIds.current.add(draft.id);
-    if (replyText.trim() || reply.isPending || discard.isPending) return;
-    setReplyText(draft.text_body);
+    if (!isBlankRichText(replyText) || reply.isPending || discard.isPending) return;
+    setReplyText(plainTextToHtml(draft.text_body));
     setUsedDraftId(draft.id);
   }, [draft, replyText, reply.isPending, discard.isPending]);
 
@@ -278,6 +290,11 @@ export function ThreadView(props: {
       }).filter((address) => !alreadyCopied.has(address.toLowerCase()))
     : [];
 
+  const replyMailbox = mailboxes.data?.find((mailbox) => mailbox.id === thread.mailbox_id);
+  const replySignature = replyMailbox?.effective_signature_html
+    ? richTextSummary(replyMailbox.effective_signature_html)
+    : "";
+
   const showCc = addingCc || replyCc.length > 0;
   const showBcc = addingBcc || replyBcc.length > 0;
   const openCopyRow = (row: "cc" | "bcc") => {
@@ -298,16 +315,18 @@ export function ThreadView(props: {
   };
 
   const submitReply = () => {
-    const text = replyText.trim();
+    const html = isBlankRichText(replyText) ? "" : sanitizeRichText(replyText);
+    const text = html ? richTextToPlainText(html) : "";
     if ((text || pendingFiles.length > 0) && !reply.isPending && !discard.isPending) {
       // Add any address still being typed; stop if one of them is invalid.
       const cc = ccField.current ? ccField.current.commit() : replyCc;
       const bcc = bccField.current ? bccField.current.commit() : replyBcc;
       if (!cc || !bcc) return;
-      const fingerprint = `${text} ${pendingFiles.map((file) => `${file.name}:${file.size}`).join(",")} cc:${cc.join(",")} bcc:${bcc.join(",")}`;
+      const fingerprint = `${html} ${pendingFiles.map((file) => `${file.name}:${file.size}`).join(",")} cc:${cc.join(",")} bcc:${bcc.join(",")}`;
       const attemptKey = usedDraftId === null ? "manual" : `draft-${usedDraftId}`;
       reply.mutate({
         text,
+        html,
         files: pendingFiles,
         cc,
         bcc,
@@ -320,7 +339,7 @@ export function ThreadView(props: {
 
   const applyDraft = (next: Draft) => {
     seenDraftIds.current.add(next.id);
-    setReplyText(next.text_body);
+    setReplyText(plainTextToHtml(next.text_body));
     setUsedDraftId(next.id);
   };
 
@@ -591,23 +610,19 @@ export function ThreadView(props: {
                 )}
               </div>
             )}
-            <Textarea
+            <RichTextEditor
+              id={`reply-${props.threadId}`}
               value={replyText}
               disabled={reply.isPending || discard.isPending}
-              onChange={(event) => {
-                setReplyText(event.target.value);
-                if (!event.target.value.trim()) setUsedDraftId(null);
+              onChange={(html) => {
+                setReplyText(html);
+                if (isBlankRichText(html)) setUsedDraftId(null);
               }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                  event.preventDefault();
-                  submitReply();
-                }
-              }}
+              onSubmitShortcut={submitReply}
               placeholder="Write a reply…"
-              rows={3}
-              aria-label="Reply"
-              className="max-h-[min(30dvh,200px)] min-h-[84px] resize-none overflow-y-auto overscroll-contain rounded-none border-0 bg-transparent px-3.5 py-3 text-sm leading-6 shadow-none focus-visible:ring-0"
+              ariaLabel="Reply"
+              variant="bare"
+              contentClassName="max-h-[min(30dvh,200px)] min-h-[84px] px-3.5"
             />
             {pendingFiles.length > 0 && (
               <div className="flex flex-wrap gap-1.5 px-3.5 pb-1" aria-label="Attachments to send">
@@ -637,6 +652,14 @@ export function ThreadView(props: {
                 ))}
               </div>
             )}
+            {replySignature && (
+              <p
+                className="truncate px-3.5 pb-2 text-xs text-muted-foreground"
+                title={replySignature}
+              >
+                <span className="text-foreground/70">Signature:</span> {replySignature}
+              </p>
+            )}
             <div className="flex items-center justify-end px-3 pb-3 sm:justify-between">
               <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
                 <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
@@ -665,7 +688,7 @@ export function ThreadView(props: {
                 <Button
                   onClick={submitReply}
                   disabled={
-                    (!replyText.trim() && pendingFiles.length === 0) || reply.isPending || discard.isPending
+                    (isBlankRichText(replyText) && pendingFiles.length === 0) || reply.isPending || discard.isPending
                   }
                 >
                   <SendIcon className="h-3.5 w-3.5" />

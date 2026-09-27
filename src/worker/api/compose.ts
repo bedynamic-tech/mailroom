@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_TOTAL_BYTES, MAX_MESSAGE_CHARS, MAX_RECIPIENTS_PER_MESSAGE, MAX_SUBJECT_CHARS } from "../../shared/email-limits.ts";
+import { MAX_RICH_TEXT_HTML_LENGTH, normalizeMessageBody } from "../../shared/rich-text.ts";
 import { AttachmentInputError } from "../email/attachments.ts";
 import { ComposeIntentError, sendNewEmailAttempt, type ComposeEnv } from "../email/compose.ts";
 
@@ -12,6 +13,7 @@ const input = z.object({
   bcc: z.array(z.email().max(254)).max(MAX_RECIPIENTS_PER_MESSAGE),
   subject: z.string().trim().min(1).max(MAX_SUBJECT_CHARS).regex(/^[^\r\n]+$/),
   text: z.string().trim().max(MAX_MESSAGE_CHARS),
+  html: z.string().max(MAX_RICH_TEXT_HTML_LENGTH).optional(),
   attempt_id: z.uuid(),
 });
 
@@ -34,6 +36,7 @@ composeApi.post("/", bodyLimit({ maxSize: 4 * 1024 * 1024 }), async (c) => {
     bcc: copyAddresses(form, "bcc"),
     subject: form.get("subject"),
     text: form.get("text") ?? "",
+    html: form.get("html") || undefined,
     attempt_id: form.get("attempt_id"),
   });
   if (!parsed.success) {
@@ -41,10 +44,13 @@ composeApi.post("/", bodyLimit({ maxSize: 4 * 1024 * 1024 }), async (c) => {
     const message = field === "to" ? "Enter one valid recipient email address"
       : field === "cc" || field === "bcc" ? `Enter valid ${field === "cc" ? "Cc" : "Bcc"} email addresses, up to ${MAX_RECIPIENTS_PER_MESSAGE} recipients`
       : field === "subject" ? `Enter a subject of 1–${MAX_SUBJECT_CHARS} characters without line breaks`
-      : field === "text" ? `Message text must be at most ${MAX_MESSAGE_CHARS.toLocaleString("en-US")} characters`
+      : field === "text" || field === "html" ? `Message text must be at most ${MAX_MESSAGE_CHARS.toLocaleString("en-US")} characters`
       : field === "mailbox_id" ? "Choose a sending inbox"
       : "Invalid send request; close this message and try again";
     return c.json({ error: message }, 400);
+  }
+  if (normalizeMessageBody(parsed.data.text, parsed.data.html).text.length > MAX_MESSAGE_CHARS) {
+    return c.json({ error: `Message text must be at most ${MAX_MESSAGE_CHARS.toLocaleString("en-US")} characters` }, 400);
   }
   const files = form.getAll("attachments");
   if (files.some((file) => !(file instanceof File) || file.size === 0)) {
@@ -64,6 +70,7 @@ composeApi.post("/", bodyLimit({ maxSize: 4 * 1024 * 1024 }), async (c) => {
       bcc: parsed.data.bcc,
       subject: parsed.data.subject,
       text: parsed.data.text,
+      html: parsed.data.html,
       sentBy: "human",
       attachments: await Promise.all(attachments.map(async (file) => ({
         filename: file.name, contentType: file.type, content: await file.arrayBuffer(),

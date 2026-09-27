@@ -14,6 +14,8 @@ import {
 } from "./attachments.ts";
 import { sendEmail, type SendEmailEnv } from "./send.ts";
 import { normalizeSenderName, senderFrom } from "../../shared/sender-name.ts";
+import { composeOutgoingBodies, effectiveSignature } from "../../shared/signature.ts";
+import { normalizeMessageBody } from "../../shared/rich-text.ts";
 import { claimDailySendBudget } from "./send-budget.ts";
 
 export interface ReplyEnv extends SendEmailEnv {
@@ -25,6 +27,8 @@ export interface ReplyIntent {
   attemptId: string;
   threadId: number;
   text: string;
+  /** Rich-text body; when set, `text` is derived from it. */
+  html?: string | null;
   /** Extra Cc/Bcc recipients; To is always the reviewed inbound reply target. */
   cc?: string[];
   bcc?: string[];
@@ -54,12 +58,16 @@ interface StoredAttempt {
   sent_by?: "human" | "agent";
   actor_id?: string | null;
   oauth_client_id?: string | null;
+  signature_html?: string | null;
+  html_body?: string | null;
 }
 
 export async function sendReplyAttempt(
   env: ReplyEnv,
-  intent: ReplyIntent,
+  requested: ReplyIntent,
 ): Promise<ReplyAttemptResult> {
+  const body = normalizeMessageBody(requested.text, requested.html);
+  const intent: ReplyIntent = { ...requested, text: body.text, html: body.html };
   const attachments = normalizeAttachments(intent.attachments ?? []);
   if (!intent.text.trim() && attachments.length === 0) {
     throw new ReplyIntentError("Reply text is required", 400);
@@ -77,7 +85,10 @@ export async function sendReplyAttempt(
 
   const thread = await env.DB.prepare(
     `SELECT t.id, t.mailbox_id, t.subject, m.address AS mailbox_address,
-       m.display_name AS mailbox_display_name
+       m.display_name AS mailbox_display_name,
+       m.signature_mode AS mailbox_signature_mode,
+       m.signature_html AS mailbox_signature_html,
+       (SELECT default_signature_html FROM global_settings WHERE id = 1) AS default_signature_html
      FROM threads t JOIN mailboxes m ON m.id = t.mailbox_id WHERE t.id = ?`,
   )
     .bind(intent.threadId)
@@ -87,8 +98,19 @@ export async function sendReplyAttempt(
       subject: string;
       mailbox_address: string;
       mailbox_display_name?: string | null;
+      mailbox_signature_mode?: string | null;
+      mailbox_signature_html?: string | null;
+      default_signature_html?: string | null;
     }>();
   if (!thread) throw new ReplyIntentError("Conversation not found", 404);
+  // A retry keeps the signature the attempt was created with.
+  const signatureHtml = existing
+    ? existing.signature_html ?? null
+    : effectiveSignature(
+        thread.mailbox_signature_mode,
+        thread.mailbox_signature_html,
+        thread.default_signature_html,
+      );
 
   const lastInbound = await env.DB.prepare(
     `SELECT id, message_id, from_address, reply_to_addresses, references_ids
@@ -166,8 +188,9 @@ export async function sendReplyAttempt(
       await env.DB.prepare(
         `INSERT INTO reply_attempts
            (id, thread_id, inbound_message_id, draft_id, status, text_body, to_addresses,
-            attachments, sent_by, actor_id, oauth_client_id, cc_addresses, bcc_addresses)
-         VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+            attachments, sent_by, actor_id, oauth_client_id, cc_addresses, bcc_addresses,
+            signature_html, html_body)
+         VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
           intent.attemptId,
@@ -182,6 +205,8 @@ export async function sendReplyAttempt(
           intent.oauthClientId ?? null,
           JSON.stringify(copies.cc),
           JSON.stringify(copies.bcc),
+          signatureHtml,
+          body.html,
         )
         .run();
       if (
@@ -227,6 +252,7 @@ export async function sendReplyAttempt(
     lastInbound.message_id,
   ]);
   const subject = /^re:/i.test(thread.subject) ? thread.subject : `Re: ${thread.subject}`;
+  const bodies = composeOutgoingBodies(body, signatureHtml);
 
   let messageId = existing?.message_id ?? null;
   if (!messageId) {
@@ -237,7 +263,8 @@ export async function sendReplyAttempt(
         cc: copies.cc,
         bcc: copies.bcc,
         subject,
-        text: intent.text.trim(),
+        text: bodies.text,
+        html: bodies.html,
         attachments: sendableAttachments(attachments),
         inReplyTo: lastInbound.message_id,
         references,
@@ -291,8 +318,8 @@ export async function sendReplyAttempt(
       `INSERT INTO messages
          (thread_id, message_id, in_reply_to, references_ids, direction, sent_by,
           from_address, from_name, to_addresses, reply_to_addresses,
-          subject, text_body, created_at, cc_addresses, bcc_addresses)
-       VALUES (?, ?, ?, ?, 'outbound', ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?)`,
+          subject, text_body, created_at, cc_addresses, bcc_addresses, html_body)
+       VALUES (?, ?, ?, ?, 'outbound', ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?, ?)`,
     ).bind(
       intent.threadId,
       messageId,
@@ -303,10 +330,11 @@ export async function sendReplyAttempt(
       normalizeSenderName(thread.mailbox_display_name) || null,
       JSON.stringify(recipients),
       subject,
-      intent.text.trim(),
+      bodies.text,
       now,
       JSON.stringify(copies.cc),
       JSON.stringify(copies.bcc),
+      bodies.html ?? null,
     ),
     ...recordAttachmentStatements(env.DB, staged, messageId),
     env.DB.prepare(
@@ -352,6 +380,7 @@ function existingResult(
   if (
     existing.thread_id !== intent.threadId ||
     existing.text_body !== intent.text.trim() ||
+    (existing.html_body ?? null) !== (intent.html ?? null) ||
     existing.draft_id !== (intent.draftId ?? null) ||
     !sameCopies(existing, intent) ||
     attachmentFingerprint(parseStagedAttachments(existing.attachments)) !==

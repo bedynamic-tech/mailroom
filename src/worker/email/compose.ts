@@ -16,6 +16,8 @@ import {
 } from "./attachments.ts";
 import { sendEmail, type SendEmailEnv } from "./send.ts";
 import { normalizeSenderName, senderFrom } from "../../shared/sender-name.ts";
+import { composeOutgoingBodies, effectiveSignature } from "../../shared/signature.ts";
+import { normalizeMessageBody } from "../../shared/rich-text.ts";
 import { claimDailySendBudget } from "./send-budget.ts";
 
 export interface ComposeEnv extends SendEmailEnv {
@@ -31,6 +33,8 @@ export interface ComposeIntent {
   bcc?: string[];
   subject: string;
   text: string;
+  /** Rich-text body; when set, `text` is derived from it. */
+  html?: string | null;
   attachments?: OutboundAttachmentInput[];
   actorId?: string;
   oauthClientId?: string;
@@ -56,6 +60,8 @@ interface StoredAttempt {
   oauth_client_id: string | null;
   error: string | null;
   sent_by: "human" | "agent";
+  signature_html?: string | null;
+  html_body?: string | null;
 }
 
 export async function sendNewEmailAttempt(
@@ -89,7 +95,9 @@ export async function sendNewEmailAttempt(
   }
 
   const inbox = await env.DB.prepare(
-    `SELECT m.id, m.address, m.display_name, d.status AS domain_status
+    `SELECT m.id, m.address, m.display_name, d.status AS domain_status,
+       m.signature_mode, m.signature_html,
+       (SELECT default_signature_html FROM global_settings WHERE id = 1) AS default_signature_html
      FROM mailboxes m LEFT JOIN domains d ON d.id = m.domain_id
      WHERE m.id = ?`,
   )
@@ -99,11 +107,19 @@ export async function sendNewEmailAttempt(
       address: string;
       display_name?: string | null;
       domain_status: "pending" | "active" | null;
+      signature_mode?: string | null;
+      signature_html?: string | null;
+      default_signature_html?: string | null;
     }>();
   if (!inbox) throw new ComposeIntentError("Inbox not found", 404);
   if (inbox.domain_status !== "active") {
     throw new ComposeIntentError("Inbox domain is not ready for outbound sending", 409);
   }
+  // A retry keeps the signature the attempt was created with.
+  const signatureHtml = existing
+    ? existing.signature_html ?? null
+    : effectiveSignature(inbox.signature_mode, inbox.signature_html, inbox.default_signature_html);
+  const bodies = composeOutgoingBodies({ text: normalized.text, html: normalized.html }, signatureHtml);
 
   let staged: StagedAttachment[] = existing
     ? parseStagedAttachments(existing.attachments)
@@ -120,8 +136,9 @@ export async function sendNewEmailAttempt(
       await env.DB.prepare(
         `INSERT INTO outbound_attempts
            (id, mailbox_id, status, to_addresses, subject, text_body, attachments,
-            actor_id, oauth_client_id, sent_by, cc_addresses, bcc_addresses)
-         VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            actor_id, oauth_client_id, sent_by, cc_addresses, bcc_addresses, signature_html,
+            html_body)
+         VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
           normalized.attemptId,
@@ -135,6 +152,8 @@ export async function sendNewEmailAttempt(
           normalized.sentBy ?? "agent",
           JSON.stringify(normalized.cc),
           JSON.stringify(normalized.bcc),
+          signatureHtml,
+          normalized.html,
         )
         .run();
       if (
@@ -207,7 +226,8 @@ export async function sendNewEmailAttempt(
         cc: normalized.cc,
         bcc: normalized.bcc,
         subject: normalized.subject,
-        text: normalized.text,
+        text: bodies.text,
+        html: bodies.html,
         attachments: sendableAttachments(attachments),
         autoSubmitted: normalized.sentBy === "human" ? undefined : "auto-generated",
         attemptId: normalized.attemptId,
@@ -245,8 +265,8 @@ export async function sendNewEmailAttempt(
       `INSERT INTO messages
          (thread_id, message_id, references_ids, direction, sent_by,
           from_address, from_name, to_addresses, reply_to_addresses,
-          subject, text_body, created_at, cc_addresses, bcc_addresses)
-       VALUES (?, ?, '[]', 'outbound', ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?)`,
+          subject, text_body, created_at, cc_addresses, bcc_addresses, html_body)
+       VALUES (?, ?, '[]', 'outbound', ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?, ?)`,
     ).bind(
       conversationId,
       messageId,
@@ -255,10 +275,11 @@ export async function sendNewEmailAttempt(
       normalizeSenderName(inbox.display_name) || null,
       JSON.stringify(normalized.to),
       normalized.subject,
-      normalized.text,
+      bodies.text,
       now,
       JSON.stringify(normalized.cc),
       JSON.stringify(normalized.bcc),
+      bodies.html ?? null,
     ),
     ...recordAttachmentStatements(env.DB, staged, messageId),
     env.DB.prepare(
@@ -315,6 +336,7 @@ function existingResult(
     (existing.bcc_addresses ?? "[]") !== JSON.stringify(intent.bcc) ||
     existing.subject !== intent.subject ||
     existing.text_body !== intent.text ||
+    (existing.html_body ?? null) !== intent.html ||
     attachmentFingerprint(parseStagedAttachments(existing.attachments)) !==
       attachmentFingerprint(attachments) ||
     existing.actor_id !== (intent.actorId ?? null) ||
@@ -344,12 +366,13 @@ function failedResult(id: string, conversationId: number | null, error: string):
   };
 }
 
-interface NormalizedIntent extends Omit<ComposeIntent, "to" | "cc" | "bcc" | "subject" | "text"> {
+interface NormalizedIntent extends Omit<ComposeIntent, "to" | "cc" | "bcc" | "subject" | "text" | "html"> {
   to: string[];
   cc: string[];
   bcc: string[];
   subject: string;
   text: string;
+  html: string | null;
 }
 
 function normalizeIntent(intent: ComposeIntent): NormalizedIntent {
@@ -363,7 +386,7 @@ function normalizeIntent(intent: ComposeIntent): NormalizedIntent {
       bcc: normalizeList(intent.bcc),
     }),
     subject: intent.subject.trim(),
-    text: intent.text.trim(),
+    ...normalizeMessageBody(intent.text, intent.html),
   };
 }
 

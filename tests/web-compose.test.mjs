@@ -163,3 +163,57 @@ test("Web compose rejects invalid or excessive Cc and Bcc recipients before send
   assert.equal(f.sent.length, 0);
   assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM outbound_attempts").get().n, 0);
 });
+
+test("new email carries the default signature, an inbox's own signature, or none", async (t) => {
+  const f = fixture(t);
+  f.db.prepare("UPDATE global_settings SET default_signature_html = ? WHERE id = 1")
+    .run('<b>Acme Support</b><br><a href="https://acme.com">acme.com</a>');
+
+  assert.equal((await f.post(message())).status, 200);
+  assert.equal(f.sent[0].text, "Hello from a human\n\n-- \nAcme Support\nacme.com");
+  assert.match(f.sent[0].html, /<b>Acme Support<\/b><br><a href="https:\/\/acme.com">acme.com<\/a>/);
+  const stored = f.db.prepare("SELECT text_body, html_body FROM messages").get();
+  assert.equal(stored.text_body, f.sent[0].text);
+  assert.equal(stored.html_body, f.sent[0].html);
+  assert.equal(f.db.prepare("SELECT snippet FROM threads").get().snippet, "Hello from a human");
+
+  f.db.prepare("UPDATE mailboxes SET signature_mode = 'custom', signature_html = '<i>Jane</i>' WHERE id = 1").run();
+  assert.equal((await f.post(message())).status, 200);
+  assert.equal(f.sent[1].text, "Hello from a human\n\n-- \nJane");
+
+  f.db.prepare("UPDATE mailboxes SET signature_mode = 'none' WHERE id = 1").run();
+  assert.equal((await f.post(message())).status, 200);
+  assert.equal(f.sent[2].text, "Hello from a human");
+  assert.equal(f.sent[2].html, undefined);
+});
+
+test("a retried Send Attempt keeps the signature it was created with", async (t) => {
+  const f = fixture(t);
+  f.db.prepare("UPDATE global_settings SET default_signature_html = '<b>New</b>' WHERE id = 1").run();
+  const id = crypto.randomUUID();
+  f.db.prepare(`INSERT INTO outbound_attempts (id, mailbox_id, status, to_addresses, subject, text_body, sent_by, signature_html)
+    VALUES (?, 1, 'pending', ?, 'A new conversation', 'Hello from a human', 'human', '<b>Old</b>')`)
+    .run(`web_compose_${id}`, JSON.stringify(["person@example.com"]));
+  assert.equal((await f.post(message({ attempt_id: id }))).status, 200);
+  assert.equal(f.sent[0].text, "Hello from a human\n\n-- \nOld");
+});
+
+test("Web compose sends a rich-text body with a derived plain-text part", async (t) => {
+  const f = fixture(t);
+  const id = crypto.randomUUID();
+  const html = '<div><b>Hello</b> <a href="https://acme.com/docs">docs</a></div><div>Bye<script>x()</script></div>';
+  const first = await f.post(message({ attempt_id: id, text: "ignored", html }));
+  assert.equal(first.status, 200);
+  assert.equal(f.sent[0].text, "Hello docs <https://acme.com/docs>\nBye");
+  assert.match(f.sent[0].html, /<div><b>Hello<\/b> <a href="https:\/\/acme.com\/docs">docs<\/a><\/div><div>Bye<\/div>/);
+  assert.doesNotMatch(f.sent[0].html, /script/);
+  const stored = f.db.prepare("SELECT text_body, html_body FROM messages").get();
+  assert.equal(stored.text_body, f.sent[0].text);
+  assert.equal(stored.html_body, f.sent[0].html);
+
+  const result = await first.json();
+  assert.deepEqual(await (await f.post(message({ attempt_id: id, text: "ignored", html }))).json(), result);
+  assert.equal((await f.post(message({ attempt_id: id, html: "<i>Changed</i>" }))).status, 409);
+  assert.equal((await f.post(message({ text: "", html: "<div><br></div>" }))).status, 400);
+  assert.equal(f.sent.length, 1);
+});

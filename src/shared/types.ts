@@ -1,3 +1,5 @@
+import type { SignatureMode } from "./signature.ts";
+
 export interface Mailbox {
   id: number;
   address: string;
@@ -5,6 +7,12 @@ export interface Mailbox {
   color: string;
   agent_mode: "off" | "draft" | "auto";
   agent_instructions: string | null;
+  /** Whether the Inbox signs with the workspace default, its own signature, or none. */
+  signature_mode: SignatureMode;
+  /** The Inbox's own signature (sanitized HTML), used when signature_mode is "custom". */
+  signature_html: string | null;
+  /** The signature this Inbox currently appends to outgoing email, if any. */
+  effective_signature_html: string | null;
   unread_count: number;
 }
 
@@ -27,6 +35,8 @@ export interface GeneralSettings {
   email_notification_template: EmailNotificationTemplate;
   /** Create a Contact for each new inbound sender whose name can be parsed. */
   auto_create_contacts: boolean;
+  /** Signature (sanitized HTML) for every Inbox set to use the default. */
+  default_signature_html: string | null;
 }
 
 export interface EmailNotificationTemplate {

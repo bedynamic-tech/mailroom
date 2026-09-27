@@ -7,6 +7,13 @@ import { blockedSendersApi } from "./blocked-senders.ts";
 import { mailRulesApi } from "./mail-rules.ts";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
 import { MAX_SENDER_NAME_LENGTH, normalizeSenderName } from "../../shared/sender-name.ts";
+import { MAX_RICH_TEXT_HTML_LENGTH, normalizeMessageBody } from "../../shared/rich-text.ts";
+import {
+  effectiveSignature,
+  parseSignatureInput,
+  SIGNATURE_MODES,
+  type SignatureMode,
+} from "../../shared/signature.ts";
 import { enqueueDraftRun } from "../agent/runs";
 import {
   AttachmentInputError,
@@ -65,7 +72,8 @@ api.get("/settings/general", async (c) => {
     c.env.DB.prepare(
       `SELECT browser_notifications_enabled, email_notifications_enabled, email_notification_address,
               email_notification_from_name, email_notification_from_mailbox_id,
-              email_notification_subject, email_notification_body, auto_create_contacts
+              email_notification_subject, email_notification_body, auto_create_contacts,
+              default_signature_html
        FROM global_settings WHERE id = 1`,
     ).first<
       StoredNotificationTemplate & {
@@ -74,6 +82,7 @@ api.get("/settings/general", async (c) => {
         email_notification_address: string | null;
         email_notification_from_mailbox_id: number | null;
         auto_create_contacts: number;
+        default_signature_html: string | null;
       }
     >(),
     c.env.DB.prepare("SELECT COUNT(*) AS count FROM push_subscriptions")
@@ -97,6 +106,7 @@ api.get("/settings/general", async (c) => {
       body: template.body,
     },
     auto_create_contacts: Boolean(settings?.auto_create_contacts ?? 1),
+    default_signature_html: settings?.default_signature_html ?? null,
   };
   return c.json(result);
 });
@@ -253,6 +263,21 @@ api.put("/settings/contacts", async (c) => {
   return c.json({ ok: true });
 });
 
+api.put("/settings/default-signature", async (c) => {
+  const body = await c.req.json<{ html?: unknown }>().catch(() => null);
+  const signature = parseSignatureInput(body?.html ?? null);
+  if (!signature.ok) return c.json({ error: signature.error }, 400);
+  await c.env.DB.prepare(
+    `UPDATE global_settings
+     SET default_signature_html = ?,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE id = 1`,
+  )
+    .bind(signature.html)
+    .run();
+  return c.json({ ok: true, html: signature.html });
+});
+
 api.put("/settings/email-notifications/enabled", async (c) => {
   const body = await c.req.json<{ enabled?: unknown }>().catch(() => null);
   if (typeof body?.enabled !== "boolean") return c.json({ error: "enabled must be true or false" }, 400);
@@ -274,10 +299,20 @@ api.get("/mailboxes", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT m.*,
        (SELECT COUNT(*) FROM threads t
-        WHERE t.mailbox_id = m.id AND t.is_read = 0 AND t.status != 'archived') AS unread_count
+        WHERE t.mailbox_id = m.id AND t.is_read = 0 AND t.status != 'archived') AS unread_count,
+       (SELECT default_signature_html FROM global_settings WHERE id = 1) AS default_signature_html
      FROM mailboxes m ORDER BY m.address`,
-  ).all();
-  return c.json(results);
+  ).all<Omit<Mailbox, "effective_signature_html"> & { default_signature_html: string | null }>();
+  return c.json(
+    results.map(({ default_signature_html, ...mailbox }): Mailbox => ({
+      ...mailbox,
+      effective_signature_html: effectiveSignature(
+        mailbox.signature_mode,
+        mailbox.signature_html,
+        default_signature_html,
+      ),
+    })),
+  );
 });
 
 api.get("/domains", async (c) => {
@@ -373,7 +408,21 @@ api.post("/mailboxes", async (c) => {
     throw error;
   }
 
-  return c.json({ ...mailbox!, unread_count: 0 }, 201);
+  const defaults = await c.env.DB.prepare(
+    "SELECT default_signature_html FROM global_settings WHERE id = 1",
+  ).first<{ default_signature_html: string | null }>();
+  return c.json(
+    {
+      ...mailbox!,
+      unread_count: 0,
+      effective_signature_html: effectiveSignature(
+        mailbox!.signature_mode,
+        mailbox!.signature_html,
+        defaults?.default_signature_html,
+      ),
+    },
+    201,
+  );
 });
 
 api.patch("/mailboxes/:id", async (c) => {
@@ -381,6 +430,8 @@ api.patch("/mailboxes/:id", async (c) => {
     agent_mode?: "off" | "draft" | "auto";
     agent_instructions?: string;
     display_name?: unknown;
+    signature_mode?: unknown;
+    signature_html?: unknown;
   }>();
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -394,6 +445,19 @@ api.patch("/mailboxes/:id", async (c) => {
     }
     fields.push("display_name = ?");
     values.push(displayName || null);
+  }
+  if (body.signature_mode !== undefined) {
+    if (!SIGNATURE_MODES.includes(body.signature_mode as SignatureMode)) {
+      return c.json({ error: "invalid signature_mode" }, 400);
+    }
+    fields.push("signature_mode = ?");
+    values.push(body.signature_mode);
+  }
+  if (body.signature_html !== undefined) {
+    const signature = parseSignatureInput(body.signature_html);
+    if (!signature.ok) return c.json({ error: signature.error }, 400);
+    fields.push("signature_html = ?");
+    values.push(signature.html);
   }
   if (body.agent_mode !== undefined) {
     if (!["off", "draft", "auto"].includes(body.agent_mode)) {
@@ -976,6 +1040,7 @@ api.post("/threads/:id/reply", async (c) => {
   if (threadId === null) return c.json({ error: "Invalid conversation" }, 400);
 
   let text = "";
+  let html: string | undefined;
   let draftId: number | undefined;
   let attemptId = "";
   let cc: unknown[] = [];
@@ -984,9 +1049,11 @@ api.post("/threads/:id/reply", async (c) => {
   if ((c.req.header("content-type") ?? "").includes("multipart/form-data")) {
     const form = await c.req.formData();
     const formText = form.get("text");
+    const formHtml = form.get("html");
     const formDraft = form.get("draft_id");
     const formAttempt = form.get("attempt_id");
     text = typeof formText === "string" ? formText : "";
+    html = typeof formHtml === "string" && formHtml ? formHtml : undefined;
     attemptId = typeof formAttempt === "string" ? formAttempt : "";
     cc = copyAddresses(form, "cc");
     bcc = copyAddresses(form, "bcc");
@@ -1007,19 +1074,24 @@ api.post("/threads/:id/reply", async (c) => {
   } else {
     const body = await c.req.json<{
       text?: string;
+      html?: string;
       draft_id?: number;
       attempt_id?: string;
       cc?: unknown[];
       bcc?: unknown[];
     }>();
     text = body.text ?? "";
+    html = typeof body.html === "string" && body.html ? body.html : undefined;
     draftId = body.draft_id;
     attemptId = body.attempt_id ?? "";
     cc = Array.isArray(body.cc) ? body.cc : [];
     bcc = Array.isArray(body.bcc) ? body.bcc : [];
   }
 
-  if (!text.trim() && attachments.length === 0) {
+  if (html !== undefined && html.length > MAX_RICH_TEXT_HTML_LENGTH) {
+    return c.json({ error: "This reply is too long" }, 400);
+  }
+  if (!normalizeMessageBody(text, html).text && attachments.length === 0) {
     return c.json({ error: "text is required" }, 400);
   }
   if (!attemptId || attemptId.length > 120 || !/^[a-zA-Z0-9_-]+$/.test(attemptId)) {
@@ -1042,6 +1114,7 @@ api.post("/threads/:id/reply", async (c) => {
       attemptId,
       threadId,
       text,
+      html,
       cc: copies.data.cc,
       bcc: copies.data.bcc,
       attachments,
