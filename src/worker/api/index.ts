@@ -4,6 +4,7 @@ import { requireSameOrigin } from "./csrf.ts";
 import { composeApi, copyAddresses } from "./compose.ts";
 import { contactsApi } from "./contacts.ts";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
+import { MAX_SENDER_NAME_LENGTH, normalizeSenderName } from "../../shared/sender-name.ts";
 import { enqueueDraftRun } from "../agent/runs";
 import {
   AttachmentInputError,
@@ -373,9 +374,21 @@ api.patch("/mailboxes/:id", async (c) => {
   const body = await c.req.json<{
     agent_mode?: "off" | "draft" | "auto";
     agent_instructions?: string;
+    display_name?: unknown;
   }>();
   const fields: string[] = [];
   const values: unknown[] = [];
+  if (body.display_name !== undefined) {
+    if (body.display_name !== null && typeof body.display_name !== "string") {
+      return c.json({ error: "invalid display_name" }, 400);
+    }
+    const displayName = normalizeSenderName(body.display_name);
+    if (displayName.length > MAX_SENDER_NAME_LENGTH) {
+      return c.json({ error: `Keep the sender name under ${MAX_SENDER_NAME_LENGTH} characters` }, 400);
+    }
+    fields.push("display_name = ?");
+    values.push(displayName || null);
+  }
   if (body.agent_mode !== undefined) {
     if (!["off", "draft", "auto"].includes(body.agent_mode)) {
       return c.json({ error: "invalid agent_mode" }, 400);

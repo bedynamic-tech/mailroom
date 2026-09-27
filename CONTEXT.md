@@ -5,7 +5,7 @@ Mailroom is a shared email workspace where people and agents handle customer con
 ## Language
 
 **Inbox**:
-A manually registered customer-facing email address under one ready Domain, with its own agent configuration and collection of conversations. The address is its sole identity; mail sent to an unregistered address is not part of the workspace.
+A manually registered customer-facing email address under one ready Domain, with its own agent configuration and collection of conversations. The address is its sole identity; mail sent to an unregistered address is not part of the workspace. An Inbox may carry a Sender Name (for example "Jane Doe from Acme") that recipients see in the From header of every reply and new email it sends; without one, mail shows only the address.
 _Avoid_: Mailbox, account, inbox account
 
 **Domain**:

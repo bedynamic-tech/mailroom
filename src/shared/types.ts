@@ -1,6 +1,7 @@
 export interface Mailbox {
   id: number;
   address: string;
+  display_name: string | null;
   color: string;
   agent_mode: "off" | "draft" | "auto";
   agent_instructions: string | null;

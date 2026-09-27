@@ -26,6 +26,8 @@ class FakeDb {
   attempts = new Map();
   messageAttachments = [];
   allowBudget = true;
+  displayName = null;
+  messages = [];
 
   prepare(sql) {
     return new FakeStatement(this, sql);
@@ -34,7 +36,13 @@ class FakeDb {
   async first(sql, args) {
     if (sql.includes("SELECT * FROM reply_attempts")) return this.attempts.get(args[0]) ?? null;
     if (sql.includes("SELECT t.id, t.mailbox_id, t.subject")) {
-      return { id: 1, mailbox_id: 1, subject: "Help", mailbox_address: "support@example.com" };
+      return {
+        id: 1,
+        mailbox_id: 1,
+        subject: "Help",
+        mailbox_address: "support@example.com",
+        mailbox_display_name: this.displayName,
+      };
     }
     if (sql.includes("SELECT id, message_id, from_address")) {
       const requestedMessageId = args[1];
@@ -79,6 +87,8 @@ class FakeDb {
         message_id: null,
         error: null,
       });
+    } else if (sql.includes("INSERT INTO messages")) {
+      this.messages.push({ from_address: args[5], from_name: args[6] });
     } else if (sql.includes("INSERT INTO attachments")) {
       this.messageAttachments.push({
         filename: args[0],
@@ -144,6 +154,22 @@ test("replaying one Reply Attempt returns the stored result without sending twic
   assert.equal(first.status, "sent");
   assert.deepEqual(replay, first);
   assert.equal(fixture.sends(), 1);
+});
+
+test("a reply is sent under the inbox's sender name", async () => {
+  const fixture = makeEnv();
+  fixture.env.DB.displayName = "Jane Doe from Acme";
+
+  await sendReplyAttempt(fixture.env, { attemptId: "attempt-named", threadId: 1, text: "Hello" });
+
+  assert.deepEqual(fixture.sent()[0].from, {
+    email: "support@example.com",
+    name: "Jane Doe from Acme",
+  });
+  assert.deepEqual(fixture.env.DB.messages[0], {
+    from_address: "support@example.com",
+    from_name: "Jane Doe from Acme",
+  });
 });
 
 test("a failed Reply Attempt is not automatically sent again", async () => {

@@ -163,7 +163,7 @@ export const createMailbox = (input: { local_part: string; domain_id: number }) 
 
 export const updateMailbox = (
   id: number,
-  input: Partial<Pick<Mailbox, "agent_mode" | "agent_instructions">>,
+  input: Partial<Pick<Mailbox, "agent_mode" | "agent_instructions" | "display_name">>,
 ) =>
   request<{ ok: true }>(`/mailboxes/${id}`, {
     method: "PATCH",

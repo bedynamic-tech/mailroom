@@ -31,6 +31,7 @@ class FakeDb {
   messages = [];
   messageAttachments = [];
   nextThread = 1;
+  displayName = null;
 
   prepare(sql) {
     return new FakeStatement(this, sql);
@@ -42,7 +43,12 @@ class FakeDb {
     }
     if (sql.includes("SELECT m.id, m.address")) {
       return args[0] === 1
-        ? { id: 1, address: "support@example.com", domain_status: "active" }
+        ? {
+            id: 1,
+            address: "support@example.com",
+            display_name: this.displayName,
+            domain_status: "active",
+          }
         : null;
     }
     if (sql.includes("UPDATE outbound_attempts") && sql.includes("RETURNING id")) {
@@ -89,7 +95,13 @@ class FakeDb {
     } else if (sql.includes("INSERT INTO threads")) {
       this.threads.set(args[0], { id: args[0], message_count: 0 });
     } else if (sql.includes("INSERT INTO messages")) {
-      this.messages.push({ thread_id: args[0], message_id: args[1], sent_by: args[2], to: args[4] });
+      this.messages.push({
+        thread_id: args[0],
+        message_id: args[1],
+        sent_by: args[2],
+        from_name: args[4],
+        to: args[5],
+      });
     } else if (sql.includes("UPDATE threads") && sql.includes("message_count = 1")) {
       this.threads.get(args[2]).message_count = 1;
     } else if (sql.includes("SET status = 'sent'")) {
@@ -155,6 +167,21 @@ test("a new-email Send Attempt is recorded in the inbox and sent once", async ()
   assert.equal(fixture.db.messages[0].sent_by, "agent");
   assert.equal(fixture.sent()[0].headers["Auto-Submitted"], "auto-generated");
   assert.equal(fixture.db.threads.get(first.conversation_id).message_count, 1);
+  assert.equal(fixture.sent()[0].from, "support@example.com");
+  assert.equal(fixture.db.messages[0].from_name, null);
+});
+
+test("a new email is sent under the inbox's sender name", async () => {
+  const fixture = makeFixture();
+  fixture.db.displayName = "  Jane Doe\r\nfrom Acme ";
+
+  await sendNewEmailAttempt(fixture.env, intent);
+
+  assert.deepEqual(fixture.sent()[0].from, {
+    email: "support@example.com",
+    name: "Jane Doe from Acme",
+  });
+  assert.equal(fixture.db.messages[0].from_name, "Jane Doe from Acme");
 });
 
 test("a new-email idempotency key cannot be reused for different content", async () => {
