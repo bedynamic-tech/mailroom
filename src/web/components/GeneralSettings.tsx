@@ -102,7 +102,7 @@ export function GeneralSettings(props: {
                   className="flex items-center gap-2 text-[13.5px] font-medium text-foreground"
                 >
                   <BellIcon className="h-4 w-4 text-muted-foreground" />
-                  New email notifications
+                  Browser notifications
                 </label>
                 <p className="mt-1 max-w-xl text-[13px] leading-5 text-muted-foreground">
                   {notificationDescription({
