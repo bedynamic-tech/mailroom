@@ -106,6 +106,7 @@ export function buildEmailNotification(
 }
 
 interface NotificationSettings extends StoredNotificationTemplate {
+  email_notifications_enabled: number;
   email_notification_address: string | null;
   email_notification_origin: string | null;
   email_notification_from_mailbox_id: number | null;
@@ -117,7 +118,7 @@ export type EmailNotificationResult =
 
 async function loadSettings(env: { DB: D1Database }): Promise<NotificationSettings | null> {
   return env.DB.prepare(
-    `SELECT email_notification_address, email_notification_origin,
+    `SELECT email_notifications_enabled, email_notification_address, email_notification_origin,
             email_notification_from_name, email_notification_from_mailbox_id,
             email_notification_subject, email_notification_body
      FROM global_settings WHERE id = 1`,
@@ -130,7 +131,9 @@ export async function notifyNewEmailByEmail(
 ): Promise<EmailNotificationResult> {
   const settings = await loadSettings(env);
   const recipient = settings?.email_notification_address;
-  if (!settings || !recipient) return { status: "skipped", reason: "off" };
+  if (!settings?.email_notifications_enabled || !recipient) {
+    return { status: "skipped", reason: "off" };
+  }
 
   // Never notify about mail from the notification address itself or from one
   // of our own Inboxes: an auto-responder or forward would otherwise loop.

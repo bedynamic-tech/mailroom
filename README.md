@@ -156,8 +156,9 @@ VAPID keys and uses the deploying Cloudflare user's email as the push contact
 notifications must grant permission and subscribe once; turning the global
 switch off removes all stored subscriptions.
 
-Email notifications are also off by default. Enter an address under
-**Settings → General** to receive a short notice (sender, subject, preview and
+Email notifications are also off by default. Save an address under
+**Settings → General** (saving the first address switches them on; the switch
+pauses them without forgetting the address) to receive a short notice (sender, subject, preview and
 a link to the conversation) whenever any inbox receives a new email. Choose
 **Customize email** to edit the sender name, the inbox it is sent from, the
 subject and the body, using placeholders such as `{{sender_name}}`,

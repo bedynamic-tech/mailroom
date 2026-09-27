@@ -102,7 +102,14 @@ test("applies a custom template", () => {
   assert.equal(content.text, "alice@customer.test wrote:\nHi there, I would like a refund.");
 });
 
-function fakeEnv({ address, inboxes = [], template = {}, fromMailbox = null, sendError = null }) {
+function fakeEnv({
+  address,
+  enabled = true,
+  inboxes = [],
+  template = {},
+  fromMailbox = null,
+  sendError = null,
+}) {
   const sent = [];
   return {
     sent,
@@ -123,6 +130,7 @@ function fakeEnv({ address, inboxes = [], template = {}, fromMailbox = null, sen
           async first() {
             if (sql.includes("global_settings")) {
               return {
+                email_notifications_enabled: enabled ? 1 : 0,
                 email_notification_address: address,
                 email_notification_origin: "https://mail.example.com",
                 email_notification_from_name: null,
@@ -227,4 +235,10 @@ test("sends a test notice without a conversation link", async () => {
 test("surfaces provider errors from a test send", async () => {
   const env = fakeEnv({ address: "me@example.org", sendError: "destination address not verified" });
   await assert.rejects(sendTestEmailNotification(env), /destination address not verified/);
+});
+
+test("keeps the address but sends nothing while switched off", async () => {
+  const env = fakeEnv({ address: "me@example.org", enabled: false });
+  assert.deepEqual(await notifyNewEmailByEmail(env, input), { status: "skipped", reason: "off" });
+  assert.equal(env.sent.length, 0);
 });

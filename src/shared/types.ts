@@ -21,6 +21,7 @@ export interface GeneralSettings {
   browser_notifications_configured: boolean;
   push_subscription_count: number;
   vapid_public_key: string | null;
+  email_notifications_enabled: boolean;
   email_notification_address: string | null;
   email_notification_template: EmailNotificationTemplate;
 }

@@ -106,8 +106,12 @@ export const updateEmailNotifications = (address: string) =>
     body: JSON.stringify({ address }),
   });
 
-export const disableEmailNotifications = () =>
-  request<{ ok: true }>("/settings/email-notifications", { method: "DELETE" });
+export const setEmailNotificationsEnabled = (enabled: boolean) =>
+  request<{ ok: true }>("/settings/email-notifications/enabled", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
 
 export const sendTestEmailNotification = () =>
   request<{ status: "sent"; from: string; to: string }>("/settings/email-notifications/test", {

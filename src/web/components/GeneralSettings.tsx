@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
   disableBrowserNotifications,
-  disableEmailNotifications,
   enableBrowserNotifications,
   fetchGeneralSettings,
   sendTestEmailNotification,
+  setEmailNotificationsEnabled,
   updateEmailNotifications,
 } from "../api";
 import type { EmailNotificationTemplate } from "../../shared/types";
@@ -147,6 +147,7 @@ export function GeneralSettings(props: {
               </span>
             </div>
             <EmailNotificationSetting
+              enabled={Boolean(settings.data?.email_notifications_enabled)}
               savedAddress={settings.data?.email_notification_address ?? null}
               template={settings.data?.email_notification_template ?? null}
               loading={settings.isLoading}
@@ -161,6 +162,7 @@ export function GeneralSettings(props: {
 }
 
 function EmailNotificationSetting(props: {
+  enabled: boolean;
   savedAddress: string | null;
   template: EmailNotificationTemplate | null;
   loading: boolean;
@@ -175,44 +177,63 @@ function EmailNotificationSetting(props: {
     mutationFn: (value: string) => updateEmailNotifications(value),
     onSettled: refresh,
   });
-  const turnOff = useMutation({
-    mutationFn: disableEmailNotifications,
-    onSuccess: () => setAddress(""),
+  const toggle = useMutation({
+    mutationFn: setEmailNotificationsEnabled,
     onSettled: refresh,
   });
-
   const sendTest = useMutation({ mutationFn: sendTestEmailNotification });
 
-  const busy = save.isPending || turnOff.isPending;
+  const busy = save.isPending || toggle.isPending;
   const trimmed = address.trim();
   const unchanged = trimmed.toLowerCase() === (props.savedAddress ?? "");
-  const error = save.error ?? turnOff.error;
+  const error = save.error ?? toggle.error;
+  // Show the pending state while the switch request is in flight.
+  const checked = toggle.isPending ? Boolean(toggle.variables) : props.enabled;
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (trimmed) save.mutate(trimmed);
+    if (trimmed && !unchanged) save.mutate(trimmed);
   };
 
   return (
     <>
       <form onSubmit={onSubmit} className="border-t px-4 py-4 sm:px-5">
-        <label
-          htmlFor="email-notification-address"
-          className="flex items-center gap-2 text-[13.5px] font-medium text-foreground"
-        >
-          <MailIcon className="h-4 w-4 text-muted-foreground" />
-          Email notifications
-        </label>
-        <p className="mt-1 max-w-xl text-[13px] leading-5 text-muted-foreground">
-          {props.savedAddress
-            ? `A notice is sent to ${props.savedAddress} when any inbox receives a new email.`
-            : "Send a notice to an email address when any inbox receives a new email."}
-        </p>
+        <div className="flex items-start gap-4">
+          <div className="min-w-0 flex-1">
+            <label
+              htmlFor="email-notifications"
+              className="flex items-center gap-2 text-[13.5px] font-medium text-foreground"
+            >
+              <MailIcon className="h-4 w-4 text-muted-foreground" />
+              Email notifications
+            </label>
+            <p className="mt-1 max-w-xl text-[13px] leading-5 text-muted-foreground">
+              {!props.savedAddress
+                ? "Add an email address to get a notice when any inbox receives a new email."
+                : props.enabled
+                  ? `A notice is sent to ${props.savedAddress} when any inbox receives a new email.`
+                  : `Notices to ${props.savedAddress} are paused.`}
+            </p>
+          </div>
+          <Switch
+            id="email-notifications"
+            checked={checked}
+            onCheckedChange={(value) => toggle.mutate(value)}
+            disabled={props.loading || busy || !props.savedAddress}
+            aria-describedby="email-notifications-description"
+            className="mt-0.5"
+          />
+          <span id="email-notifications-description" className="sr-only">
+            Applies to new email received by every inbox in this workspace.
+          </span>
+        </div>
+
         <div className="mt-3 flex max-w-xl flex-wrap items-center gap-2">
           <Input
             id="email-notification-address"
             type="email"
             autoComplete="email"
+            aria-label="Notification email address"
             placeholder="you@example.com"
             value={address}
             onChange={(event) => setAddress(event.target.value)}
@@ -222,31 +243,24 @@ function EmailNotificationSetting(props: {
           <Button
             type="submit"
             size="sm"
+            variant={props.savedAddress ? "outline" : "default"}
             disabled={props.loading || busy || !trimmed || unchanged}
           >
-            {save.isPending ? "Saving…" : props.savedAddress ? "Update" : "Turn on"}
+            {save.isPending ? "Saving…" : "Save"}
           </Button>
-          {props.savedAddress && (
+        </div>
+
+        {props.savedAddress && (
+          <div className="mt-2 flex flex-wrap items-center gap-1 -ml-2.5">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
-              onClick={() => turnOff.mutate()}
-              disabled={busy}
+              onClick={() => setEditorOpen(true)}
+              disabled={!props.template}
             >
-              {turnOff.isPending ? "Turning off…" : "Turn off"}
+              Customize email
             </Button>
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setEditorOpen(true)}
-            disabled={!props.template}
-          >
-            Customize email
-          </Button>
-          {props.savedAddress && (
             <Button
               type="button"
               variant="ghost"
@@ -256,8 +270,9 @@ function EmailNotificationSetting(props: {
             >
               {sendTest.isPending ? "Sending…" : "Send test"}
             </Button>
-          )}
-        </div>
+          </div>
+        )}
+
         {sendTest.isSuccess && (
           <p className="mt-2 text-xs leading-5 text-muted-foreground" role="status">
             Test sent from {sendTest.data.from} to {sendTest.data.to}. If it doesn’t arrive, check

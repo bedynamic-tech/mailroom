@@ -46,13 +46,14 @@ api.route("/compose", composeApi);
 api.get("/settings/general", async (c) => {
   const [settings, subscriptions] = await Promise.all([
     c.env.DB.prepare(
-      `SELECT browser_notifications_enabled, email_notification_address,
+      `SELECT browser_notifications_enabled, email_notifications_enabled, email_notification_address,
               email_notification_from_name, email_notification_from_mailbox_id,
               email_notification_subject, email_notification_body
        FROM global_settings WHERE id = 1`,
     ).first<
       StoredNotificationTemplate & {
         browser_notifications_enabled: number;
+        email_notifications_enabled: number;
         email_notification_address: string | null;
         email_notification_from_mailbox_id: number | null;
       }
@@ -69,6 +70,7 @@ api.get("/settings/general", async (c) => {
     browser_notifications_configured: configured,
     push_subscription_count: Number(subscriptions?.count ?? 0),
     vapid_public_key: configured ? c.env.VAPID_PUBLIC_KEY! : null,
+    email_notifications_enabled: Boolean(settings?.email_notifications_enabled),
     email_notification_address: settings?.email_notification_address ?? null,
     email_notification_template: {
       from_name: template.fromName,
@@ -146,7 +148,11 @@ api.put("/settings/email-notifications", async (c) => {
 
   await c.env.DB.prepare(
     `UPDATE global_settings
-     SET email_notification_address = ?,
+     SET email_notifications_enabled = CASE
+           WHEN email_notification_address IS NULL THEN 1
+           ELSE email_notifications_enabled
+         END,
+         email_notification_address = ?,
          email_notification_origin = ?,
          updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
      WHERE id = 1`,
@@ -212,13 +218,20 @@ api.post("/settings/email-notifications/test", async (c) => {
   }
 });
 
-api.delete("/settings/email-notifications", async (c) => {
-  await c.env.DB.prepare(
+api.put("/settings/email-notifications/enabled", async (c) => {
+  const body = await c.req.json<{ enabled?: unknown }>().catch(() => null);
+  if (typeof body?.enabled !== "boolean") return c.json({ error: "enabled must be true or false" }, 400);
+
+  const updated = await c.env.DB.prepare(
     `UPDATE global_settings
-     SET email_notification_address = NULL,
+     SET email_notifications_enabled = ?,
          updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-     WHERE id = 1`,
-  ).run();
+     WHERE id = 1 AND (? = 0 OR email_notification_address IS NOT NULL)
+     RETURNING id`,
+  )
+    .bind(body.enabled ? 1 : 0, body.enabled ? 1 : 0)
+    .first();
+  if (!updated) return c.json({ error: "Add an email address before turning notifications on" }, 400);
   return c.json({ ok: true });
 });
 
