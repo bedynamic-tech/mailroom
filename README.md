@@ -7,7 +7,7 @@ held for one-click human approval.
 
 Runs entirely on Cloudflare: Workers, Email Routing, D1, R2, and Web Push.
 
-![Mailroom: three inboxes in one workspace, with an agent draft awaiting approval](docs/screenshot.png)
+<img width="2880" height="1800" alt="image" src="https://github.com/user-attachments/assets/34079ed5-8eff-41fc-86c6-d51013dd5d16" />
 
 ## Features
 
