@@ -25,6 +25,8 @@ export function RecipientInput(props: {
   taken?: ReadonlySet<string>;
   disabled?: boolean;
   placeholder?: string;
+  /** Called when the field loses focus with no addresses and nothing typed, so it can collapse. */
+  onDismiss?: () => void;
   /** Called on Cmd/Ctrl+Enter when the field is not inside a form that handles it. */
   onSubmitShortcut?: () => void;
   className?: string;
@@ -165,7 +167,9 @@ export function RecipientInput(props: {
                 props.onChange(props.values.slice(0, -1));
               }
             }}
-            onBlur={() => add(draftRef.current)}
+            onBlur={() => {
+              if (add(draftRef.current)?.length === 0) props.onDismiss?.();
+            }}
             className="h-6 min-w-[12ch] flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
         )}

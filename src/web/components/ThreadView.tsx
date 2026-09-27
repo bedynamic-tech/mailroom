@@ -49,7 +49,9 @@ export function ThreadView(props: {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [replyCc, setReplyCc] = useState<string[]>([]);
   const [replyBcc, setReplyBcc] = useState<string[]>([]);
-  const [showCopies, setShowCopies] = useState(false);
+  // Cc/Bcc rows stay collapsed unless they hold an address or are being filled in.
+  const [addingCc, setAddingCc] = useState(false);
+  const [addingBcc, setAddingBcc] = useState(false);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
   const [failedAttemptKey, setFailedAttemptKey] = useState<string | null>(null);
   const [usedDraftId, setUsedDraftId] = useState<number | null>(null);
@@ -93,7 +95,8 @@ export function ThreadView(props: {
     setPendingFiles([]);
     setReplyCc([]);
     setReplyBcc([]);
-    setShowCopies(false);
+    setAddingCc(false);
+    setAddingBcc(false);
     setSendNotice(null);
     setFailedAttemptKey(null);
     setUsedDraftId(null);
@@ -135,7 +138,8 @@ export function ThreadView(props: {
         setPendingFiles([]);
         setReplyCc([]);
         setReplyBcc([]);
-        setShowCopies(false);
+        setAddingCc(false);
+        setAddingBcc(false);
         setUsedDraftId(null);
       }
       setFailedAttemptKey(null);
@@ -255,8 +259,14 @@ export function ThreadView(props: {
       }).filter((address) => !alreadyCopied.has(address.toLowerCase()))
     : [];
 
+  const showCc = addingCc || replyCc.length > 0;
+  const showBcc = addingBcc || replyBcc.length > 0;
+  const openCopyRow = (row: "cc" | "bcc") => {
+    (row === "cc" ? setAddingCc : setAddingBcc)(true);
+    requestAnimationFrame(() => (row === "cc" ? ccInputRef : bccInputRef).current?.focus());
+  };
+
   const replyAll = () => {
-    setShowCopies(true);
     setReplyCc((current) => [...current, ...replyAllMissing.slice(0, Math.max(0, copyCapacity))]);
   };
 
@@ -393,33 +403,44 @@ export function ThreadView(props: {
                 <span className="truncate font-medium text-foreground/80" title={thread.mailbox_address}>
                   {thread.mailbox_address}
                 </span>
-                {!showCopies && (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    className="ml-1 shrink-0 text-muted-foreground"
-                    aria-label="Add Cc or Bcc recipients"
-                    disabled={reply.isPending}
-                    onClick={() => {
-                      setShowCopies(true);
-                      requestAnimationFrame(() => ccInputRef.current?.focus());
-                    }}
-                  >
-                    Cc/Bcc
-                  </Button>
-                )}
-                {replyAllMissing.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    className={`${showCopies ? "ml-1" : ""} shrink-0 text-muted-foreground`}
-                    title={`Copy everyone on the last email: ${replyAllMissing.join(", ")}`}
-                    disabled={reply.isPending || copyCapacity <= 0}
-                    onClick={replyAll}
-                  >
-                    Reply all
-                  </Button>
-                )}
+                <span className="ml-1 flex shrink-0 items-center">
+                  {!showCc && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-muted-foreground"
+                      aria-label="Add Cc recipients"
+                      disabled={reply.isPending}
+                      onClick={() => openCopyRow("cc")}
+                    >
+                      Cc
+                    </Button>
+                  )}
+                  {!showBcc && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-muted-foreground"
+                      aria-label="Add Bcc recipients"
+                      disabled={reply.isPending}
+                      onClick={() => openCopyRow("bcc")}
+                    >
+                      Bcc
+                    </Button>
+                  )}
+                  {replyAllMissing.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-muted-foreground"
+                      title={`Copy everyone on the last email: ${replyAllMissing.join(", ")}`}
+                      disabled={reply.isPending || copyCapacity <= 0}
+                      onClick={replyAll}
+                    >
+                      Reply all
+                    </Button>
+                  )}
+                </span>
               </span>
               <DraftAssist
                 status={agentStatus}
@@ -440,38 +461,44 @@ export function ThreadView(props: {
                 onStart={() => startDraft.mutate()}
               />
             </div>
-            {showCopies && (
+            {(showCc || showBcc) && (
               <div className="border-b border-border/70 text-xs">
-                <CopyRecipientsRow label="Cc" htmlFor="reply-cc">
-                  <RecipientInput
-                    ref={ccField}
-                    inputRef={ccInputRef}
-                    id="reply-cc"
-                    label="Cc"
-                    values={replyCc}
-                    onChange={setReplyCc}
-                    capacity={copyCapacity}
-                    taken={new Set(lowered([...replyTargets, ...replyBcc]))}
-                    disabled={reply.isPending}
-                    placeholder="Add Cc recipients"
-                    onSubmitShortcut={submitReply}
-                  />
-                </CopyRecipientsRow>
-                <CopyRecipientsRow label="Bcc" htmlFor="reply-bcc">
-                  <RecipientInput
-                    ref={bccField}
-                    inputRef={bccInputRef}
-                    id="reply-bcc"
-                    label="Bcc"
-                    values={replyBcc}
-                    onChange={setReplyBcc}
-                    capacity={copyCapacity}
-                    taken={new Set(lowered([...replyTargets, ...replyCc]))}
-                    disabled={reply.isPending}
-                    placeholder="Add Bcc recipients"
-                    onSubmitShortcut={submitReply}
-                  />
-                </CopyRecipientsRow>
+                {showCc && (
+                  <CopyRecipientsRow label="Cc" htmlFor="reply-cc">
+                    <RecipientInput
+                      ref={ccField}
+                      inputRef={ccInputRef}
+                      id="reply-cc"
+                      label="Cc"
+                      values={replyCc}
+                      onChange={setReplyCc}
+                      capacity={copyCapacity}
+                      taken={new Set(lowered([...replyTargets, ...replyBcc]))}
+                      disabled={reply.isPending}
+                      placeholder="Add Cc recipients"
+                      onDismiss={() => setAddingCc(false)}
+                      onSubmitShortcut={submitReply}
+                    />
+                  </CopyRecipientsRow>
+                )}
+                {showBcc && (
+                  <CopyRecipientsRow label="Bcc" htmlFor="reply-bcc">
+                    <RecipientInput
+                      ref={bccField}
+                      inputRef={bccInputRef}
+                      id="reply-bcc"
+                      label="Bcc"
+                      values={replyBcc}
+                      onChange={setReplyBcc}
+                      capacity={copyCapacity}
+                      taken={new Set(lowered([...replyTargets, ...replyCc]))}
+                      disabled={reply.isPending}
+                      placeholder="Add Bcc recipients"
+                      onDismiss={() => setAddingBcc(false)}
+                      onSubmitShortcut={submitReply}
+                    />
+                  </CopyRecipientsRow>
+                )}
                 {copyCapacity <= 0 && (
                   <p role="status" className="px-3.5 pb-2 text-muted-foreground">
                     This reply has reached the limit of {MAX_RECIPIENTS_PER_MESSAGE} recipients.

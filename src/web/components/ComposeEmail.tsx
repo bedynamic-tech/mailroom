@@ -25,8 +25,9 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   const [to, setTo] = useState<string[]>([]);
   const [cc, setCc] = useState<string[]>([]);
   const [bcc, setBcc] = useState<string[]>([]);
-  const [showCc, setShowCc] = useState(false);
-  const [showBcc, setShowBcc] = useState(false);
+  // Cc/Bcc rows stay collapsed unless they hold an address or are being filled in.
+  const [addingCc, setAddingCc] = useState(false);
+  const [addingBcc, setAddingBcc] = useState(false);
   const [subject, setSubject] = useState("");
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -49,6 +50,8 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes, enabled: open });
   const domains = useQuery({ queryKey: ["domains"], queryFn: fetchDomains, enabled: open });
   const hasDraft = Boolean(to.length || cc.length || bcc.length || subject || text || files.length);
+  const showCc = addingCc || cc.length > 0;
+  const showBcc = addingBcc || bcc.length > 0;
   const remaining = MAX_RECIPIENTS_PER_MESSAGE - to.length - cc.length - bcc.length;
   // Copies never take the last slot while the message still needs its To recipient.
   const copyCapacity = remaining - (to.length === 0 ? 1 : 0);
@@ -78,7 +81,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
   }, [hasDraft]);
 
   const reset = () => {
-    setTo([]); setCc([]); setBcc([]); setShowCc(false); setShowBcc(false); setSubject(""); setText(""); setFiles([]);
+    setTo([]); setCc([]); setBcc([]); setAddingCc(false); setAddingBcc(false); setSubject(""); setText(""); setFiles([]);
     setNotice(null); setFileError(null); setFailed(false); setUncertain(false);
     setConfirmDiscard(false); attempt.current = null;
   };
@@ -191,21 +194,21 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                   <RecipientInput ref={toField} inputRef={toRef} id="compose-to" label="To" values={to} onChange={setTo} capacity={Math.min(1 - to.length, remaining)} taken={takenBy(cc, bcc)} placeholder="recipient@example.com" className="px-2.5 py-1.5" />
                   {(!showCc || !showBcc) && (
                     <span className="flex shrink-0 items-center py-2.5">
-                      {!showCc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Cc recipients" onClick={() => { setShowCc(true); requestAnimationFrame(() => ccRef.current?.focus()); }}>Cc</Button>}
-                      {!showBcc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Bcc recipients" onClick={() => { setShowBcc(true); requestAnimationFrame(() => bccRef.current?.focus()); }}>Bcc</Button>}
+                      {!showCc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Cc recipients" onClick={() => { setAddingCc(true); requestAnimationFrame(() => ccRef.current?.focus()); }}>Cc</Button>}
+                      {!showBcc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Bcc recipients" onClick={() => { setAddingBcc(true); requestAnimationFrame(() => bccRef.current?.focus()); }}>Bcc</Button>}
                     </span>
                   )}
                 </div>
                 {showCc && (
                   <div className="flex min-h-12 items-start gap-3 border-b">
                     <label htmlFor="compose-cc" className="w-14 shrink-0 py-3.5 text-sm text-muted-foreground">Cc</label>
-                    <RecipientInput ref={ccField} inputRef={ccRef} id="compose-cc" label="Cc" values={cc} onChange={setCc} capacity={copyCapacity} taken={takenBy(to, bcc)} placeholder="Add Cc recipients" className="px-2.5 py-1.5" />
+                    <RecipientInput ref={ccField} inputRef={ccRef} id="compose-cc" label="Cc" values={cc} onChange={setCc} capacity={copyCapacity} taken={takenBy(to, bcc)} placeholder="Add Cc recipients" onDismiss={() => setAddingCc(false)} className="px-2.5 py-1.5" />
                   </div>
                 )}
                 {showBcc && (
                   <div className="flex min-h-12 items-start gap-3 border-b">
                     <label htmlFor="compose-bcc" className="w-14 shrink-0 py-3.5 text-sm text-muted-foreground">Bcc</label>
-                    <RecipientInput ref={bccField} inputRef={bccRef} id="compose-bcc" label="Bcc" values={bcc} onChange={setBcc} capacity={copyCapacity} taken={takenBy(to, cc)} placeholder="Add Bcc recipients" className="px-2.5 py-1.5" />
+                    <RecipientInput ref={bccField} inputRef={bccRef} id="compose-bcc" label="Bcc" values={bcc} onChange={setBcc} capacity={copyCapacity} taken={takenBy(to, cc)} placeholder="Add Bcc recipients" onDismiss={() => setAddingBcc(false)} className="px-2.5 py-1.5" />
                   </div>
                 )}
                 {copyCapacity <= 0 && (
