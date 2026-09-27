@@ -1,15 +1,16 @@
 import type { Mailbox } from "../../shared/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArchiveIcon, InboxIcon, SettingsIcon } from "./Icons";
+import { ArchiveIcon, ContactsIcon, InboxIcon, SettingsIcon } from "./Icons";
 import { SquarePen } from "lucide-react";
 
 export function Sidebar(props: {
   mailboxes: Mailbox[];
   selected: number | null;
-  activeView: "inbox" | "archive" | "settings";
+  activeView: "inbox" | "archive" | "contacts" | "settings";
   onSelect: (id: number | null) => void;
   onOpenArchive: () => void;
+  onOpenContacts: () => void;
   onOpenSettings: () => void;
   onCompose: () => void;
 }) {
@@ -58,6 +59,13 @@ export function Sidebar(props: {
             unread={0}
             active={props.activeView === "archive"}
             onClick={props.onOpenArchive}
+          />
+          <SidebarItem
+            label="Contacts"
+            icon={<ContactsIcon className="h-4 w-4" />}
+            unread={0}
+            active={props.activeView === "contacts"}
+            onClick={props.onOpenContacts}
           />
         </div>
       </nav>

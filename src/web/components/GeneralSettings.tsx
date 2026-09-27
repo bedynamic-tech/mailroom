@@ -31,6 +31,7 @@ import {
 export function GeneralSettings(props: {
   onBack: () => void;
   onOpenInboxes: () => void;
+  onOpenContacts: () => void;
 }) {
   const queryClient = useQueryClient();
   const settings = useQuery({
@@ -90,6 +91,7 @@ export function GeneralSettings(props: {
         onBack={props.onBack}
         onOpenGeneral={() => undefined}
         onOpenInboxes={props.onOpenInboxes}
+        onOpenContacts={props.onOpenContacts}
       />
 
       <SettingsPage>

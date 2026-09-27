@@ -28,7 +28,7 @@ import {
 } from "./Icons";
 
 export type ThreadFilter = "all" | "unread";
-export type ThreadScope = "all" | "archive" | number;
+export type ThreadScope = "all" | "archive" | "contacts" | number;
 
 export function ThreadList(props: {
   mailboxes: Mailbox[];
@@ -179,7 +179,11 @@ export function ThreadList(props: {
             <Select
               value={String(props.scope)}
               onValueChange={(value) =>
-                props.onSelectScope(value === "all" || value === "archive" ? value : Number(value))
+                props.onSelectScope(
+                  value === "all" || value === "archive" || value === "contacts"
+                    ? value
+                    : Number(value),
+                )
               }
             >
               <SelectTrigger
@@ -196,6 +200,7 @@ export function ThreadList(props: {
                   </SelectItem>
                 ))}
                 <SelectItem value="archive">Archive</SelectItem>
+                <SelectItem value="contacts">Contacts</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="ghost" size="icon" onClick={props.onCompose} aria-label="Compose new message" title="Compose new message" className="shrink-0"><SquarePen className="h-4 w-4" /></Button>

@@ -20,6 +20,8 @@ import {
 } from "./api";
 import { AccessSetup } from "./components/AccessSetup";
 import { AgentSettings } from "./components/AgentSettings";
+import { Contacts } from "./components/Contacts";
+import { ContactSettings } from "./components/ContactSettings";
 import { GeneralSettings } from "./components/GeneralSettings";
 import { ComposeEmailProvider, useCompose } from "./components/ComposeEmail";
 import { InboxIcon } from "./components/Icons";
@@ -27,8 +29,8 @@ import { Sidebar } from "./components/Sidebar";
 import { ThreadList, type ThreadFilter, type ThreadScope } from "./components/ThreadList";
 import { ThreadView } from "./components/ThreadView";
 
-type WorkspaceView = "inbox" | "archive" | "settings";
-type SettingsSection = "general" | "inboxes";
+type WorkspaceView = "inbox" | "archive" | "contacts" | "settings";
+type SettingsSection = "general" | "inboxes" | "contacts";
 
 export function App() {
   return (
@@ -44,10 +46,17 @@ export function App() {
         path="/mailboxes/:mailboxId/threads/:threadId"
         element={<Workspace view="inbox" mailboxScoped />}
       />
+      <Route path="/contacts" element={<Workspace view="contacts" />} />
+      <Route path="/contacts/new" element={<Workspace view="contacts" creatingContact />} />
+      <Route path="/contacts/:contactId" element={<Workspace view="contacts" />} />
       <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
       <Route
         path="/settings/general"
         element={<Workspace view="settings" settingsSection="general" />}
+      />
+      <Route
+        path="/settings/contacts"
+        element={<Workspace view="settings" settingsSection="contacts" />}
       />
       <Route
         path="/settings/inboxes"
@@ -67,11 +76,12 @@ function Workspace(props: {
   view: WorkspaceView;
   mailboxScoped?: boolean;
   settingsSection?: SettingsSection;
+  creatingContact?: boolean;
 }) {
   const navigate = useNavigate();
   const openCompose = useCompose();
   const location = useLocation();
-  const params = useParams<{ mailboxId?: string; threadId?: string }>();
+  const params = useParams<{ mailboxId?: string; threadId?: string; contactId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const autoSelectedScope = useRef<string | null>(null);
 
@@ -87,7 +97,7 @@ function Workspace(props: {
   const activeLabel = parseId(searchParams.get("label") ?? undefined);
   const deferredSearch = useDeferredValue(search.trim());
   const isArchive = props.view === "archive";
-  const isMailView = props.view !== "settings";
+  const isMailView = props.view === "inbox" || props.view === "archive";
   const autoSelected = (location.state as { autoSelected?: boolean } | null)?.autoSelected === true;
 
   const mailboxes = useQuery({
@@ -181,6 +191,7 @@ function Workspace(props: {
 
   const selectScope = (scope: ThreadScope) => {
     if (scope === "archive") navigate("/archive");
+    else if (scope === "contacts") navigate("/contacts");
     else selectMailbox(scope === "all" ? null : scope);
   };
 
@@ -247,16 +258,40 @@ function Workspace(props: {
         activeView={props.view}
         onSelect={selectMailbox}
         onOpenArchive={() => navigate("/archive")}
+        onOpenContacts={() => navigate("/contacts")}
         onOpenSettings={openSettings}
         onCompose={() => openCompose(selectedMailbox)}
       />
 
-      {props.view === "settings" ? (
+      {props.view === "contacts" ? (
+        <main className="min-w-0 flex-1 overflow-hidden">
+          <Contacts
+            contactId={parseId(params.contactId)}
+            creating={Boolean(props.creatingContact)}
+            onSelect={(id, options) => navigate(`/contacts/${id}`, options)}
+            onNew={() => navigate("/contacts/new")}
+            onCloseDetail={() => navigate("/contacts")}
+            onBack={() => navigate("/inbox")}
+            onCompose={(address) => openCompose(null, { to: address })}
+            onOpenConversation={(id, archived) =>
+              navigate(`${archived ? "/archive" : "/inbox"}/${id}`)
+            }
+          />
+        </main>
+      ) : props.view === "settings" ? (
         <main className="min-w-0 flex-1 overflow-hidden">
           {props.settingsSection === "general" ? (
             <GeneralSettings
               onBack={() => navigate("/inbox")}
               onOpenInboxes={openInboxSettings}
+              onOpenContacts={() => navigate("/settings/contacts")}
+            />
+          ) : props.settingsSection === "contacts" ? (
+            <ContactSettings
+              onBack={() => navigate("/inbox")}
+              onOpenGeneral={() => navigate("/settings/general")}
+              onOpenInboxes={openInboxSettings}
+              onOpenContacts={() => navigate("/contacts")}
             />
           ) : (
             <AgentSettings
@@ -272,6 +307,7 @@ function Workspace(props: {
                 )
               }
               onOpenGeneral={() => navigate("/settings/general")}
+              onOpenContacts={() => navigate("/settings/contacts")}
               onBack={() => navigate("/inbox")}
             />
           )}

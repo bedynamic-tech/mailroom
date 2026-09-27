@@ -28,6 +28,10 @@ _Avoid_: Template, canned response, rule
 A per-Inbox named tag with a natural-language match condition. When a new inbound Message opens a Conversation, the `typesafe/jev` evaluation model checks every Label's condition and applies each match; replies in existing Conversations are never labeled. A Conversation can carry any number of Labels, and the conversation list can be filtered by Label.
 _Avoid_: Tag, category, folder
 
+**Contact**:
+A workspace-wide record of a person the Inboxes correspond with, identified by email address and carrying a name, company, phone and notes. With "Automatically create new contacts" on, an external sender whose name can be parsed from the From header becomes a Contact on their first inbound Message; Contacts can also be added and edited by hand. Deleting a Contact leaves its Conversations untouched. Recipient fields suggest matching Contacts.
+_Avoid_: Customer, address book entry, sender
+
 **Agent Draft**:
 A proposed reply authored by the agent and held for human review before sending.
 _Avoid_: Auto-reply, suggestion
