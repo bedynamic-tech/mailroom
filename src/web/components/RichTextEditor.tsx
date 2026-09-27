@@ -190,7 +190,8 @@ export function RichTextEditor(props: {
         aria-label="Formatting"
         aria-controls={props.id}
         className={cn(
-          "flex flex-wrap items-center gap-0.5 px-1.5 py-1",
+          // Phones keep every control on one row; it scrolls sideways only on the narrowest screens.
+          "flex flex-wrap items-center gap-0.5 px-1.5 py-1 touch:flex-nowrap touch:gap-0 touch:overflow-x-auto touch:px-1",
           variant === "boxed" ? "border-b bg-muted/30" : "border-b border-border/60",
         )}
       >
@@ -388,7 +389,7 @@ function ToolbarButton(props: {
 }) {
   return (
     <>
-      {props.separatorBefore && <span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />}
+      {props.separatorBefore && <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-border touch:mx-0.5" />}
       <Button
         type="button"
         variant="ghost"
@@ -400,7 +401,7 @@ function ToolbarButton(props: {
         // Keep the editor's selection while clicking toolbar buttons.
         onMouseDown={(event) => event.preventDefault()}
         onClick={props.onClick}
-        className={cn(props.pressed && "bg-muted text-foreground")}
+        className={cn("shrink-0 touch:size-8", props.pressed && "bg-muted text-foreground")}
       >
         {props.children}
       </Button>
