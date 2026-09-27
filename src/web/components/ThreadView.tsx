@@ -32,12 +32,14 @@ import {
   InboxIcon,
   PaperclipIcon,
   SendIcon,
+  ShieldBanIcon,
   SparklesIcon,
   TagIcon,
   TrashIcon,
   XIcon,
 } from "./Icons";
 import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
+import { ReportSpamDialog } from "./ReportSpamDialog";
 import { LinkifiedText } from "./LinkifiedText";
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
 
@@ -59,6 +61,7 @@ export function ThreadView(props: {
   const [failedAttemptKey, setFailedAttemptKey] = useState<string | null>(null);
   const [usedDraftId, setUsedDraftId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [reportingSpam, setReportingSpam] = useState(false);
   const seenDraftIds = useRef(new Set<number>());
   const markedRead = useRef<number | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
@@ -372,6 +375,27 @@ export function ThreadView(props: {
             )}
           </div>
         </div>
+        {thread.last_from_address && (
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setReportingSpam(true)}
+              disabled={moveThread.isPending || removeThread.isPending}
+              aria-label="Report spam"
+              className="shrink-0"
+            >
+              <ShieldBanIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Spam</span>
+            </Button>
+            <ReportSpamDialog
+              open={reportingSpam}
+              threadId={props.threadId}
+              sender={thread.last_from_address}
+              onOpenChange={setReportingSpam}
+              onReported={props.onMoved}
+            />
+          </>
+        )}
         {thread.status === "archived" ? (
           <>
             <Button

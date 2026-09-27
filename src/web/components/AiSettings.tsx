@@ -6,6 +6,7 @@ export function AiSettings(props: {
   onOpenGeneral: () => void;
   onOpenInboxes: () => void;
   onOpenContacts: () => void;
+  onOpenSpam: () => void;
 }) {
   return (
     <div className="flex h-full min-w-0 flex-col bg-canvas">
@@ -15,6 +16,7 @@ export function AiSettings(props: {
         onOpenGeneral={props.onOpenGeneral}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={props.onOpenContacts}
+        onOpenSpam={props.onOpenSpam}
         onOpenAi={() => undefined}
       />
 

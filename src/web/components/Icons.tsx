@@ -188,3 +188,12 @@ export function MenuIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function ShieldBanIcon(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props}>
+      <path d="M12 3 4.5 6v5.5c0 4.5 3.2 8 7.5 9.5 4.3-1.5 7.5-5 7.5-9.5V6L12 3Z" />
+      <path d="m9 9 6 6" />
+    </svg>
+  );
+}

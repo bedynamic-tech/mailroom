@@ -16,6 +16,7 @@ Runs entirely on Cloudflare: Workers, Email Routing, D1, R2, and Web Push.
 - **AI reply drafts** — enable per-inbox drafting with custom instructions and playbooks; review and approve before sending.
 - **Automatic labels** — organize incoming mail with natural-language labeling rules.
 - **Contacts** — keep names, companies, phone numbers and notes for the people who email you, see their conversations, and pick them from autocomplete in To/Cc/Bcc. Named senders can be added automatically, and contacts can be imported from CSV or vCard files.
+- **Spam blocking** — report a conversation as spam to archive it and block its sender's address or whole domain; mail from blocked senders is rejected before it reaches any inbox. Manage the blocklist under **Settings → Spam**.
 - **Search and triage** — search message content, filter conversations, mark read or archive in bulk, browse or restore archived conversations, and permanently delete them one at a time, in bulk, or with Empty archive.
 - **MCP integration** — let external AI agents read conversations, compose emails, and send replies through scoped OAuth access.
 - **Browser notifications** — opt in to Web Push alerts for new messages.
@@ -148,6 +149,7 @@ not `npx wrangler dev`: the test always targets port 5173 and `wrangler.dev.json
 - `/mailboxes/:mailboxId/threads/:threadId` — a conversation within that Inbox
 - `/settings/inboxes/:mailboxId` — Base Instructions and Playbooks for an Inbox
 - `/settings/general` — workspace-wide settings, including browser notifications
+- `/settings/spam` — Blocked Senders: add, review and unblock addresses and domains
 - `/settings/ai` — MCP server URL and connection check
 
 Search and conversation filters are URL parameters (`?q=...&filter=unread|drafts`),

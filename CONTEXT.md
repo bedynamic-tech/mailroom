@@ -32,6 +32,10 @@ _Avoid_: Tag, category, folder
 A workspace-wide record of a person the Inboxes correspond with, identified by email address and carrying a name, company, phone and notes. With "Automatically create new contacts" on, an external sender whose name can be parsed from the From header becomes a Contact on their first inbound Message; Contacts can also be added and edited by hand. Deleting a Contact leaves its Conversations untouched. Recipient fields suggest matching Contacts.
 _Avoid_: Customer, address book entry, sender
 
+**Blocked Sender**:
+A workspace-wide rule naming one sender address or one domain (which also covers its subdomains). Inbound mail whose envelope sender or From address matches is rejected before anything is stored, so it never opens a Conversation, drafts, labels or notifies. Reporting spam on a Conversation archives it and can block its latest sender's address or domain, archiving that sender's other open Conversations too. A rule can never cover one of the workspace's own Inboxes or a public mailbox provider such as gmail.com.
+_Avoid_: Spam filter, blacklist, banned sender
+
 **Agent Draft**:
 A proposed reply authored by the agent and held for human review before sending.
 _Avoid_: Auto-reply, suggestion

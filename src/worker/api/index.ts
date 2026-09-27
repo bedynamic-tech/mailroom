@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSameOrigin } from "./csrf.ts";
 import { composeApi, copyAddresses } from "./compose.ts";
 import { contactsApi } from "./contacts.ts";
+import { blockedSendersApi } from "./blocked-senders.ts";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
 import { MAX_SENDER_NAME_LENGTH, normalizeSenderName } from "../../shared/sender-name.ts";
 import { enqueueDraftRun } from "../agent/runs";
@@ -23,6 +24,8 @@ import {
   purgeConversationObjects,
 } from "../inbox/delete-conversations";
 import { validatePushSubscription } from "../notifications/push";
+import { BlockRuleError } from "../spam/blocklist";
+import { reportSpam, SpamReportError } from "../spam/report";
 import {
   effectiveTemplate,
   normalizeNotificationAddress,
@@ -53,6 +56,7 @@ export const api = new Hono<{ Bindings: Env }>();
 api.use("*", requireSameOrigin);
 api.route("/compose", composeApi);
 api.route("/contacts", contactsApi);
+api.route("/blocked-senders", blockedSendersApi);
 
 api.get("/settings/general", async (c) => {
   const [settings, subscriptions] = await Promise.all([
@@ -899,6 +903,24 @@ api.post("/threads/:id/unarchive", async (c) => {
     .bind(c.req.param("id"))
     .run();
   return c.json({ ok: true });
+});
+
+api.post("/threads/:id/spam", async (c) => {
+  const threadId = parsePositiveId(c.req.param("id"));
+  if (threadId === null) return c.json({ error: "Invalid conversation" }, 400);
+  const body = await c.req.json<{ block?: unknown }>().catch(() => null);
+  const block = body?.block ?? "none";
+  if (block !== "address" && block !== "domain" && block !== "none") {
+    return c.json({ error: "block must be address, domain or none" }, 400);
+  }
+  try {
+    return c.json(await reportSpam(c.env, threadId, block));
+  } catch (error) {
+    if (error instanceof SpamReportError || error instanceof BlockRuleError) {
+      return c.json({ error: error.message }, error.status);
+    }
+    throw error;
+  }
 });
 
 api.post("/archive/empty", async (c) => {

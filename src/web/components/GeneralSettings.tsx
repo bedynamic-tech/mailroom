@@ -32,6 +32,7 @@ export function GeneralSettings(props: {
   onBack: () => void;
   onOpenInboxes: () => void;
   onOpenContacts: () => void;
+  onOpenSpam: () => void;
   onOpenAi: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -93,6 +94,7 @@ export function GeneralSettings(props: {
         onOpenGeneral={() => undefined}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={props.onOpenContacts}
+        onOpenSpam={props.onOpenSpam}
         onOpenAi={props.onOpenAi}
       />
 

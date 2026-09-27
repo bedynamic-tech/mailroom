@@ -1,4 +1,5 @@
 import type {
+  BlockedSender,
   BrowserPushSubscription,
   ComposeAttemptResult,
   Contact,
@@ -14,6 +15,7 @@ import type {
   Playbook,
   PlaybookInput,
   ReplyAttemptResult,
+  SpamReportResult,
   ThreadSummary,
   ThreadDetail,
 } from "../shared/types";
@@ -357,4 +359,23 @@ export const importContacts = (contacts: ContactInput[], overwrite: boolean) =>
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contacts, overwrite }),
+  });
+
+export const fetchBlockedSenders = () => request<BlockedSender[]>("/blocked-senders");
+
+export const blockSender = (pattern: string) =>
+  request<BlockedSender>("/blocked-senders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pattern }),
+  });
+
+export const unblockSender = (id: number) =>
+  request<{ ok: true }>(`/blocked-senders/${id}`, { method: "DELETE" });
+
+export const reportSpam = (threadId: number, block: "address" | "domain" | "none") =>
+  request<SpamReportResult>(`/threads/${threadId}/spam`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ block }),
   });

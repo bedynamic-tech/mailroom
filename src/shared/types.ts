@@ -231,3 +231,21 @@ export interface ContactImportResult {
   /** The first few skipped entries and why. */
   errors: Array<{ address: string; error: string }>;
 }
+
+export interface BlockedSender {
+  id: number;
+  /** An exact sender address, or a domain that also covers its subdomains. */
+  kind: "address" | "domain";
+  pattern: string;
+  /** How many inbound emails this rule has rejected. */
+  blocked_count: number;
+  last_blocked_at: string | null;
+  created_at: string;
+}
+
+export interface SpamReportResult {
+  /** The rule now blocking the sender, or null when nothing was blocked. */
+  blocked: BlockedSender | null;
+  /** Conversations archived by the report, including the reported one. */
+  archived: number;
+}

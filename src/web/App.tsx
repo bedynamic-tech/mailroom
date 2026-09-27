@@ -24,6 +24,7 @@ import { AiSettings } from "./components/AiSettings";
 import { Contacts } from "./components/Contacts";
 import { ContactSettings } from "./components/ContactSettings";
 import { GeneralSettings } from "./components/GeneralSettings";
+import { SpamSettings } from "./components/SpamSettings";
 import { ComposeEmailProvider, useCompose } from "./components/ComposeEmail";
 import { InboxIcon } from "./components/Icons";
 import { MobileSidebar, Sidebar } from "./components/Sidebar";
@@ -32,7 +33,7 @@ import { ThreadView } from "./components/ThreadView";
 import { useUnreadBadge } from "./pwa";
 
 type WorkspaceView = "inbox" | "archive" | "contacts" | "settings";
-type SettingsSection = "general" | "inboxes" | "contacts" | "ai";
+type SettingsSection = "general" | "inboxes" | "contacts" | "spam" | "ai";
 
 export function App() {
   return (
@@ -60,6 +61,7 @@ export function App() {
         path="/settings/contacts"
         element={<Workspace view="settings" settingsSection="contacts" />}
       />
+      <Route path="/settings/spam" element={<Workspace view="settings" settingsSection="spam" />} />
       <Route path="/settings/ai" element={<Workspace view="settings" settingsSection="ai" />} />
       <Route
         path="/settings/inboxes"
@@ -288,6 +290,7 @@ function Workspace(props: {
               onBack={() => navigate("/inbox")}
               onOpenInboxes={openInboxSettings}
               onOpenContacts={() => navigate("/settings/contacts")}
+              onOpenSpam={() => navigate("/settings/spam")}
               onOpenAi={() => navigate("/settings/ai")}
             />
           ) : props.settingsSection === "contacts" ? (
@@ -296,6 +299,15 @@ function Workspace(props: {
               onOpenGeneral={() => navigate("/settings/general")}
               onOpenInboxes={openInboxSettings}
               onOpenContacts={() => navigate("/contacts")}
+              onOpenSpam={() => navigate("/settings/spam")}
+              onOpenAi={() => navigate("/settings/ai")}
+            />
+          ) : props.settingsSection === "spam" ? (
+            <SpamSettings
+              onBack={() => navigate("/inbox")}
+              onOpenGeneral={() => navigate("/settings/general")}
+              onOpenInboxes={openInboxSettings}
+              onOpenContacts={() => navigate("/settings/contacts")}
               onOpenAi={() => navigate("/settings/ai")}
             />
           ) : props.settingsSection === "ai" ? (
@@ -304,6 +316,7 @@ function Workspace(props: {
               onOpenGeneral={() => navigate("/settings/general")}
               onOpenInboxes={openInboxSettings}
               onOpenContacts={() => navigate("/settings/contacts")}
+              onOpenSpam={() => navigate("/settings/spam")}
             />
           ) : (
             <AgentSettings
@@ -320,6 +333,7 @@ function Workspace(props: {
               }
               onOpenGeneral={() => navigate("/settings/general")}
               onOpenContacts={() => navigate("/settings/contacts")}
+              onOpenSpam={() => navigate("/settings/spam")}
               onOpenAi={() => navigate("/settings/ai")}
               onBack={() => navigate("/inbox")}
             />

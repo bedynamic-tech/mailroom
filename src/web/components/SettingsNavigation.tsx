@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowLeftIcon } from "./Icons";
 
-export type SettingsSection = "general" | "inboxes" | "contacts" | "ai";
+export type SettingsSection = "general" | "inboxes" | "contacts" | "spam" | "ai";
 
 export function SettingsHeader(props: {
   active: SettingsSection;
@@ -11,6 +11,7 @@ export function SettingsHeader(props: {
   onOpenGeneral: () => void;
   onOpenInboxes: () => void;
   onOpenContacts: () => void;
+  onOpenSpam: () => void;
   onOpenAi: () => void;
 }) {
   return (
@@ -36,6 +37,9 @@ export function SettingsHeader(props: {
         </SettingsTab>
         <SettingsTab active={props.active === "contacts"} onClick={props.onOpenContacts}>
           Contacts
+        </SettingsTab>
+        <SettingsTab active={props.active === "spam"} onClick={props.onOpenSpam}>
+          Spam
         </SettingsTab>
         <SettingsTab active={props.active === "ai"} onClick={props.onOpenAi}>
           AI

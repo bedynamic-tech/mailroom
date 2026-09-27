@@ -26,6 +26,7 @@ export function ContactSettings(props: {
   onOpenInboxes: () => void;
   /** Opens the Contacts list itself. */
   onOpenContacts: () => void;
+  onOpenSpam: () => void;
   onOpenAi: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -50,6 +51,7 @@ export function ContactSettings(props: {
         onOpenGeneral={props.onOpenGeneral}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={() => undefined}
+        onOpenSpam={props.onOpenSpam}
         onOpenAi={props.onOpenAi}
       />
 

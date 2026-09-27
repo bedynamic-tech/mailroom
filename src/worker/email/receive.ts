@@ -5,6 +5,7 @@ import { labelNewThread } from "./label";
 import { recordSender } from "../contacts/contacts";
 import { notifyNewEmail } from "../notifications/push";
 import { notifyNewEmailByEmail } from "../notifications/email";
+import { matchBlockedSender } from "../spam/blocklist";
 import {
   addressOf,
   addressesOf,
@@ -27,9 +28,14 @@ export async function receiveEmail(
     return;
   }
 
+  // Blocked Senders are rejected before anything is stored, whether the rule
+  // matches the envelope sender or the From header people see in the app.
+  if (await rejectIfBlocked(env, message, [message.from])) return;
+
   const rawBuffer = await new Response(message.raw).arrayBuffer();
   const fingerprint = await rawFingerprint(rawBuffer);
   const parsed = await PostalMime.parse(rawBuffer);
+  if (await rejectIfBlocked(env, message, [addressOf(parsed.from)])) return;
   const messageId = parsed.messageId ?? `<raw-${fingerprint}@mailroom.invalid>`;
 
   const duplicate = await env.DB.prepare(
@@ -143,6 +149,18 @@ export async function receiveEmail(
   if (mailbox.agent_mode !== "off" && !isAutoSubmitted(parsed)) {
     await enqueueIfExternal(env, stored.threadId, stored.messageId, parsed);
   }
+}
+
+async function rejectIfBlocked(
+  env: Env,
+  message: ForwardableEmailMessage,
+  senders: string[],
+): Promise<boolean> {
+  const rule = await matchBlockedSender(env, senders);
+  if (!rule) return false;
+  console.log("Rejected mail from blocked sender", { ruleId: rule.id, kind: rule.kind });
+  message.setReject("Sender blocked by recipient");
+  return true;
 }
 
 async function enqueueIfExternal(
