@@ -260,7 +260,7 @@ export function ThreadList(props: {
                 }}
                 placeholder="Search conversations"
                 aria-label="Search conversations"
-                className="h-9 w-full bg-muted/50 pr-9 pl-8.5 text-[13px] focus-visible:bg-background"
+                className="h-10 w-full bg-muted/50 pr-9 pl-8.5 text-base focus-visible:bg-background md:h-9 md:text-[13px]"
               />
               {props.search ? (
                 <Button
@@ -540,7 +540,7 @@ export function ThreadList(props: {
 
 function FilterTab(props: { value: ThreadFilter; label: string; count?: number }) {
   return (
-    <TabsTrigger value={props.value} className="px-2 text-[13px] sm:px-2.5">
+    <TabsTrigger value={props.value} className="px-2 text-sm sm:px-2.5 md:text-[13px]">
       {props.label}
       {props.count ? (
         <span className="text-xs tabular-nums text-muted-foreground">{props.count}</span>
@@ -601,7 +601,7 @@ function ThreadRow(props: {
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             <span
-              className={`min-w-0 flex-1 truncate text-[13px] ${
+              className={`min-w-0 flex-1 truncate text-[15px] md:text-[13px] ${
                 unread ? "font-semibold text-foreground" : "font-medium text-foreground/75"
               }`}
             >
@@ -609,7 +609,7 @@ function ThreadRow(props: {
             </span>
             <time
               dateTime={thread.last_message_at}
-              className={`shrink-0 text-xs tabular-nums ${
+              className={`shrink-0 text-[13px] tabular-nums md:text-xs ${
                 unread ? "font-medium text-foreground" : "text-muted-foreground"
               }`}
             >
@@ -617,13 +617,13 @@ function ThreadRow(props: {
             </time>
           </span>
           <span
-            className={`mt-0.5 block truncate text-[13px] ${
+            className={`mt-0.5 block truncate text-[15px] md:text-[13px] ${
               unread ? "font-medium text-foreground" : "text-foreground/75"
             }`}
           >
             {thread.subject || "(no subject)"}
           </span>
-          <span className="mt-0.5 block truncate text-[12.5px] leading-5 text-muted-foreground">
+          <span className="mt-0.5 block truncate text-sm leading-5 text-muted-foreground md:text-[12.5px]">
             {thread.snippet}
           </span>
 
@@ -632,7 +632,7 @@ function ThreadRow(props: {
               {showArchivedBadge && (
                 <Badge
                   variant="outline"
-                  className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-[11px] font-normal text-muted-foreground"
+                  className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-xs font-normal text-muted-foreground md:text-[11px]"
                 >
                   <ArchiveIcon className="h-3 w-3" />
                   Archived
@@ -642,19 +642,19 @@ function ThreadRow(props: {
                 <Badge
                   key={label.id}
                   variant="outline"
-                  className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-[11px] font-normal text-foreground/75"
+                  className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-xs font-normal text-foreground/75 md:text-[11px]"
                 >
                   <TagIcon className="h-3 w-3 text-muted-foreground" />
                   {label.name}
                 </Badge>
               ))}
               {props.showMailbox && (
-                <span className="min-w-0 truncate text-[11.5px] text-muted-foreground">
+                <span className="min-w-0 truncate text-xs text-muted-foreground md:text-[11.5px]">
                   {thread.mailbox_address}
                 </span>
               )}
               {hasDraft && (
-                <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+                <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground md:text-[11px]">
                   <SparklesIcon className="h-3 w-3" />
                   Draft
                 </span>

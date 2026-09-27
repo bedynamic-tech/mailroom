@@ -38,6 +38,12 @@
     caret-color: var(--foreground);
   }
 
+  /* Keep iOS from inflating text on rotation; users can still pinch-zoom. */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   ::selection {
     background: var(--selection);
     color: var(--foreground);
@@ -47,6 +53,17 @@
     scrollbar-color: var(--scrollbar) transparent;
     scrollbar-width: thin;
     @apply border-border outline-ring/50;
+  }
+}
+
+/* iOS zooms the page when a field under 16px takes focus. Unlayered so it
+   wins over the smaller text utilities fields use on desktop. */
+@media (max-width: 767px), (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: 16px;
   }
 }
 

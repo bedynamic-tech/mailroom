@@ -112,7 +112,7 @@ export function Contacts(props: {
               }}
               placeholder="Search by name, email or company"
               aria-label="Search contacts"
-              className="h-9 w-full bg-muted/50 pr-9 pl-8.5 text-[13px] focus-visible:bg-background"
+              className="h-10 w-full bg-muted/50 pr-9 pl-8.5 text-base focus-visible:bg-background md:h-9 md:text-[13px]"
             />
             {search && (
               <Button

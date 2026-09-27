@@ -562,7 +562,7 @@ export function ThreadView(props: {
               placeholder="Write a reply…"
               rows={3}
               aria-label="Reply"
-              className="max-h-[min(30dvh,200px)] min-h-[84px] resize-none overflow-y-auto overscroll-contain rounded-none border-0 bg-transparent px-3.5 py-3 text-sm leading-6 shadow-none focus-visible:ring-0 md:text-sm"
+              className="max-h-[min(30dvh,200px)] min-h-[84px] resize-none overflow-y-auto overscroll-contain rounded-none border-0 bg-transparent px-3.5 py-3 text-base leading-6 shadow-none focus-visible:ring-0 md:text-sm"
             />
             {pendingFiles.length > 0 && (
               <div className="flex flex-wrap gap-1.5 px-3.5 pb-1" aria-label="Attachments to send">
@@ -715,32 +715,32 @@ function MessageCard({ message }: { message: Message }) {
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-[13.5px] font-semibold text-foreground">{displayName}</span>
+            <span className="truncate text-[15px] font-semibold text-foreground md:text-[13.5px]">{displayName}</span>
             {message.sent_by === "agent" && <AuthorBadge tone="agent">Agent</AuthorBadge>}
             {isOutbound && message.sent_by === "human" && <AuthorBadge tone="human">You</AuthorBadge>}
           </div>
-          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+          <div className="mt-0.5 truncate text-[13px] text-muted-foreground md:text-xs">
             {isOutbound ? `to ${to.join(", ")}` : message.from_address}
           </div>
           {!isOutbound && to.length > 1 && (
-            <div className="truncate text-xs text-muted-foreground" title={to.join(", ")}>
+            <div className="truncate text-[13px] text-muted-foreground md:text-xs" title={to.join(", ")}>
               to {to.join(", ")}
             </div>
           )}
           {cc.length > 0 && (
-            <div className="truncate text-xs text-muted-foreground" title={cc.join(", ")}>
+            <div className="truncate text-[13px] text-muted-foreground md:text-xs" title={cc.join(", ")}>
               cc {cc.join(", ")}
             </div>
           )}
           {bcc.length > 0 && (
-            <div className="truncate text-xs text-muted-foreground" title={bcc.join(", ")}>
+            <div className="truncate text-[13px] text-muted-foreground md:text-xs" title={bcc.join(", ")}>
               bcc {bcc.join(", ")}
             </div>
           )}
         </div>
         <time
           dateTime={message.created_at}
-          className="mt-0.5 shrink-0 text-xs tabular-nums text-muted-foreground"
+          className="mt-0.5 shrink-0 text-[13px] tabular-nums text-muted-foreground md:text-xs"
           title={new Date(message.created_at).toLocaleString()}
         >
           {formatTime(message.created_at)}
@@ -754,7 +754,7 @@ function MessageCard({ message }: { message: Message }) {
           sender={displayName}
         />
       ) : (
-        <div className="max-w-[72ch] break-words text-sm leading-6 whitespace-pre-wrap text-foreground">
+        <div className="max-w-[72ch] break-words text-base leading-6 whitespace-pre-wrap text-foreground md:text-sm">
           <LinkifiedText text={main} />
         </div>
       )}
@@ -765,7 +765,7 @@ function MessageCard({ message }: { message: Message }) {
               key={attachment.id}
               href={`/api/attachments/${attachment.id}`}
               download={attachment.filename || undefined}
-              className="inline-flex max-w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="inline-flex max-w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-[13px] text-foreground md:text-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <PaperclipIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="min-w-0 truncate">{attachment.filename || "Attachment"}</span>
@@ -786,7 +786,7 @@ function MessageCard({ message }: { message: Message }) {
             {showQuoted ? "Hide quoted text" : "Show quoted text"}
           </Button>
           {showQuoted && (
-            <div className="mt-2 break-words border-l border-border pl-3 text-[13px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
+            <div className="mt-2 break-words border-l border-border pl-3 text-[15px] leading-relaxed whitespace-pre-wrap text-muted-foreground md:text-[13px]">
               <LinkifiedText text={quoted} />
             </div>
           )}

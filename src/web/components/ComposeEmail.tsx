@@ -191,14 +191,14 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
               ) : null}
               <fieldset disabled={locked || loading || loadError || available.length === 0} className="min-w-0 disabled:opacity-60">
                 <div className="flex min-h-12 items-center gap-3 border-b">
-                  <label htmlFor="compose-from" className="w-14 shrink-0 text-sm text-muted-foreground">From</label>
-                  <select id="compose-from" value={mailboxId} onChange={(event) => setMailboxId(event.target.value)} required className="min-w-0 flex-1 rounded-md bg-transparent py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <label htmlFor="compose-from" className="w-14 shrink-0 text-base text-muted-foreground md:text-sm">From</label>
+                  <select id="compose-from" value={mailboxId} onChange={(event) => setMailboxId(event.target.value)} required className="min-w-0 flex-1 rounded-md bg-transparent py-2 text-base outline-none md:text-sm focus-visible:ring-2 focus-visible:ring-ring">
                     <option value="" disabled>Choose an inbox</option>
                     {available.map((mailbox) => <option key={mailbox.id} value={mailbox.id}>{mailbox.address}</option>)}
                   </select>
                 </div>
                 <div className="flex min-h-12 items-start gap-3 border-b">
-                  <label htmlFor="compose-to" className="w-14 shrink-0 py-3.5 text-sm text-muted-foreground">To</label>
+                  <label htmlFor="compose-to" className="w-14 shrink-0 py-3.5 text-base text-muted-foreground md:text-sm">To</label>
                   <RecipientInput ref={toField} inputRef={toRef} id="compose-to" label="To" values={to} onChange={setTo} capacity={Math.min(1 - to.length, remaining)} taken={takenBy(cc, bcc)} placeholder="recipient@example.com" className="px-2.5 py-1.5" />
                   {(!showCc || !showBcc) && (
                     <span className="flex shrink-0 items-center py-2.5">
@@ -209,13 +209,13 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                 </div>
                 {showCc && (
                   <div className="flex min-h-12 items-start gap-3 border-b">
-                    <label htmlFor="compose-cc" className="w-14 shrink-0 py-3.5 text-sm text-muted-foreground">Cc</label>
+                    <label htmlFor="compose-cc" className="w-14 shrink-0 py-3.5 text-base text-muted-foreground md:text-sm">Cc</label>
                     <RecipientInput ref={ccField} inputRef={ccRef} id="compose-cc" label="Cc" values={cc} onChange={setCc} capacity={copyCapacity} taken={takenBy(to, bcc)} placeholder="Add Cc recipients" onDismiss={() => setAddingCc(false)} className="px-2.5 py-1.5" />
                   </div>
                 )}
                 {showBcc && (
                   <div className="flex min-h-12 items-start gap-3 border-b">
-                    <label htmlFor="compose-bcc" className="w-14 shrink-0 py-3.5 text-sm text-muted-foreground">Bcc</label>
+                    <label htmlFor="compose-bcc" className="w-14 shrink-0 py-3.5 text-base text-muted-foreground md:text-sm">Bcc</label>
                     <RecipientInput ref={bccField} inputRef={bccRef} id="compose-bcc" label="Bcc" values={bcc} onChange={setBcc} capacity={copyCapacity} taken={takenBy(to, cc)} placeholder="Add Bcc recipients" onDismiss={() => setAddingBcc(false)} className="px-2.5 py-1.5" />
                   </div>
                 )}
@@ -225,11 +225,11 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                   </p>
                 )}
                 <div className="flex min-h-12 items-center gap-3 border-b">
-                  <label htmlFor="compose-subject" className="w-14 shrink-0 text-sm text-muted-foreground">Subject</label>
+                  <label htmlFor="compose-subject" className="w-14 shrink-0 text-base text-muted-foreground md:text-sm">Subject</label>
                   <Input id="compose-subject" required maxLength={MAX_SUBJECT_CHARS} placeholder="Add a subject" value={subject} onChange={(event) => setSubject(event.target.value)} className="min-w-0 border-0 shadow-none" />
                 </div>
                 <label htmlFor="compose-body" className="sr-only">Message</label>
-                <textarea id="compose-body" value={text} onChange={(event) => setText(event.target.value)} maxLength={MAX_MESSAGE_CHARS} placeholder="Write your message…" className="mt-3 min-h-44 w-full resize-y rounded-md bg-transparent px-2 py-2 text-sm leading-6 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring sm:min-h-64" />
+                <textarea id="compose-body" value={text} onChange={(event) => setText(event.target.value)} maxLength={MAX_MESSAGE_CHARS} placeholder="Write your message…" className="mt-3 min-h-44 w-full resize-y rounded-md bg-transparent px-2 py-2 text-base leading-6 outline-none md:text-sm placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring sm:min-h-64" />
               </fieldset>
               {files.length > 0 && <ul aria-label="Attachments" className="mb-4 space-y-1.5">{files.map((file, index) => (
                 <li key={`${file.name}-${index}`} className="flex min-w-0 items-center gap-2 rounded-md bg-muted px-3 py-1.5 text-xs">
