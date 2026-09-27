@@ -4,6 +4,7 @@ import {
   archiveThread,
   createDraft,
   discardDraft,
+  fetchMailboxes,
   fetchThread,
   markRead,
   retryDraftRun,
@@ -12,6 +13,7 @@ import {
 } from "../api";
 import type { Draft, Message } from "../../shared/types";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits";
+import { replyAllRecipients } from "../../shared/recipients";
 import {
   deriveAgentDraftStatus,
   type AgentDraftStatus,
@@ -60,6 +62,9 @@ export function ThreadView(props: {
   const ccField = useRef<RecipientInputHandle>(null);
   const bccField = useRef<RecipientInputHandle>(null);
   const attemptIds = useRef(new Map<string, { text: string; id: string }>());
+
+  // Own Inbox addresses are never copied on Reply all.
+  const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes });
 
   const detail = useQuery({
     queryKey: ["thread", props.threadId],
@@ -237,6 +242,23 @@ export function ThreadView(props: {
   const copyCapacity =
     MAX_RECIPIENTS_PER_MESSAGE - replyTargets.length - replyCc.length - replyBcc.length;
   const lowered = (values: string[]) => values.map((value) => value.toLowerCase());
+  const alreadyCopied = new Set(lowered([...replyCc, ...replyBcc]));
+  const replyAllMissing = latestInbound
+    ? replyAllRecipients({
+        to: parseAddressList(latestInbound.to_addresses),
+        cc: parseAddressList(latestInbound.cc_addresses),
+        replyTargets,
+        ownAddresses: [
+          thread.mailbox_address,
+          ...(mailboxes.data ?? []).map((mailbox) => mailbox.address),
+        ],
+      }).filter((address) => !alreadyCopied.has(address.toLowerCase()))
+    : [];
+
+  const replyAll = () => {
+    setShowCopies(true);
+    setReplyCc((current) => [...current, ...replyAllMissing.slice(0, Math.max(0, copyCapacity))]);
+  };
 
   const attemptFor = (key: string, text: string) => {
     const existing = attemptIds.current.get(key);
@@ -384,6 +406,18 @@ export function ThreadView(props: {
                     }}
                   >
                     Cc/Bcc
+                  </Button>
+                )}
+                {replyAllMissing.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    className={`${showCopies ? "ml-1" : ""} shrink-0 text-muted-foreground`}
+                    title={`Copy everyone on the last email: ${replyAllMissing.join(", ")}`}
+                    disabled={reply.isPending || copyCapacity <= 0}
+                    onClick={replyAll}
+                  >
+                    Reply all
                   </Button>
                 )}
               </span>
@@ -599,6 +633,7 @@ function MessageCard({ message }: { message: Message }) {
     ? message.from_name || message.from_address
     : message.from_name || message.from_address;
   const { main, quoted } = splitQuotedTail(message.text_body ?? "");
+  const to = parseAddressList(message.to_addresses);
   const cc = parseAddressList(message.cc_addresses);
   const bcc = isOutbound ? parseAddressList(message.bcc_addresses) : [];
 
@@ -618,8 +653,13 @@ function MessageCard({ message }: { message: Message }) {
             {isOutbound && message.sent_by === "human" && <AuthorBadge tone="human">You</AuthorBadge>}
           </div>
           <div className="mt-0.5 truncate text-xs text-muted-foreground">
-            {isOutbound ? `to ${parseAddressList(message.to_addresses).join(", ")}` : message.from_address}
+            {isOutbound ? `to ${to.join(", ")}` : message.from_address}
           </div>
+          {!isOutbound && to.length > 1 && (
+            <div className="truncate text-xs text-muted-foreground" title={to.join(", ")}>
+              to {to.join(", ")}
+            </div>
+          )}
           {cc.length > 0 && (
             <div className="truncate text-xs text-muted-foreground" title={cc.join(", ")}>
               cc {cc.join(", ")}

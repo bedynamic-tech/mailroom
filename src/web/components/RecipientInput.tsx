@@ -1,9 +1,7 @@
 import { useImperativeHandle, useRef, useState, type Ref, type RefObject } from "react";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits";
-import { normalizeEmailAddress, splitAddressInput } from "../../shared/recipients";
+import { isEmailAddress, normalizeEmailAddress, splitAddressInput } from "../../shared/recipients";
 import { XIcon } from "./Icons";
-
-const EMAIL_PATTERN = /^[^\s@,;<>"()[\]]+@[^\s@,;<>"()[\]]+\.[^\s@,;<>"()[\]]+$/;
 
 export interface RecipientInputHandle {
   /** Adds any typed address as a pill. Returns the resulting list, or null when text is left that could not be added. */
@@ -60,7 +58,7 @@ export function RecipientInput(props: {
     let overLimit = false;
     for (const token of tokens) {
       const address = normalizeEmailAddress(token);
-      if (!EMAIL_PATTERN.test(address) || address.length > 254) {
+      if (!isEmailAddress(address)) {
         invalid ??= token;
         leftover.push(token);
       } else if (seen.has(address.toLowerCase())) {

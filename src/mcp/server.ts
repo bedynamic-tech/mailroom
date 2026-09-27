@@ -259,7 +259,7 @@ export function createMailroomServer(env: McpEnv, identity: McpIdentity): McpSer
         conversation_id: z.string().describe("A Conversation id returned by search_conversations."),
         reply_to_message_id: z.string().describe("The latest inbound Message id returned by get_conversation."),
         expected_recipients: z.array(z.email()).min(1).max(20).describe("Copy reply_target from that inbound Message exactly."),
-        cc: copyRecipientsInput.describe("Optional Cc recipients, visible to everyone on the reply."),
+        cc: copyRecipientsInput.describe("Optional Cc recipients, visible to everyone on the reply. To reply all, include the inbound Message's other to and cc addresses, excluding the Inbox address."),
         bcc: copyRecipientsInput.describe("Optional Bcc recipients, hidden from the other recipients."),
         text: z.string().trim().max(100_000).default(""),
         attachments: attachmentsInput,

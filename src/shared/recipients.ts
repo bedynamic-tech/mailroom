@@ -32,3 +32,35 @@ export function normalizeEmailAddress(address: string): string {
   if (at <= 0) return trimmed;
   return `${trimmed.slice(0, at)}@${trimmed.slice(at + 1).toLowerCase()}`;
 }
+
+const EMAIL_PATTERN = /^[^\s@,;<>"()[\]]+@[^\s@,;<>"()[\]]+\.[^\s@,;<>"()[\]]+$/;
+
+/** A plain address check for recipient fields; the server validates again before sending. */
+export function isEmailAddress(address: string): boolean {
+  return address.length <= 254 && EMAIL_PATTERN.test(address);
+}
+
+/**
+ * The extra Cc recipients for "Reply all": everyone else the inbound Message
+ * was sent to or copied, excluding our own Inbox addresses, the reply target
+ * (already the To) and anything that is not a usable address.
+ */
+export function replyAllRecipients(input: {
+  to: string[];
+  cc: string[];
+  replyTargets: string[];
+  ownAddresses: string[];
+}): string[] {
+  const excluded = new Set(
+    [...input.replyTargets, ...input.ownAddresses].map((address) => address.trim().toLowerCase()),
+  );
+  const result: string[] = [];
+  for (const raw of [...input.to, ...input.cc]) {
+    const address = normalizeEmailAddress(raw);
+    const key = address.toLowerCase();
+    if (!isEmailAddress(address) || excluded.has(key)) continue;
+    excluded.add(key);
+    result.push(address);
+  }
+  return result;
+}
