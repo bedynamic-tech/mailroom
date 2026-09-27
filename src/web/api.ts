@@ -15,7 +15,7 @@ import type {
   Playbook,
   PlaybookInput,
   ReplyAttemptResult,
-  SpamReportResult,
+  BlockSenderResult,
   ThreadSummary,
   ThreadDetail,
 } from "../shared/types";
@@ -363,19 +363,23 @@ export const importContacts = (contacts: ContactInput[], overwrite: boolean) =>
 
 export const fetchBlockedSenders = () => request<BlockedSender[]>("/blocked-senders");
 
-export const blockSender = (pattern: string) =>
+export const blockSender = (input: { pattern: string; mailboxId: number | null }) =>
   request<BlockedSender>("/blocked-senders", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pattern }),
+    body: JSON.stringify({ pattern: input.pattern, mailbox_id: input.mailboxId }),
   });
 
 export const unblockSender = (id: number) =>
   request<{ ok: true }>(`/blocked-senders/${id}`, { method: "DELETE" });
 
-export const reportSpam = (threadId: number, block: "address" | "domain" | "none") =>
-  request<SpamReportResult>(`/threads/${threadId}/spam`, {
+export const blockThreadSender = (
+  threadId: number,
+  kind: "address" | "domain",
+  scope: "inbox" | "all",
+) =>
+  request<BlockSenderResult>(`/threads/${threadId}/block-sender`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ block }),
+    body: JSON.stringify({ kind, scope }),
   });

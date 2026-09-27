@@ -33,7 +33,7 @@ A workspace-wide record of a person the Inboxes correspond with, identified by e
 _Avoid_: Customer, address book entry, sender
 
 **Blocked Sender**:
-A workspace-wide rule naming one sender address or one domain (which also covers its subdomains). Inbound mail whose envelope sender or From address matches is rejected before anything is stored, so it never opens a Conversation, drafts, labels or notifies. Reporting spam on a Conversation archives it and can block its latest sender's address or domain, archiving that sender's other open Conversations too. A rule can never cover one of the workspace's own Inboxes or a public mailbox provider such as gmail.com.
+A rule naming one sender address or one domain (which also covers its subdomains), applying to one Inbox or to all Inboxes. Inbound mail to a covered Inbox whose envelope sender or From address matches is rejected before anything is stored, so it never opens a Conversation, drafts, labels or notifies. "Block sender" on a Conversation, after confirmation, blocks its latest sender's address or domain on that Conversation's Inbox or on all Inboxes, and archives the Conversation along with the sender's other open Conversations in that scope. A rule for all Inboxes replaces the same sender's per-Inbox rules. A rule can never cover one of the workspace's own Inboxes or a public mailbox provider such as gmail.com.
 _Avoid_: Spam filter, blacklist, banned sender
 
 **Agent Draft**:

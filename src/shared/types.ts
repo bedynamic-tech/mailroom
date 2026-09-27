@@ -234,6 +234,9 @@ export interface ContactImportResult {
 
 export interface BlockedSender {
   id: number;
+  /** The Inbox this rule applies to, or null for all Inboxes. */
+  mailbox_id: number | null;
+  mailbox_address: string | null;
   /** An exact sender address, or a domain that also covers its subdomains. */
   kind: "address" | "domain";
   pattern: string;
@@ -243,9 +246,9 @@ export interface BlockedSender {
   created_at: string;
 }
 
-export interface SpamReportResult {
-  /** The rule now blocking the sender, or null when nothing was blocked. */
-  blocked: BlockedSender | null;
-  /** Conversations archived by the report, including the reported one. */
+export interface BlockSenderResult {
+  /** The rule now blocking the sender. */
+  blocked: BlockedSender;
+  /** Conversations archived, including the one the sender was blocked from. */
   archived: number;
 }

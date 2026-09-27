@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   archiveThread,
+  blockThreadSender,
   createDraft,
   deleteThread,
   discardDraft,
@@ -39,7 +40,7 @@ import {
   XIcon,
 } from "./Icons";
 import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
-import { ReportSpamDialog } from "./ReportSpamDialog";
+import { BlockSenderDialog } from "./BlockSenderDialog";
 import { LinkifiedText } from "./LinkifiedText";
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
 
@@ -61,7 +62,7 @@ export function ThreadView(props: {
   const [failedAttemptKey, setFailedAttemptKey] = useState<string | null>(null);
   const [usedDraftId, setUsedDraftId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [reportingSpam, setReportingSpam] = useState(false);
+  const [blockingSender, setBlockingSender] = useState(false);
   const seenDraftIds = useRef(new Set<number>());
   const markedRead = useRef<number | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
@@ -379,20 +380,40 @@ export function ThreadView(props: {
           <>
             <Button
               variant="outline"
-              onClick={() => setReportingSpam(true)}
+              onClick={() => setBlockingSender(true)}
               disabled={moveThread.isPending || removeThread.isPending}
-              aria-label="Report spam"
+              aria-label="Block sender"
               className="shrink-0"
             >
               <ShieldBanIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Spam</span>
+              <span className="hidden sm:inline">Block sender</span>
             </Button>
-            <ReportSpamDialog
-              open={reportingSpam}
-              threadId={props.threadId}
+            <BlockSenderDialog
+              open={blockingSender}
               sender={thread.last_from_address}
-              onOpenChange={setReportingSpam}
-              onReported={props.onMoved}
+              scopes={[
+                {
+                  value: "inbox",
+                  label: thread.mailbox_address,
+                  hint: "Only this inbox",
+                  target: thread.mailbox_address,
+                },
+                {
+                  value: "all",
+                  label: "All inboxes",
+                  hint: "Every inbox in this workspace",
+                  target: "any of your inboxes",
+                },
+              ]}
+              archives
+              onBlock={(kind, scope) =>
+                blockThreadSender(props.threadId, kind, scope === "all" ? "all" : "inbox")
+              }
+              onOpenChange={setBlockingSender}
+              onBlocked={() => {
+                invalidateAll();
+                props.onMoved();
+              }}
             />
           </>
         )}

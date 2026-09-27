@@ -25,7 +25,7 @@ import {
 } from "../inbox/delete-conversations";
 import { validatePushSubscription } from "../notifications/push";
 import { BlockRuleError } from "../spam/blocklist";
-import { reportSpam, SpamReportError } from "../spam/report";
+import { blockThreadSender, BlockThreadSenderError } from "../spam/block-thread-sender";
 import {
   effectiveTemplate,
   normalizeNotificationAddress,
@@ -905,18 +905,22 @@ api.post("/threads/:id/unarchive", async (c) => {
   return c.json({ ok: true });
 });
 
-api.post("/threads/:id/spam", async (c) => {
+api.post("/threads/:id/block-sender", async (c) => {
   const threadId = parsePositiveId(c.req.param("id"));
   if (threadId === null) return c.json({ error: "Invalid conversation" }, 400);
-  const body = await c.req.json<{ block?: unknown }>().catch(() => null);
-  const block = body?.block ?? "none";
-  if (block !== "address" && block !== "domain" && block !== "none") {
-    return c.json({ error: "block must be address, domain or none" }, 400);
+  const body = await c.req.json<{ kind?: unknown; scope?: unknown }>().catch(() => null);
+  const kind = body?.kind;
+  const scope = body?.scope;
+  if (kind !== "address" && kind !== "domain") {
+    return c.json({ error: "kind must be address or domain" }, 400);
+  }
+  if (scope !== "inbox" && scope !== "all") {
+    return c.json({ error: "scope must be inbox or all" }, 400);
   }
   try {
-    return c.json(await reportSpam(c.env, threadId, block));
+    return c.json(await blockThreadSender(c.env, threadId, kind, scope));
   } catch (error) {
-    if (error instanceof SpamReportError || error instanceof BlockRuleError) {
+    if (error instanceof BlockThreadSenderError || error instanceof BlockRuleError) {
       return c.json({ error: error.message }, error.status);
     }
     throw error;

@@ -2,7 +2,14 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { blockSender, fetchBlockedSenders, unblockSender } from "../api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { blockSender, fetchBlockedSenders, fetchMailboxes, unblockSender } from "../api";
 import { formatTime } from "../lib";
 import { ShieldBanIcon, TrashIcon } from "./Icons";
 import {
@@ -11,6 +18,8 @@ import {
   SettingsPage,
   SettingsPanel,
 } from "./SettingsNavigation";
+
+const ALL_INBOXES = "all";
 
 export function SpamSettings(props: {
   onBack: () => void;
@@ -21,7 +30,9 @@ export function SpamSettings(props: {
 }) {
   const queryClient = useQueryClient();
   const [pattern, setPattern] = useState("");
+  const [scope, setScope] = useState(ALL_INBOXES);
   const blocked = useQuery({ queryKey: ["blocked-senders"], queryFn: fetchBlockedSenders });
+  const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes });
   const add = useMutation({
     mutationFn: blockSender,
     onSuccess: () => {
@@ -36,7 +47,11 @@ export function SpamSettings(props: {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (pattern.trim()) add.mutate(pattern.trim());
+    if (!pattern.trim()) return;
+    add.mutate({
+      pattern: pattern.trim(),
+      mailboxId: scope === ALL_INBOXES ? null : Number(scope),
+    });
   };
 
   return (
@@ -55,7 +70,7 @@ export function SpamSettings(props: {
         <SettingsBlock
           id="blocked-senders-heading"
           title="Blocked senders"
-          description="Mail from these addresses and domains is rejected before it reaches any inbox. Blocking a domain also blocks its subdomains. Use Report spam on a conversation to block its sender in one step."
+          description="Mail from these addresses and domains is rejected before it reaches the inbox, or every inbox, they’re blocked on. Blocking a domain also blocks its subdomains. Use Block sender on a conversation to block its sender in one step."
         >
           <SettingsPanel>
             <form onSubmit={submit} className="flex flex-col gap-2 border-b px-4 py-4 sm:flex-row sm:px-5">
@@ -75,6 +90,28 @@ export function SpamSettings(props: {
                 aria-invalid={add.isError || undefined}
                 aria-describedby={add.isError ? "block-sender-error" : undefined}
               />
+              <label htmlFor="block-sender-scope" className="sr-only">
+                Inbox to block on
+              </label>
+              <Select
+                value={scope}
+                onValueChange={(value) => {
+                  setScope(value);
+                  if (add.isError) add.reset();
+                }}
+              >
+                <SelectTrigger id="block-sender-scope" className="w-full shrink-0 sm:w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_INBOXES}>All inboxes</SelectItem>
+                  {(mailboxes.data ?? []).map((mailbox) => (
+                    <SelectItem key={mailbox.id} value={String(mailbox.id)}>
+                      {mailbox.address}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button type="submit" disabled={!pattern.trim() || add.isPending} className="shrink-0">
                 <ShieldBanIcon className="h-4 w-4" />
                 {add.isPending ? "Blocking…" : "Block"}
@@ -107,6 +144,8 @@ export function SpamSettings(props: {
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {rule.kind === "domain" ? "Domain and subdomains" : "Address"}
+                        {" on "}
+                        {rule.mailbox_address ?? "all inboxes"}
                         {" · "}
                         {rule.blocked_count === 0
                           ? "Nothing blocked yet"
@@ -119,7 +158,7 @@ export function SpamSettings(props: {
                       size="sm"
                       onClick={() => remove.mutate(rule.id)}
                       disabled={remove.isPending && remove.variables === rule.id}
-                      aria-label={`Unblock ${rule.pattern}`}
+                      aria-label={`Unblock ${rule.pattern} on ${rule.mailbox_address ?? "all inboxes"}`}
                       className="shrink-0 text-muted-foreground"
                     >
                       <TrashIcon className="h-4 w-4" />

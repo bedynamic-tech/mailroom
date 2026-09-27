@@ -8,15 +8,20 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ApiError,
+  blockSender,
   CONTACT_PAGE_SIZE,
   createContact,
   deleteContact,
+  fetchBlockedSenders,
   fetchContact,
   fetchContacts,
+  fetchMailboxes,
   updateContact,
   type ContactCursor,
 } from "../api";
 import { formatTime } from "../lib";
+import { blockCandidates } from "../../shared/blocked-senders";
+import { BlockSenderDialog } from "./BlockSenderDialog";
 import { EmailAvatar } from "./EmailAvatar";
 import {
   ArchiveIcon,
@@ -24,6 +29,7 @@ import {
   ContactsIcon,
   PlusIcon,
   SearchIcon,
+  ShieldBanIcon,
   TrashIcon,
   XIcon,
 } from "./Icons";
@@ -322,6 +328,9 @@ function ContactDetails(props: {
   const contact = detail.data?.contact;
   const [form, setForm] = useState<ContactForm>(EMPTY_FORM);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [blocking, setBlocking] = useState(false);
+  const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes });
+  const blockedSenders = useQuery({ queryKey: ["blocked-senders"], queryFn: fetchBlockedSenders });
 
   useEffect(() => {
     if (contact) setForm(formOf(contact));
@@ -368,23 +377,73 @@ function ContactDetails(props: {
 
   const dirty = JSON.stringify(form) !== JSON.stringify(formOf(contact));
   const title = contact.name ?? contact.address;
+  const candidates = blockCandidates(contact.address);
+  const blockRules = (blockedSenders.data ?? []).filter((rule) =>
+    candidates.includes(rule.pattern),
+  );
 
   return (
     <DetailShell
       title={title}
       onBack={props.onBack}
       actions={
-        <Button variant="outline" size="sm" onClick={() => props.onCompose(contact.address)}>
-          <SquarePen className="h-3.5 w-3.5" />
-          Email
-        </Button>
+        <>
+          <Button variant="outline" size="sm" onClick={() => setBlocking(true)}>
+            <ShieldBanIcon className="h-3.5 w-3.5" />
+            Block
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => props.onCompose(contact.address)}>
+            <SquarePen className="h-3.5 w-3.5" />
+            Email
+          </Button>
+        </>
       }
     >
+      <BlockSenderDialog
+        open={blocking}
+        sender={contact.address}
+        scopes={[
+          {
+            value: "all",
+            label: "All inboxes",
+            hint: "Every inbox in this workspace",
+            target: "any of your inboxes",
+          },
+          ...(mailboxes.data ?? []).map((mailbox) => ({
+            value: String(mailbox.id),
+            label: mailbox.address,
+            hint: "Only this inbox",
+            target: mailbox.address,
+          })),
+        ]}
+        archives={false}
+        onBlock={(kind, scope) =>
+          blockSender({
+            pattern: kind === "domain" ? contact.address.split("@").pop() ?? "" : contact.address,
+            mailboxId: scope === "all" ? null : Number(scope),
+          })
+        }
+        onOpenChange={setBlocking}
+      />
       <div className="flex items-center gap-3">
         <EmailAvatar email={contact.address} label={title} className="h-11 w-11 text-base" />
         <div className="min-w-0">
           <p className="truncate text-base font-semibold text-foreground">{title}</p>
           <p className="truncate text-sm text-muted-foreground">{contact.address}</p>
+          {blockRules.length > 0 && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
+              <ShieldBanIcon className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0">
+                Blocked{" "}
+                {blockRules
+                  .map(
+                    (rule) =>
+                      `${rule.kind === "domain" ? `(all of @${rule.pattern}) ` : ""}on ${rule.mailbox_address ?? "all inboxes"}`,
+                  )
+                  .join(", ")}
+              </span>
+            </p>
+          )}
         </div>
       </div>
 

@@ -30,12 +30,12 @@ export async function receiveEmail(
 
   // Blocked Senders are rejected before anything is stored, whether the rule
   // matches the envelope sender or the From header people see in the app.
-  if (await rejectIfBlocked(env, message, [message.from])) return;
+  if (await rejectIfBlocked(env, mailbox.id, message, [message.from])) return;
 
   const rawBuffer = await new Response(message.raw).arrayBuffer();
   const fingerprint = await rawFingerprint(rawBuffer);
   const parsed = await PostalMime.parse(rawBuffer);
-  if (await rejectIfBlocked(env, message, [addressOf(parsed.from)])) return;
+  if (await rejectIfBlocked(env, mailbox.id, message, [addressOf(parsed.from)])) return;
   const messageId = parsed.messageId ?? `<raw-${fingerprint}@mailroom.invalid>`;
 
   const duplicate = await env.DB.prepare(
@@ -153,12 +153,13 @@ export async function receiveEmail(
 
 async function rejectIfBlocked(
   env: Env,
+  mailboxId: number,
   message: ForwardableEmailMessage,
   senders: string[],
 ): Promise<boolean> {
-  const rule = await matchBlockedSender(env, senders);
+  const rule = await matchBlockedSender(env, mailboxId, senders);
   if (!rule) return false;
-  console.log("Rejected mail from blocked sender", { ruleId: rule.id, kind: rule.kind });
+  console.log("Rejected mail from blocked sender", { ruleId: rule.id, kind: rule.kind, mailboxId });
   message.setReject("Sender blocked by recipient");
   return true;
 }

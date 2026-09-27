@@ -8,23 +8,30 @@ import type { BlockedSender } from "../../shared/types.ts";
 
 type Db = { DB: D1Database };
 
+export const BLOCKED_SENDER_COLUMNS = `b.*, m.address AS mailbox_address
+  FROM blocked_senders b LEFT JOIN mailboxes m ON m.id = b.mailbox_id`;
+
 /**
- * Returns the Blocked Sender rule matching any of `senders`, recording the
- * rejection on it, or null when none of them is blocked.
+ * Returns the Blocked Sender rule matching any of `senders` for mail arriving
+ * at the Inbox `mailboxId`, recording the rejection on it, or null when none
+ * of them is blocked there. Rules for all Inboxes and for this Inbox apply.
  */
 export async function matchBlockedSender(
   env: Db,
+  mailboxId: number,
   senders: string[],
   now = new Date().toISOString(),
 ): Promise<BlockedSender | null> {
   const candidates = [...new Set(senders.flatMap(blockCandidates))];
   if (candidates.length === 0) return null;
   const rule = await env.DB.prepare(
-    `SELECT * FROM blocked_senders
-     WHERE pattern IN (${candidates.map(() => "?").join(", ")})
-     ORDER BY kind = 'address' DESC, length(pattern) DESC LIMIT 1`,
+    `SELECT ${BLOCKED_SENDER_COLUMNS}
+     WHERE b.pattern IN (${candidates.map(() => "?").join(", ")})
+       AND (b.mailbox_id IS NULL OR b.mailbox_id = ?)
+     ORDER BY b.kind = 'address' DESC, length(b.pattern) DESC, b.mailbox_id IS NULL
+     LIMIT 1`,
   )
-    .bind(...candidates)
+    .bind(...candidates, mailboxId)
     .first<BlockedSender>();
   if (!rule) return null;
   await env.DB.prepare(
@@ -50,25 +57,48 @@ export class BlockRuleError extends Error {
 }
 
 /**
- * Validates and stores a Blocked Sender rule. Rules that would block one of
- * the workspace's own Inboxes, or a public mailbox provider such as gmail.com,
- * are refused.
+ * Validates and stores a Blocked Sender rule for one Inbox, or for all Inboxes
+ * when `mailboxId` is null. A rule for all Inboxes replaces any per-Inbox
+ * rules for the same pattern. Rules that would block one of the workspace's
+ * own Inboxes, or a public mailbox provider such as gmail.com, are refused.
  */
-export async function addBlockedSender(env: Db, value: unknown): Promise<BlockedSender> {
+export async function addBlockedSender(
+  env: Db,
+  value: unknown,
+  mailboxId: number | null,
+): Promise<BlockedSender> {
   const parsed = parseBlockPattern(value);
   if ("error" in parsed) throw new BlockRuleError(parsed.error, 400);
   await assertBlockable(env, parsed);
-
-  const existing = await env.DB.prepare("SELECT id FROM blocked_senders WHERE pattern = ?")
-    .bind(parsed.pattern)
-    .first<{ id: number }>();
-  if (existing) {
-    throw new BlockRuleError(`${parsed.pattern} is already blocked`, 409, existing.id);
+  if (mailboxId !== null) {
+    const inbox = await env.DB.prepare("SELECT id FROM mailboxes WHERE id = ?")
+      .bind(mailboxId)
+      .first();
+    if (!inbox) throw new BlockRuleError("That inbox no longer exists", 400);
   }
-  const rule = await env.DB.prepare(
-    "INSERT INTO blocked_senders (kind, pattern) VALUES (?, ?) RETURNING *",
+
+  const existing = await env.DB.prepare(
+    `SELECT ${BLOCKED_SENDER_COLUMNS}
+     WHERE b.pattern = ? AND (b.mailbox_id IS NULL OR b.mailbox_id IS ?)
+     ORDER BY b.mailbox_id IS NULL DESC LIMIT 1`,
   )
-    .bind(parsed.kind, parsed.pattern)
+    .bind(parsed.pattern, mailboxId)
+    .first<BlockedSender>();
+  if (existing) {
+    const where = existing.mailbox_address ? `for ${existing.mailbox_address}` : "for all inboxes";
+    throw new BlockRuleError(`${parsed.pattern} is already blocked ${where}`, 409, existing.id);
+  }
+
+  const [inserted] = await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO blocked_senders (mailbox_id, kind, pattern) VALUES (?, ?, ?)",
+    ).bind(mailboxId, parsed.kind, parsed.pattern),
+    env.DB.prepare(
+      "DELETE FROM blocked_senders WHERE ? IS NULL AND pattern = ? AND mailbox_id IS NOT NULL",
+    ).bind(mailboxId, parsed.pattern),
+  ]);
+  const rule = await env.DB.prepare(`SELECT ${BLOCKED_SENDER_COLUMNS} WHERE b.id = ?`)
+    .bind(Number(inserted.meta.last_row_id))
     .first<BlockedSender>();
   if (!rule) throw new Error("Blocked sender was not stored");
   return rule;
