@@ -7,7 +7,10 @@ held for one-click human approval.
 
 Runs entirely on Cloudflare: Workers, Email Routing, D1, R2, and Web Push.
 
-![Mailroom: three inboxes in one workspace, with an agent draft awaiting approval](docs/screenshot.png)
+![Mailroom: three inboxes in one workspace, with an AI draft ready to review and send](docs/screenshot.png)
+
+The screenshot uses the demo data in [`scripts/demo-seed.sql`](scripts/demo-seed.sql); see
+[Setup](#setup) to load it locally.
 
 ## Features
 
@@ -107,6 +110,19 @@ npm run db:migrate:local
 npm run db:seed:local
 npm run dev
 ```
+
+To explore the app with the fuller demo workspace from the screenshot (three
+inboxes across two domains, labels, playbooks, agent drafts, contacts and
+blocked senders), load `scripts/demo-seed.sql` instead of the basic seed on a
+freshly migrated database:
+
+```sh
+npm run db:migrate:local
+npm run db:seed:demo:local
+npm run dev
+```
+
+To switch between the two seeds, delete `.wrangler/state` and migrate again.
 
 > Local development uses `wrangler.dev.jsonc`, which omits the AI and outbound
 > email bindings. Inbound handling, the API, and the web UI remain available;

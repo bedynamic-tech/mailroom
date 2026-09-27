@@ -12,6 +12,7 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local --config wrangler.dev.jsonc",
     "db:migrate": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc",
     "db:seed:local": "wrangler d1 execute DB --local --config wrangler.dev.jsonc --file=./scripts/seed.sql",
+    "db:seed:demo:local": "wrangler d1 execute DB --local --config wrangler.dev.jsonc --file=./scripts/demo-seed.sql",
     "email:test": "curl -X POST 'http://localhost:5173/cdn-cgi/handler/email?from=customer@example.com&to=support@yourdomain.com' -H 'Content-Type: message/rfc822' --data-binary @./scripts/test-email.eml",
     "email:test:attachment": "curl -X POST 'http://localhost:5173/cdn-cgi/handler/email?from=forms@example.com&to=support@yourdomain.com' -H 'Content-Type: message/rfc822' --data-binary @./scripts/test-email-attachment.eml",
     "email:test:reopen": "curl -X POST 'http://localhost:5173/cdn-cgi/handler/email?from=forms@example.com&to=support@yourdomain.com' -H 'Content-Type: message/rfc822' --data-binary @./scripts/test-email-reopen.eml",
