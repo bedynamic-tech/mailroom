@@ -159,7 +159,7 @@ test("sends from the receiving inbox as auto-generated mail", async () => {
   await notifyNewEmailByEmail(env, input);
   assert.equal(env.sent.length, 1);
   assert.deepEqual(env.sent[0].to, ["me@example.org"]);
-  assert.deepEqual(env.sent[0].from, { email: "support@example.com", name: "Mailroom" });
+  assert.deepEqual(env.sent[0].from, { email: "support@example.com", name: "Mailroom +" });
   assert.equal(env.sent[0].headers["Auto-Submitted"], "auto-generated");
 });
 
@@ -233,7 +233,7 @@ test("sends a test notice without a conversation link", async () => {
   const env = fakeEnv({ address: "me@example.org" });
   assert.equal((await sendTestEmailNotification(env)).status, "sent");
   assert.deepEqual(env.sent[0].to, ["me@example.org"]);
-  assert.match(env.sent[0].subject, /Test notification from Mailroom/);
+  assert.match(env.sent[0].subject, /Test notification from Mailroom \+/);
   assert.doesNotMatch(env.sent[0].text, /Open conversation/);
 });
 

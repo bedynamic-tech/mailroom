@@ -75,7 +75,7 @@ export function BlockSenderDialog(props: {
         <DialogHeader>
           <DialogTitle>Block sender?</DialogTitle>
           <DialogDescription>
-            Blocked mail is rejected before it reaches Mailroom. You can unblock under
+            Blocked mail is rejected before it reaches Mailroom +. You can unblock under
             Settings → Spam.
           </DialogDescription>
         </DialogHeader>

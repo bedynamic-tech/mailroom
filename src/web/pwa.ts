@@ -97,7 +97,7 @@ export function useInstallState(): InstallState {
 export function useUnreadBadge(unread: number | null): void {
   useEffect(() => {
     if (unread === null) return;
-    document.title = unread > 0 ? `(${unread > 999 ? "999+" : unread}) Mailroom` : "Mailroom";
+    document.title = unread > 0 ? `(${unread > 999 ? "999+" : unread}) Mailroom +` : "Mailroom +";
     const nav = navigator as BadgingNavigator;
     const update = unread > 0 ? nav.setAppBadge?.(unread) : nav.clearAppBadge?.();
     update?.catch(() => undefined);

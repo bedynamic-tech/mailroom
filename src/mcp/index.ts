@@ -159,7 +159,7 @@ function getOAuthProvider(origin: string, web: WebHandler): OAuthProvider<McpWor
       : {}),
     scopes_supported: [MCP_READ_SCOPE, MCP_SEND_SCOPE],
     bearer_methods_supported: ["header"],
-    resource_name: "Mailroom",
+    resource_name: "Mailroom +",
   },
   accessTokenTTL: 15 * 60,
   refreshTokenTTL: 30 * 24 * 60 * 60,
