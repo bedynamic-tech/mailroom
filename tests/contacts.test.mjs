@@ -172,6 +172,33 @@ test("contacts API creates, lists, searches, updates and deletes contacts", asyn
   assert.equal((await f.call("DELETE", `/${created.body.id}`)).status, 404);
 });
 
+test("contacts API lists contacts A-Z by name, falling back to the address, across pages", async (t) => {
+  const f = fixture(t);
+  for (const [address, name] of [
+    ["zed@example.org", "zed"],
+    ["amy@example.org", "Amy"],
+    ["bob@example.org", undefined],
+    ["carl@example.org", "Carl"],
+    ["amy2@example.org", "amy"],
+  ]) {
+    assert.equal((await f.call("POST", "", { address, name })).status, 201);
+  }
+  const expected = ["amy@example.org", "amy2@example.org", "bob@example.org", "carl@example.org", "zed@example.org"];
+  assert.deepEqual((await f.call("GET", "?sort=name")).body.map((c) => c.address), expected);
+
+  const seen = [];
+  let cursor = "";
+  for (;;) {
+    const page = (await f.call("GET", `?sort=name&limit=2${cursor}`)).body;
+    if (page.length === 0) break;
+    seen.push(...page.map((c) => c.address));
+    const last = page.at(-1);
+    const params = new URLSearchParams({ after_address: last.address, after_name: last.name ?? "", after_id: String(last.id) });
+    cursor = `&${params}`;
+  }
+  assert.deepEqual(seen, expected);
+});
+
 test("contacts import creates new contacts, fills or overwrites existing ones and reports skips", async (t) => {
   const f = fixture(t);
   inbound(f.db, { thread: 3, from: "new@example.org", at: "2026-04-01T00:00:00.000Z" });

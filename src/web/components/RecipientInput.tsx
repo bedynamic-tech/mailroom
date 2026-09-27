@@ -72,7 +72,7 @@ export function RecipientInput(props: {
   const lookup = focused && !full && !props.disabled && query !== "" && !/[\s,;]/.test(query);
   const contacts = useQuery({
     queryKey: ["contacts", "suggest", query],
-    queryFn: () => fetchContacts(query, null, MAX_SUGGESTIONS + 4),
+    queryFn: () => fetchContacts(query, MAX_SUGGESTIONS + 4),
     enabled: lookup,
     staleTime: 30_000,
   });

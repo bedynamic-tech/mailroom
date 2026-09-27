@@ -17,12 +17,37 @@ const CONTACT_CONVERSATION_LIMIT = 20;
 
 export const contactsApi = new Hono<{ Bindings: { DB: D1Database } }>();
 
+// A contact sorts by its name, or by its address when it has no name.
+const contactSortKey = (name: string, address: string) =>
+  `lower(COALESCE(NULLIF(trim(${name}), ''), ${address}))`;
+
 contactsApi.get("/", async (c) => {
   const q = (c.req.query("q") ?? "").trim().slice(0, 200);
-  const beforeAt = c.req.query("before_at") ?? "";
-  const beforeId = parseId(c.req.query("before_id") ?? "") ?? 0;
   const limit = Math.min(parseId(c.req.query("limit") ?? "") ?? CONTACT_PAGE_SIZE, CONTACT_PAGE_SIZE);
   const pattern = `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+
+  if (c.req.query("sort") === "name") {
+    // Keyset pagination: the cursor is the last row's name, address and id.
+    const afterAddress = c.req.query("after_address") ?? "";
+    const afterName = c.req.query("after_name") ?? "";
+    const afterId = parseId(c.req.query("after_id") ?? "") ?? 0;
+    const key = contactSortKey("name", "address");
+    const cursorKey = contactSortKey("?4", "?3");
+    const { results } = await c.env.DB.prepare(
+      `SELECT * FROM contacts
+       WHERE (?1 = '' OR address LIKE ?2 ESCAPE '\\' OR name LIKE ?2 ESCAPE '\\'
+              OR company LIKE ?2 ESCAPE '\\')
+         AND (?3 = '' OR ${key} > ${cursorKey} OR (${key} = ${cursorKey} AND id > ?5))
+       ORDER BY ${key} ASC, id ASC
+       LIMIT ?6`,
+    )
+      .bind(q, pattern, afterAddress, afterName, afterId, limit)
+      .all<Contact>();
+    return c.json(results);
+  }
+
+  const beforeAt = c.req.query("before_at") ?? "";
+  const beforeId = parseId(c.req.query("before_id") ?? "") ?? 0;
   const { results } = await c.env.DB.prepare(
     `SELECT * FROM contacts
      WHERE (?1 = '' OR address LIKE ?2 ESCAPE '\\' OR name LIKE ?2 ESCAPE '\\'

@@ -206,7 +206,7 @@ function SidebarContent(
                 <ChevronDownIcon
                   className={cn(
                     "h-4 w-4 transition-transform duration-200 ease-out",
-                    inboxesCollapsed && "-rotate-90",
+                    inboxesCollapsed && "rotate-90",
                   )}
                 />
               </button>

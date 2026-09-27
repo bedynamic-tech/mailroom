@@ -333,22 +333,30 @@ export const createDraft = (threadId: number) =>
 
 export const CONTACT_PAGE_SIZE = 100;
 
+/** The last contact of a page of the A-Z contact list. */
 export interface ContactCursor {
-  at: string;
+  address: string;
+  name: string | null;
   id: number;
 }
 
-export const fetchContacts = (
-  q: string,
-  cursor: ContactCursor | null = null,
-  limit?: number,
-) => {
+/** Most recently seen contacts first, for recipient suggestions. */
+export const fetchContacts = (q: string, limit?: number) => {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (limit) params.set("limit", String(limit));
+  const search = params.toString();
+  return request<Contact[]>(`/contacts${search ? `?${search}` : ""}`);
+};
+
+/** Contacts sorted A-Z by name, or by address when unnamed. */
+export const fetchContactsByName = (q: string, cursor: ContactCursor | null = null) => {
+  const params = new URLSearchParams({ sort: "name" });
+  if (q) params.set("q", q);
   if (cursor) {
-    params.set("before_at", cursor.at);
-    params.set("before_id", String(cursor.id));
+    params.set("after_address", cursor.address);
+    params.set("after_name", cursor.name ?? "");
+    params.set("after_id", String(cursor.id));
   }
   const search = params.toString();
   return request<Contact[]>(`/contacts${search ? `?${search}` : ""}`);

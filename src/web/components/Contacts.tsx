@@ -14,7 +14,7 @@ import {
   deleteContact,
   fetchBlockedSenders,
   fetchContact,
-  fetchContacts,
+  fetchContactsByName,
   fetchMailboxes,
   updateContact,
   type ContactCursor,
@@ -66,13 +66,13 @@ export function Contacts(props: {
   const deferredSearch = useDeferredValue(search.trim());
   const contacts = useInfiniteQuery({
     queryKey: ["contacts", "list", deferredSearch],
-    queryFn: ({ pageParam }) => fetchContacts(deferredSearch, pageParam),
+    queryFn: ({ pageParam }) => fetchContactsByName(deferredSearch, pageParam),
     initialPageParam: null as ContactCursor | null,
     getNextPageParam: (lastPage) => {
       const last = lastPage.at(-1);
       return !last || lastPage.length < CONTACT_PAGE_SIZE
         ? undefined
-        : { at: last.last_seen_at ?? last.created_at, id: last.id };
+        : { address: last.address, name: last.name, id: last.id };
     },
   });
   const rows = contacts.data?.pages.flat() ?? [];
