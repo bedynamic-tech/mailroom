@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bold,
   Italic,
@@ -82,24 +82,29 @@ export function RichTextEditor(props: {
     setEmpty(isBlankRichText(props.value));
   }, [props.value]);
 
-  useEffect(() => {
-    const updateActive = () => {
-      const editor = editorRef.current;
-      const selection = document.getSelection();
-      if (!editor || !selection?.rangeCount || !editor.contains(selection.anchorNode)) return;
-      const next = new Set<FormatCommand>();
-      for (const { command } of FORMAT_BUTTONS) {
-        try {
-          if (document.queryCommandState(command)) next.add(command);
-        } catch {
-          // queryCommandState is unsupported for some commands in some browsers.
-        }
+  // Formatting toggled with a collapsed caret (toolbar or Ctrl+B) changes no
+  // selection, so the toolbar also refreshes after commands, input and keys.
+  const refreshActive = useCallback(() => {
+    const editor = editorRef.current;
+    const selection = document.getSelection();
+    if (!editor || !selection?.rangeCount || !editor.contains(selection.anchorNode)) return;
+    const next = new Set<FormatCommand>();
+    for (const { command } of FORMAT_BUTTONS) {
+      try {
+        if (document.queryCommandState(command)) next.add(command);
+      } catch {
+        // queryCommandState is unsupported for some commands in some browsers.
       }
-      setActive(next);
-    };
-    document.addEventListener("selectionchange", updateActive);
-    return () => document.removeEventListener("selectionchange", updateActive);
+    }
+    setActive((current) =>
+      current.size === next.size && [...next].every((command) => current.has(command)) ? current : next,
+    );
   }, []);
+
+  useEffect(() => {
+    document.addEventListener("selectionchange", refreshActive);
+    return () => document.removeEventListener("selectionchange", refreshActive);
+  }, [refreshActive]);
 
   const emit = () => {
     const editor = editorRef.current;
@@ -117,6 +122,7 @@ export function RichTextEditor(props: {
     document.execCommand("styleWithCSS", false, "false");
     document.execCommand(command, false, value);
     emit();
+    refreshActive();
   };
 
   const openLinkEditor = () => {
@@ -288,7 +294,16 @@ export function RichTextEditor(props: {
           contentEditable={!props.disabled}
           suppressContentEditableWarning
           spellCheck
-          onInput={emit}
+          onInput={(event) => {
+            const editor = editorRef.current;
+            const inputType = (event.nativeEvent as InputEvent).inputType ?? "";
+            if (editor && inputType.startsWith("delete")) discardPendingStyles(editor);
+            emit();
+            refreshActive();
+          }}
+          onKeyUp={refreshActive}
+          onMouseUp={refreshActive}
+          onFocus={refreshActive}
           onBlur={emit}
           onKeyDown={(event) => {
             if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
@@ -340,6 +355,27 @@ export function RichTextPreview(props: { html: string; className?: string }) {
 /** One-line plain-text summary of rich text. */
 export function richTextSummary(html: string): string {
   return richTextToPlainText(html).replace(/\s+/g, " ").trim();
+}
+
+/**
+ * After a deletion, browsers keep the deleted text's bold/italic/strikethrough
+ * pending for the next character even when the caret is now in plain text,
+ * which makes the toolbar look stuck. Re-placing the caret discards those
+ * pending styles, so new text takes the formatting around the caret. An
+ * editor emptied by the deletion also loses leftover empty formatting tags.
+ */
+function discardPendingStyles(editor: HTMLDivElement) {
+  const selection = document.getSelection();
+  if (!selection?.rangeCount || !selection.isCollapsed) return;
+  let range = selection.getRangeAt(0).cloneRange();
+  if (editor.innerHTML !== "" && isBlankRichText(sanitizeRichText(editor.innerHTML))) {
+    editor.innerHTML = "";
+    range = document.createRange();
+    range.setStart(editor, 0);
+    range.collapse(true);
+  }
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 function ToolbarButton(props: {
