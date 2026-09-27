@@ -171,3 +171,12 @@ export function ContactsIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function SidebarIcon(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+      <path d="M9.5 4.5v15" />
+    </svg>
+  );
+}
