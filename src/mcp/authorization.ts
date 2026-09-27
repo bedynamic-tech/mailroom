@@ -186,10 +186,10 @@ function consentPage(
   const clientName = client.clientName?.trim() || "An MCP client";
 
   return htmlPage(
-    "Authorize Mailroom",
+    "Authorize Mailroom +",
     `<header>
       <div class="mark" aria-hidden="true">AI</div>
-      <div><h1>Authorize ${escapeHtml(clientName)}</h1><p>Connect this client to Mailroom.</p></div>
+      <div><h1>Authorize ${escapeHtml(clientName)}</h1><p>Connect this client to Mailroom +.</p></div>
     </header>
     <section class="client">
       <span>Signed in as</span><strong>${escapeHtml(ownerEmail)}</strong>

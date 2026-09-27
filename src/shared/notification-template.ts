@@ -5,13 +5,13 @@ export const NOTIFICATION_PLACEHOLDERS = [
   { key: "subject", description: "Subject of the new email" },
   { key: "preview", description: "First 500 characters of the new email" },
   { key: "inbox", description: "Inbox that received the email" },
-  { key: "link", description: "Link to the conversation in Mailroom" },
+  { key: "link", description: "Link to the conversation in Mailroom +" },
 ] as const;
 
 export type NotificationPlaceholder = (typeof NOTIFICATION_PLACEHOLDERS)[number]["key"];
 export type NotificationValues = Record<NotificationPlaceholder, string>;
 
-export const DEFAULT_NOTIFICATION_FROM_NAME = "Mailroom";
+export const DEFAULT_NOTIFICATION_FROM_NAME = "Mailroom +";
 export const DEFAULT_NOTIFICATION_SUBJECT = "New email from {{sender_name}}: {{subject}}";
 export const DEFAULT_NOTIFICATION_BODY = [
   "{{inbox}} received a new email.",
@@ -23,7 +23,7 @@ export const DEFAULT_NOTIFICATION_BODY = [
   "",
   "Open conversation: {{link}}",
   "",
-  "You are receiving this because email notifications are on in Mailroom settings.",
+  "You are receiving this because email notifications are on in Mailroom + settings.",
 ].join("\n");
 
 export const NOTIFICATION_LIMITS = {

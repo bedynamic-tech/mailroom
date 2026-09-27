@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Mailroom",
-  "short_name": "Mailroom",
+  "name": "Mailroom +",
+  "short_name": "Mailroom +",
   "description": "A shared email workspace for people and agents.",
   "start_url": "/inbox",
   "scope": "/",

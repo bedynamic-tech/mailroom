@@ -165,7 +165,7 @@ export async function sendTestEmailNotification(
     inboxAddress: inbox.address,
     senderName: "Alice Customer",
     senderAddress: "alice@example.com",
-    subject: "Test notification from Mailroom",
+    subject: "Test notification from Mailroom +",
     preview: "This is a test of your email notification settings. New emails will look like this.",
   });
 }

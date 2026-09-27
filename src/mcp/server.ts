@@ -125,7 +125,7 @@ function decodeBase64(value: string): Uint8Array {
 export function createMailroomServer(env: McpEnv, identity: McpIdentity): McpServer {
   const server = new McpServer({
     name: "Mailroom",
-    title: "Mailroom",
+    title: "Mailroom +",
     version: "0.1.0",
   });
 
@@ -133,7 +133,7 @@ export function createMailroomServer(env: McpEnv, identity: McpIdentity): McpSer
     "list_inboxes",
     {
       title: "List inboxes",
-      description: "List the email inboxes available in this Mailroom workspace.",
+      description: "List the email inboxes available in this Mailroom + workspace.",
       inputSchema: z.object({}),
       outputSchema: z.object({ inboxes: z.array(inboxSchema) }),
       annotations: {

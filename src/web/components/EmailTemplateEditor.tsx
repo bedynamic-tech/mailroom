@@ -163,7 +163,7 @@ export function EmailTemplateEditor(props: {
                     maxLength={NOTIFICATION_LIMITS.fromName}
                     onChange={(event) => setFromName(event.target.value)}
                     onFocus={() => setActiveField("fromName")}
-                    placeholder="Mailroom"
+                    placeholder="Mailroom +"
                   />
                 </EditorField>
                 <EditorField label="Send from" htmlFor="notification-from-inbox">

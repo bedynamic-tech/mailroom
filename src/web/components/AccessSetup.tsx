@@ -17,7 +17,7 @@ export function AccessSetup(props: { error: ApiError; onRetry: () => void; retry
   return (
     <div className="flex h-dvh min-h-[560px] justify-center overflow-y-auto bg-canvas px-4 py-10 text-foreground md:py-16">
       <div className="w-full max-w-[620px]">
-        <h1 className="text-xl font-semibold tracking-tight">Finish securing Mailroom</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Finish securing Mailroom +</h1>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
           Mail stays locked until Cloudflare Access protects this Worker.
         </p>

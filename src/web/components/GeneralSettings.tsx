@@ -264,7 +264,7 @@ function AppSettings() {
     <SettingsBlock
       id="app-settings-heading"
       title="App"
-      description="Install Mailroom to open it in its own window, show unread counts on its icon, and get notifications from your operating system."
+      description="Install Mailroom + to open it in its own window, show unread counts on its icon, and get notifications from your operating system."
     >
       <SettingsPanel>
         <div className="flex items-center gap-4 px-4 py-4 sm:px-5">
@@ -276,7 +276,7 @@ function AppSettings() {
             className="h-10 w-10 shrink-0 rounded-[10px] border"
           />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground">Mailroom app</p>
+            <p className="text-sm font-medium text-foreground">Mailroom + app</p>
             <p className="mt-0.5 text-sm leading-5 text-muted-foreground">
               {install.installed
                 ? "Installed on this device."
@@ -450,7 +450,7 @@ function notificationDescription(state: {
 }): string {
   if (!state.configured) return "Push delivery has not been configured on this server.";
   if (!state.supported && isIosBrowser()) {
-    return "On iPhone and iPad, add Mailroom to your Home Screen, then open it from there to turn on notifications.";
+    return "On iPhone and iPad, add Mailroom + to your Home Screen, then open it from there to turn on notifications.";
   }
   if (!state.supported) return "This browser does not support push notifications.";
   if (state.blocked) return "Notifications are blocked in this browser's site settings.";
