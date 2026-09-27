@@ -15,6 +15,7 @@ Runs entirely on Cloudflare: Workers, Email Routing, D1, R2, and Web Push.
 - **Compose and reply** — send new emails or reply to conversations, with attachments.
 - **AI reply drafts** — enable per-inbox drafting with custom instructions and playbooks; review and approve before sending.
 - **Automatic labels** — organize incoming mail with natural-language labeling rules.
+- **Rules**: filter inbound mail by sender address or domain, subject text, body text, or attachments, then apply a label, mark read, archive, skip the AI draft, or skip notifications. Manage rules under **Settings → Rules**.
 - **Contacts** — keep names, companies, phone numbers and notes for the people who email you, see their conversations, and pick them from autocomplete in To/Cc/Bcc. Named senders can be added automatically, and contacts can be imported from CSV or vCard files.
 - **Spam blocking** — block a conversation's sender by address or whole domain, on that inbox or on all inboxes; mail from blocked senders is rejected before it reaches Mailroom. Manage the blocklist under **Settings → Spam**.
 - **Search and triage** — search message content, filter conversations, mark read or archive in bulk, browse or restore archived conversations, and permanently delete them one at a time, in bulk, or with Empty archive.

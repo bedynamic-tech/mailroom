@@ -6,6 +6,8 @@ import { recordSender } from "../contacts/contacts";
 import { notifyNewEmail } from "../notifications/push";
 import { notifyNewEmailByEmail } from "../notifications/email";
 import { matchBlockedSender } from "../spam/blocklist";
+import { applyMailRules, matchingMailRules, type AppliedMailRules } from "./mail-rules";
+import type { MailRuleSubject } from "../../shared/mail-rules";
 import {
   addressOf,
   addressesOf,
@@ -46,7 +48,11 @@ export async function receiveEmail(
     .first<{ id: number; thread_id: number; is_auto_submitted: number }>();
   if (duplicate) {
     if (mailbox.agent_mode !== "off" && !duplicate.is_auto_submitted) {
-      await enqueueIfExternal(env, duplicate.thread_id, duplicate.id, parsed);
+      // Rules were applied on first delivery; only honour their draft skip here.
+      const rules = await matchingMailRules(env, mailbox.id, ruleSubject(parsed));
+      if (!rules.some((rule) => rule.skip_draft)) {
+        await enqueueIfExternal(env, duplicate.thread_id, duplicate.id, parsed);
+      }
     }
     return;
   }
@@ -94,6 +100,19 @@ export async function receiveEmail(
 
   await storeAttachments(env, mailbox.id, stored.messageId, parsed.attachments);
 
+  const rules = await applyMailRules(env, {
+    mailboxId: mailbox.id,
+    threadId: stored.threadId,
+    message: ruleSubject(parsed),
+  }).catch((error): AppliedMailRules => {
+    // A broken rule must never bounce or lose mail that is already stored.
+    console.error("Mail rules failed", {
+      threadId: stored.threadId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { ruleIds: [], skipDraft: false, skipNotifications: false };
+  });
+
   if (sender && !isAutoSubmitted(parsed)) {
     ctx.waitUntil(
       recordSender(env, {
@@ -121,34 +140,47 @@ export async function receiveEmail(
     );
   }
 
-  ctx.waitUntil(
-    notifyNewEmail(env, {
-      threadId: stored.threadId,
-      senderName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
-      senderAddress: sender || "unknown",
-      subject,
-    }).catch((error) => console.error("Browser notification task failed", error)),
-  );
-
-  ctx.waitUntil(
-    notifyNewEmailByEmail(env, {
-      threadId: stored.threadId,
-      inboxAddress,
-      senderName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
-      senderAddress: sender,
-      subject,
-      preview: snippet,
-    }).catch((error) =>
-      console.error("Email notification task failed", {
+  if (!rules.skipNotifications) {
+    ctx.waitUntil(
+      notifyNewEmail(env, {
         threadId: stored.threadId,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-    ),
-  );
+        senderName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
+        senderAddress: sender || "unknown",
+        subject,
+      }).catch((error) => console.error("Browser notification task failed", error)),
+    );
 
-  if (mailbox.agent_mode !== "off" && !isAutoSubmitted(parsed)) {
+    ctx.waitUntil(
+      notifyNewEmailByEmail(env, {
+        threadId: stored.threadId,
+        inboxAddress,
+        senderName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
+        senderAddress: sender,
+        subject,
+        preview: snippet,
+      }).catch((error) =>
+        console.error("Email notification task failed", {
+          threadId: stored.threadId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      ),
+    );
+  }
+
+  if (mailbox.agent_mode !== "off" && !rules.skipDraft && !isAutoSubmitted(parsed)) {
     await enqueueIfExternal(env, stored.threadId, stored.messageId, parsed);
   }
+}
+
+function ruleSubject(parsed: Email): MailRuleSubject {
+  return {
+    fromAddress: addressOf(parsed.from),
+    fromName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
+    subject: parsed.subject ?? "",
+    body: parsed.text ?? htmlToText(parsed.html ?? ""),
+    // Inline resources such as signature logos are not attachments people sent.
+    attachmentCount: parsed.attachments.filter((item) => item.disposition !== "inline").length,
+  };
 }
 
 async function rejectIfBlocked(

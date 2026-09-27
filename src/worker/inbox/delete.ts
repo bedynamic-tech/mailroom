@@ -83,6 +83,7 @@ export async function deleteInbox(
     ).bind(inbox.id),
     env.DB.prepare("DELETE FROM threads WHERE mailbox_id = ?").bind(inbox.id),
     env.DB.prepare("DELETE FROM playbooks WHERE mailbox_id = ?").bind(inbox.id),
+    env.DB.prepare("DELETE FROM mail_rules WHERE mailbox_id = ?").bind(inbox.id),
     env.DB.prepare("DELETE FROM labels WHERE mailbox_id = ?").bind(inbox.id),
     env.DB.prepare("DELETE FROM blocked_senders WHERE mailbox_id = ?").bind(inbox.id),
     env.DB.prepare("DELETE FROM mailboxes WHERE id = ?").bind(inbox.id),

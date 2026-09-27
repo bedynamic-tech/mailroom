@@ -252,3 +252,43 @@ export interface BlockSenderResult {
   /** Conversations archived, including the one the sender was blocked from. */
   archived: number;
 }
+
+/** What a Mail Rule looks for. Every condition that is set must match. */
+export interface MailRuleConditions {
+  /** An address, a domain (also covering subdomains), or text in the sender's name or address. */
+  from_pattern: string | null;
+  subject_contains: string | null;
+  body_contains: string | null;
+  /** Require at least one attachment; inline images do not count. */
+  has_attachment: boolean;
+}
+
+/** What a Mail Rule does to a matching inbound Message and its Conversation. */
+export interface MailRuleActions {
+  /** A Label of the rule's Inbox; only rules for one Inbox can apply a Label. */
+  label_id: number | null;
+  mark_read: boolean;
+  archive: boolean;
+  /** Never start a Draft Run for the Message. */
+  skip_draft: boolean;
+  /** Send no browser or email notification for the Message. */
+  skip_notifications: boolean;
+}
+
+export interface MailRuleInput extends MailRuleConditions, MailRuleActions {
+  /** The Inbox this rule applies to, or null for all Inboxes. */
+  mailbox_id: number | null;
+  name: string;
+  enabled: boolean;
+}
+
+export interface MailRule extends MailRuleInput {
+  id: number;
+  mailbox_address: string | null;
+  label_name: string | null;
+  /** How many inbound emails this rule has matched. */
+  match_count: number;
+  last_matched_at: string | null;
+  created_at: string;
+  updated_at: string;
+}

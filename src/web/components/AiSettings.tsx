@@ -6,6 +6,7 @@ export function AiSettings(props: {
   onOpenGeneral: () => void;
   onOpenInboxes: () => void;
   onOpenContacts: () => void;
+  onOpenRules: () => void;
   onOpenSpam: () => void;
 }) {
   return (
@@ -16,6 +17,7 @@ export function AiSettings(props: {
         onOpenGeneral={props.onOpenGeneral}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={props.onOpenContacts}
+        onOpenRules={props.onOpenRules}
         onOpenSpam={props.onOpenSpam}
         onOpenAi={() => undefined}
       />

@@ -12,6 +12,8 @@ import type {
   Label,
   LabelInput,
   Mailbox,
+  MailRule,
+  MailRuleInput,
   Playbook,
   PlaybookInput,
   ReplyAttemptResult,
@@ -383,3 +385,17 @@ export const blockThreadSender = (
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ kind, scope }),
   });
+
+export const fetchMailRules = () => request<MailRule[]>("/mail-rules");
+
+export const saveMailRule = (input: MailRuleInput & { id?: number }) => {
+  const { id, ...rule } = input;
+  return request<MailRule>(id ? `/mail-rules/${id}` : "/mail-rules", {
+    method: id ? "PUT" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(rule),
+  });
+};
+
+export const deleteMailRule = (id: number) =>
+  request<{ ok: true }>(`/mail-rules/${id}`, { method: "DELETE" });

@@ -100,6 +100,7 @@ export function AgentSettings(props: {
   onMailboxDeleted: (nextMailboxId: number | null) => void;
   onOpenGeneral: () => void;
   onOpenContacts: () => void;
+  onOpenRules: () => void;
   onOpenSpam: () => void;
   onOpenAi: () => void;
   onBack: () => void;
@@ -349,6 +350,7 @@ export function AgentSettings(props: {
         onOpenGeneral={props.onOpenGeneral}
         onOpenInboxes={() => undefined}
         onOpenContacts={props.onOpenContacts}
+        onOpenRules={props.onOpenRules}
         onOpenSpam={props.onOpenSpam}
         onOpenAi={props.onOpenAi}
       />

@@ -4,6 +4,7 @@ import { requireSameOrigin } from "./csrf.ts";
 import { composeApi, copyAddresses } from "./compose.ts";
 import { contactsApi } from "./contacts.ts";
 import { blockedSendersApi } from "./blocked-senders.ts";
+import { mailRulesApi } from "./mail-rules.ts";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
 import { MAX_SENDER_NAME_LENGTH, normalizeSenderName } from "../../shared/sender-name.ts";
 import { enqueueDraftRun } from "../agent/runs";
@@ -57,6 +58,7 @@ api.use("*", requireSameOrigin);
 api.route("/compose", composeApi);
 api.route("/contacts", contactsApi);
 api.route("/blocked-senders", blockedSendersApi);
+api.route("/mail-rules", mailRulesApi);
 
 api.get("/settings/general", async (c) => {
   const [settings, subscriptions] = await Promise.all([
@@ -615,9 +617,10 @@ api.delete("/labels/:id", async (c) => {
   if (id === null) return c.json({ error: "invalid label id" }, 400);
   const results = await c.env.DB.batch([
     c.env.DB.prepare("DELETE FROM thread_labels WHERE label_id = ?").bind(id),
+    c.env.DB.prepare("UPDATE mail_rules SET label_id = NULL WHERE label_id = ?").bind(id),
     c.env.DB.prepare("DELETE FROM labels WHERE id = ?").bind(id),
   ]);
-  if (!results[1].meta.changes) return c.json({ error: "label not found" }, 404);
+  if (!results[2].meta.changes) return c.json({ error: "label not found" }, 404);
   return c.json({ ok: true });
 });
 

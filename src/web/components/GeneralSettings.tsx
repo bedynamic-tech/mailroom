@@ -32,6 +32,7 @@ export function GeneralSettings(props: {
   onBack: () => void;
   onOpenInboxes: () => void;
   onOpenContacts: () => void;
+  onOpenRules: () => void;
   onOpenSpam: () => void;
   onOpenAi: () => void;
 }) {
@@ -94,6 +95,7 @@ export function GeneralSettings(props: {
         onOpenGeneral={() => undefined}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={props.onOpenContacts}
+        onOpenRules={props.onOpenRules}
         onOpenSpam={props.onOpenSpam}
         onOpenAi={props.onOpenAi}
       />

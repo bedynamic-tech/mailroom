@@ -36,6 +36,10 @@ _Avoid_: Customer, address book entry, sender
 A rule naming one sender address or one domain (which also covers its subdomains), applying to one Inbox or to all Inboxes. Inbound mail to a covered Inbox whose envelope sender or From address matches is rejected before anything is stored, so it never opens a Conversation, drafts, labels or notifies. "Block sender" on a Conversation, after confirmation, blocks its latest sender's address or domain on that Conversation's Inbox or on all Inboxes, and archives the Conversation along with the sender's other open Conversations in that scope. A rule for all Inboxes replaces the same sender's per-Inbox rules. A rule can never cover one of the workspace's own Inboxes or a public mailbox provider such as gmail.com.
 _Avoid_: Spam filter, blacklist, banned sender
 
+**Mail Rule**:
+A deterministic filter for one Inbox or all Inboxes, checked against every stored inbound Message. Its conditions (From as an address, a domain covering its subdomains, or text in the sender's name or address; Subject contains; Body contains; Has an attachment, not counting inline images) must all match; text matching ignores case. A match applies every action it names: apply one of its Inbox's Labels, mark the Conversation read, archive it, skip the Draft Run, or skip Browser and Email Notifications. Actions of all matching rules combine, and run before drafting and notifications. Unlike a Label's natural-language condition, a Mail Rule never calls a model; unlike a Blocked Sender, the Message is still stored. Deleting a rule's Label leaves the rule without that action; deleting its Inbox deletes the rule.
+_Avoid_: Filter, automation, playbook
+
 **Agent Draft**:
 A proposed reply authored by the agent and held for human review before sending.
 _Avoid_: Auto-reply, suggestion

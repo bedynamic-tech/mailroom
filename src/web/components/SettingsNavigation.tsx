@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowLeftIcon } from "./Icons";
 
-export type SettingsSection = "general" | "inboxes" | "contacts" | "spam" | "ai";
+export type SettingsSection = "general" | "inboxes" | "contacts" | "rules" | "spam" | "ai";
 
 export function SettingsHeader(props: {
   active: SettingsSection;
@@ -11,6 +11,7 @@ export function SettingsHeader(props: {
   onOpenGeneral: () => void;
   onOpenInboxes: () => void;
   onOpenContacts: () => void;
+  onOpenRules: () => void;
   onOpenSpam: () => void;
   onOpenAi: () => void;
 }) {
@@ -28,7 +29,10 @@ export function SettingsHeader(props: {
         </Button>
         <h1 className="text-base font-semibold tracking-[-0.015em] text-foreground">Settings</h1>
       </div>
-      <nav aria-label="Settings sections" className="-mb-px flex gap-5">
+      <nav
+        aria-label="Settings sections"
+        className="-mb-px flex gap-5 overflow-x-auto [scrollbar-width:none]"
+      >
         <SettingsTab active={props.active === "general"} onClick={props.onOpenGeneral}>
           General
         </SettingsTab>
@@ -37,6 +41,9 @@ export function SettingsHeader(props: {
         </SettingsTab>
         <SettingsTab active={props.active === "contacts"} onClick={props.onOpenContacts}>
           Contacts
+        </SettingsTab>
+        <SettingsTab active={props.active === "rules"} onClick={props.onOpenRules}>
+          Rules
         </SettingsTab>
         <SettingsTab active={props.active === "spam"} onClick={props.onOpenSpam}>
           Spam
@@ -56,7 +63,7 @@ function SettingsTab(props: { active: boolean; onClick: () => void; children: Re
       onClick={props.onClick}
       aria-current={props.active ? "page" : undefined}
       className={cn(
-        "relative rounded-t-sm pb-2.5 text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+        "relative shrink-0 rounded-t-sm pb-2.5 text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
         "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:transition-colors",
         props.active
           ? "font-medium text-foreground after:bg-foreground"

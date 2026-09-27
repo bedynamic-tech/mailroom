@@ -26,6 +26,7 @@ export function ContactSettings(props: {
   onOpenInboxes: () => void;
   /** Opens the Contacts list itself. */
   onOpenContacts: () => void;
+  onOpenRules: () => void;
   onOpenSpam: () => void;
   onOpenAi: () => void;
 }) {
@@ -51,6 +52,7 @@ export function ContactSettings(props: {
         onOpenGeneral={props.onOpenGeneral}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={() => undefined}
+        onOpenRules={props.onOpenRules}
         onOpenSpam={props.onOpenSpam}
         onOpenAi={props.onOpenAi}
       />

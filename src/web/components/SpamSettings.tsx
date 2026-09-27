@@ -26,6 +26,7 @@ export function SpamSettings(props: {
   onOpenGeneral: () => void;
   onOpenInboxes: () => void;
   onOpenContacts: () => void;
+  onOpenRules: () => void;
   onOpenAi: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -62,6 +63,7 @@ export function SpamSettings(props: {
         onOpenGeneral={props.onOpenGeneral}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={props.onOpenContacts}
+        onOpenRules={props.onOpenRules}
         onOpenSpam={() => undefined}
         onOpenAi={props.onOpenAi}
       />
