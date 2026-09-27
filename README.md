@@ -1,9 +1,6 @@
-# Mailroom
+# Mailroom +
 
-A self-hosted email system shared by humans and AI agents. Humans read, compose, and reply
-through a Gmail-style web UI; agents read and send through MCP. Inbound mail
-can be triaged with automatic labels and answered by an agent-drafted reply,
-held for one-click human approval.
+A fork of the original Mailroom, but with a massive amount of features added for everyday use by humans and AI integrated.
 
 Runs entirely on Cloudflare: Workers, Email Routing, D1, R2, and Web Push.
 
