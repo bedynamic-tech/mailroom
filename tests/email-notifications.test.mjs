@@ -169,11 +169,13 @@ test("does nothing when email notifications are off", async () => {
   assert.equal(env.sent.length, 0);
 });
 
-test("never notifies about mail that could loop", async () => {
-  const fromRecipient = fakeEnv({ address: "alice@customer.test" });
-  await notifyNewEmailByEmail(fromRecipient, input);
-  assert.equal(fromRecipient.sent.length, 0);
+test("notifies about mail sent from the notification address itself", async () => {
+  const env = fakeEnv({ address: "alice@customer.test" });
+  await notifyNewEmailByEmail(env, input);
+  assert.deepEqual(env.sent[0].to, ["alice@customer.test"]);
+});
 
+test("never notifies about mail that could loop through Mailroom", async () => {
   const fromInbox = fakeEnv({ address: "me@example.org", inboxes: ["alice@customer.test"] });
   await notifyNewEmailByEmail(fromInbox, input);
   assert.equal(fromInbox.sent.length, 0);
@@ -215,8 +217,11 @@ test("reports why a notice was skipped", async () => {
     reason: "off",
   });
   assert.deepEqual(
-    await notifyNewEmailByEmail(fakeEnv({ address: "alice@customer.test" }), input),
-    { status: "skipped", reason: "from_recipient" },
+    await notifyNewEmailByEmail(
+      fakeEnv({ address: "me@example.org", inboxes: ["alice@customer.test"] }),
+      input,
+    ),
+    { status: "skipped", reason: "internal_address" },
   );
   assert.deepEqual(
     await notifyNewEmailByEmail(fakeEnv({ address: "me@example.org" }), input),

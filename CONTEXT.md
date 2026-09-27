@@ -73,5 +73,5 @@ A workspace-wide opt-in that sends a new-email notification to every subscribed 
 _Avoid_: Inbox notifications, notification channel
 
 **Email Notifications**:
-A workspace-wide opt-in that sends a short new-email notice to one external email address, across all Inboxes. Its template (sender name, sending Inbox, subject and body with `{{placeholder}}` values) is editable; by default the notice is sent from the Inbox that received the email. It is marked auto-generated; mail from the notification address or from any Inbox never produces a notice.
+A workspace-wide opt-in that sends a short new-email notice to one external email address, across all Inboxes. Its template (sender name, sending Inbox, subject and body with `{{placeholder}}` values) is editable; by default the notice is sent from the Inbox that received the email. It is marked auto-generated; mail from any Inbox never produces a notice.
 _Avoid_: Forwarding, digest, alert email

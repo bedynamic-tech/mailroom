@@ -166,9 +166,10 @@ subject and the body, using placeholders such as `{{sender_name}}`,
 with a live preview. The notice is sent through Email Sending (by default from
 the inbox that received the email), so delivering to arbitrary external
 addresses requires Workers Paid. The address
-cannot be one of the workspace's own inboxes, and mail from the notification
-address or from an inbox never triggers a notice, so forwards and
-auto-responders cannot loop.
+cannot be one of the workspace's own inboxes, and mail from an inbox never
+triggers a notice, so notices cannot loop back through Mailroom. Mail you send
+from the notification address itself does trigger a notice; notices are marked
+`Auto-Submitted: auto-generated`, so well-behaved auto-responders ignore them.
 
 ## MCP server
 

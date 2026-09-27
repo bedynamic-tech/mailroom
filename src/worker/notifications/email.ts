@@ -114,7 +114,7 @@ interface NotificationSettings extends StoredNotificationTemplate {
 
 export type EmailNotificationResult =
   | { status: "sent"; from: string; to: string }
-  | { status: "skipped"; reason: "off" | "from_recipient" | "internal_address" };
+  | { status: "skipped"; reason: "off" | "internal_address" };
 
 async function loadSettings(env: { DB: D1Database }): Promise<NotificationSettings | null> {
   return env.DB.prepare(
@@ -135,10 +135,9 @@ export async function notifyNewEmailByEmail(
     return { status: "skipped", reason: "off" };
   }
 
-  // Never notify about mail from the notification address itself or from one
-  // of our own Inboxes: an auto-responder or forward would otherwise loop.
+  // Never notify about mail from one of our own Inboxes (or when the recipient
+  // is one): the notice would arrive back in Mailroom and loop.
   const sender = input.senderAddress.trim().toLowerCase();
-  if (sender === recipient) return skipped("from_recipient", input);
   const internal = await env.DB.prepare(
     "SELECT id FROM mailboxes WHERE address IN (?, ?) LIMIT 1",
   )
@@ -204,7 +203,7 @@ async function deliver(
 }
 
 function skipped(
-  reason: "from_recipient" | "internal_address",
+  reason: "internal_address",
   input: EmailNotificationInput,
 ): EmailNotificationResult {
   console.log("Email notification skipped", { threadId: input.threadId, reason });
