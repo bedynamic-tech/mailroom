@@ -180,6 +180,7 @@ export async function receiveEmail(
     ctx.waitUntil(
       notifyNewEmail(env, {
         threadId: stored.threadId,
+        isReply: existingThreadId !== null,
         senderName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
         senderAddress: sender || "unknown",
         subject,
@@ -189,6 +190,7 @@ export async function receiveEmail(
     ctx.waitUntil(
       notifyNewEmailByEmail(env, {
         threadId: stored.threadId,
+        isReply: existingThreadId !== null,
         inboxAddress: mailbox.address,
         senderName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
         senderAddress: sender,

@@ -83,6 +83,10 @@
       }
     ]
   },
+  // Sends Board Item reminders.
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
   "observability": {
     "enabled": true
   }

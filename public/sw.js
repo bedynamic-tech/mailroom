@@ -96,7 +96,10 @@ self.addEventListener("push", (event) => {
         data,
       }),
       updateAppBadge(data.unread),
-      notifyClients({ type: "mailroom:new-email", url: data.url }),
+      // Board reminders don't change the mail lists, so open windows needn't refresh.
+      data.kind === "board-reminder"
+        ? Promise.resolve()
+        : notifyClients({ type: "mailroom:new-email", url: data.url }),
     ]),
   );
 });

@@ -25,6 +25,7 @@ import { Board } from "./components/Board";
 import { Contacts } from "./components/Contacts";
 import { ContactSettings } from "./components/ContactSettings";
 import { GeneralSettings } from "./components/GeneralSettings";
+import { NotificationSettings } from "./components/NotificationSettings";
 import { SpamSettings } from "./components/SpamSettings";
 import { MailRulesSettings } from "./components/MailRulesSettings";
 import { ComposeEmailProvider, useCompose } from "./components/ComposeEmail";
@@ -36,7 +37,7 @@ import { UniversalSearchProvider, UniversalSearchTrigger } from "./components/Un
 import { useUnreadBadge } from "./pwa";
 
 type WorkspaceView = "inbox" | "archive" | "contacts" | "board" | "settings";
-type SettingsSection = "general" | "inboxes" | "contacts" | "rules" | "spam" | "ai";
+type SettingsSection = "general" | "notifications" | "inboxes" | "contacts" | "rules" | "spam" | "ai";
 
 export function App() {
   return (
@@ -71,6 +72,10 @@ export function App() {
       <Route
         path="/settings/rules/:ruleId"
         element={<Workspace view="settings" settingsSection="rules" />}
+      />
+      <Route
+        path="/settings/notifications"
+        element={<Workspace view="settings" settingsSection="notifications" />}
       />
       <Route path="/settings/spam" element={<Workspace view="settings" settingsSection="spam" />} />
       <Route path="/settings/ai" element={<Workspace view="settings" settingsSection="ai" />} />
@@ -324,6 +329,17 @@ function Workspace(props: {
           {props.settingsSection === "general" ? (
             <GeneralSettings
               onBack={() => navigate("/inbox")}
+              onOpenNotifications={() => navigate("/settings/notifications")}
+              onOpenInboxes={openInboxSettings}
+              onOpenContacts={() => navigate("/settings/contacts")}
+              onOpenRules={() => navigate("/settings/rules")}
+              onOpenSpam={() => navigate("/settings/spam")}
+              onOpenAi={() => navigate("/settings/ai")}
+            />
+          ) : props.settingsSection === "notifications" ? (
+            <NotificationSettings
+              onBack={() => navigate("/inbox")}
+              onOpenGeneral={() => navigate("/settings/general")}
               onOpenInboxes={openInboxSettings}
               onOpenContacts={() => navigate("/settings/contacts")}
               onOpenRules={() => navigate("/settings/rules")}
@@ -334,6 +350,7 @@ function Workspace(props: {
             <ContactSettings
               onBack={() => navigate("/inbox")}
               onOpenGeneral={() => navigate("/settings/general")}
+              onOpenNotifications={() => navigate("/settings/notifications")}
               onOpenInboxes={openInboxSettings}
               onOpenContacts={() => navigate("/contacts")}
               onOpenRules={() => navigate("/settings/rules")}
@@ -344,6 +361,7 @@ function Workspace(props: {
             <SpamSettings
               onBack={() => navigate("/inbox")}
               onOpenGeneral={() => navigate("/settings/general")}
+              onOpenNotifications={() => navigate("/settings/notifications")}
               onOpenInboxes={openInboxSettings}
               onOpenContacts={() => navigate("/settings/contacts")}
               onOpenRules={() => navigate("/settings/rules")}
@@ -355,6 +373,7 @@ function Workspace(props: {
               onRuleOpened={() => navigate("/settings/rules", { replace: true })}
               onBack={() => navigate("/inbox")}
               onOpenGeneral={() => navigate("/settings/general")}
+              onOpenNotifications={() => navigate("/settings/notifications")}
               onOpenInboxes={openInboxSettings}
               onOpenContacts={() => navigate("/settings/contacts")}
               onOpenSpam={() => navigate("/settings/spam")}
@@ -364,6 +383,7 @@ function Workspace(props: {
             <AiSettings
               onBack={() => navigate("/inbox")}
               onOpenGeneral={() => navigate("/settings/general")}
+              onOpenNotifications={() => navigate("/settings/notifications")}
               onOpenInboxes={openInboxSettings}
               onOpenContacts={() => navigate("/settings/contacts")}
               onOpenRules={() => navigate("/settings/rules")}
@@ -383,6 +403,7 @@ function Workspace(props: {
                 )
               }
               onOpenGeneral={() => navigate("/settings/general")}
+              onOpenNotifications={() => navigate("/settings/notifications")}
               onOpenContacts={() => navigate("/settings/contacts")}
               onOpenRules={() => navigate("/settings/rules")}
               onOpenSpam={() => navigate("/settings/spam")}

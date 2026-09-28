@@ -23,6 +23,7 @@ import {
 export function ContactSettings(props: {
   onBack: () => void;
   onOpenGeneral: () => void;
+  onOpenNotifications: () => void;
   onOpenInboxes: () => void;
   /** Opens the Contacts list itself. */
   onOpenContacts: () => void;
@@ -50,6 +51,7 @@ export function ContactSettings(props: {
         active="contacts"
         onBack={props.onBack}
         onOpenGeneral={props.onOpenGeneral}
+        onOpenNotifications={props.onOpenNotifications}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={() => undefined}
         onOpenRules={props.onOpenRules}

@@ -90,7 +90,8 @@ api.get("/settings/general", async (c) => {
       `SELECT browser_notifications_enabled, email_notifications_enabled, email_notification_address,
               email_notification_from_name, email_notification_from_mailbox_id,
               email_notification_subject, email_notification_body, auto_create_contacts,
-              default_signature_html
+              default_signature_html, browser_new_email, email_new_email, browser_replies, email_replies,
+              browser_board_reminders, email_board_reminders
        FROM global_settings WHERE id = 1`,
     ).first<
       StoredNotificationTemplate & {
@@ -100,6 +101,12 @@ api.get("/settings/general", async (c) => {
         email_notification_from_mailbox_id: number | null;
         auto_create_contacts: number;
         default_signature_html: string | null;
+        browser_new_email: number;
+        email_new_email: number;
+        browser_replies: number;
+        email_replies: number;
+        browser_board_reminders: number;
+        email_board_reminders: number;
       }
     >(),
     c.env.DB.prepare("SELECT COUNT(*) AS count FROM push_subscriptions")
@@ -124,6 +131,12 @@ api.get("/settings/general", async (c) => {
     },
     auto_create_contacts: Boolean(settings?.auto_create_contacts ?? 1),
     default_signature_html: settings?.default_signature_html ?? null,
+    browser_new_email: Boolean(settings?.browser_new_email ?? 1),
+    email_new_email: Boolean(settings?.email_new_email ?? 1),
+    browser_replies: Boolean(settings?.browser_replies ?? 1),
+    email_replies: Boolean(settings?.email_replies ?? 1),
+    browser_board_reminders: Boolean(settings?.browser_board_reminders ?? 1),
+    email_board_reminders: Boolean(settings?.email_board_reminders ?? 1),
   };
   return c.json(result);
 });
@@ -177,6 +190,36 @@ api.delete("/settings/browser-notifications", async (c) => {
     ),
     c.env.DB.prepare("DELETE FROM push_subscriptions"),
   ]);
+  return c.json({ ok: true });
+});
+
+const NOTIFICATION_TYPE_COLUMNS = {
+  browser_new_email: "browser_new_email",
+  email_new_email: "email_new_email",
+  browser_replies: "browser_replies",
+  email_replies: "email_replies",
+  browser_board_reminders: "browser_board_reminders",
+  email_board_reminders: "email_board_reminders",
+} as const;
+
+/** What Browser and Email Notifications carry: new email, replies and Board Reminders. */
+api.put("/settings/notification-types", async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const entries = Object.entries(body ?? {});
+  if (
+    entries.length === 0 ||
+    entries.some(([key, value]) => !(key in NOTIFICATION_TYPE_COLUMNS) || typeof value !== "boolean")
+  ) {
+    return c.json({ error: "Send notification types as true or false" }, 400);
+  }
+  await c.env.DB.prepare(
+    `UPDATE global_settings
+     SET ${entries.map(([key]) => `${NOTIFICATION_TYPE_COLUMNS[key as keyof typeof NOTIFICATION_TYPE_COLUMNS]} = ?`).join(", ")},
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE id = 1`,
+  )
+    .bind(...entries.map(([, value]) => (value ? 1 : 0)))
+    .run();
   return c.json({ ok: true });
 });
 

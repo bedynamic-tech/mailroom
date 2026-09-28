@@ -125,6 +125,21 @@ export const enableBrowserNotifications = (subscription: BrowserPushSubscription
     body: JSON.stringify(subscription),
   });
 
+export type NotificationType =
+  | "browser_new_email"
+  | "email_new_email"
+  | "browser_replies"
+  | "email_replies"
+  | "browser_board_reminders"
+  | "email_board_reminders";
+
+export const updateNotificationTypes = (input: Partial<Record<NotificationType, boolean>>) =>
+  request<{ ok: true }>("/settings/notification-types", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
 export const disableBrowserNotifications = () =>
   request<{ ok: true }>("/settings/browser-notifications", { method: "DELETE" });
 
@@ -494,7 +509,10 @@ export const deleteBoardColumn = (id: number) =>
 export const createBoardCard = (input: BoardCardInput) =>
   request<BoardCard>("/board/cards", jsonBody("POST", input));
 
-export const updateBoardCard = (id: number, input: Pick<BoardCardInput, "title" | "description">) =>
+export const updateBoardCard = (
+  id: number,
+  input: Pick<BoardCardInput, "title" | "description" | "due_at" | "due_time_zone" | "reminder_minutes">,
+) =>
   request<BoardCard>(`/board/cards/${id}`, jsonBody("PATCH", input));
 
 export const moveBoardCard = (id: number, columnId: number, index: number) =>

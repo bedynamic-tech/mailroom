@@ -1,11 +1,13 @@
 import { Hono } from "hono";
 import {
+  BOARD_REMINDER_OPTIONS,
   MAX_BOARD_CARD_CONVERSATIONS,
   MAX_BOARD_CARD_DESCRIPTION_LENGTH,
   MAX_BOARD_CARD_TITLE_LENGTH,
   MAX_BOARD_COLUMN_NAME_LENGTH,
   MAX_BOARD_COLUMNS,
   MAX_BOARD_NOTE_LENGTH,
+  reminderTime,
 } from "../../shared/board.ts";
 import type {
   Board,
@@ -110,6 +112,9 @@ boardApi.post("/cards", async (c) => {
   if (!body) return c.json({ error: "Send the card as JSON" }, 400);
   const fields = cardFields(body, true);
   if ("error" in fields) return c.json({ error: fields.error }, 400);
+  const schedule = scheduleFields(body);
+  if ("error" in schedule) return c.json({ error: schedule.error }, 400);
+  const due = schedule.set ?? EMPTY_SCHEDULE;
 
   let threadIds: number[] = [];
   if (body.thread_ids !== undefined) {
@@ -138,11 +143,23 @@ boardApi.post("/cards", async (c) => {
   if (!column) return c.json({ error: "Column not found" }, 404);
 
   const card = await c.env.DB.prepare(
-    `INSERT INTO board_cards (column_id, title, description, position)
-     VALUES (?1, ?2, ?3, (SELECT COALESCE(MAX(position) + 1, 0) FROM board_cards WHERE column_id = ?1))
+    `INSERT INTO board_cards
+       (column_id, title, description, position,
+        due_at, due_time_zone, reminder_minutes, remind_at, reminder_sent_at)
+     VALUES (?1, ?2, ?3, (SELECT COALESCE(MAX(position) + 1, 0) FROM board_cards WHERE column_id = ?1),
+       ?4, ?5, ?6, ?7, CASE WHEN ?8 THEN ${NOW} END)
      RETURNING id`,
   )
-    .bind(column.id, fields.title, fields.description ?? null)
+    .bind(
+      column.id,
+      fields.title,
+      fields.description ?? null,
+      due.due_at,
+      due.due_time_zone,
+      due.reminder_minutes,
+      due.remind_at,
+      due.expired ? 1 : 0,
+    )
     .first<{ id: number }>();
   if (!card) throw new Error("Card was not created");
   if (threadIds.length) {
@@ -211,14 +228,37 @@ boardApi.patch("/cards/:id", async (c) => {
   }
   const fields = cardFields(body, false);
   if ("error" in fields) return c.json({ error: fields.error }, 400);
-  const entries = Object.entries(fields);
+  const schedule = scheduleFields(body);
+  if ("error" in schedule) return c.json({ error: schedule.error }, 400);
+  const entries: Array<[string, unknown]> = Object.entries(fields).map(([field, value]) => [
+    `${field} = ?`,
+    value,
+  ]);
+  if (schedule.set) {
+    const due = schedule.set;
+    // Saving the same due time and reminder again keeps a reminder that
+    // already went out from going out twice.
+    entries.push(
+      [
+        `reminder_sent_at = CASE
+           WHEN due_at IS ? AND reminder_minutes IS ? THEN reminder_sent_at
+           WHEN ? THEN ${NOW}
+         END`,
+        [due.due_at, due.reminder_minutes, due.expired ? 1 : 0],
+      ],
+      ["due_at = ?", due.due_at],
+      ["due_time_zone = ?", due.due_time_zone],
+      ["reminder_minutes = ?", due.reminder_minutes],
+      ["remind_at = ?", due.remind_at],
+    );
+  }
   if (entries.length === 0) return c.json({ error: "no fields to update" }, 400);
   const updated = await c.env.DB.prepare(
     `UPDATE board_cards
-     SET ${entries.map(([field]) => `${field} = ?`).join(", ")}, updated_at = ${NOW}
+     SET ${entries.map(([assignment]) => assignment).join(", ")}, updated_at = ${NOW}
      WHERE id = ? RETURNING id`,
   )
-    .bind(...entries.map(([, value]) => value), id)
+    .bind(...entries.flatMap(([, value]) => (Array.isArray(value) ? value : [value])), id)
     .first<{ id: number }>();
   if (!updated) return c.json({ error: "Card not found" }, 404);
   return c.json(await loadCard(c.env.DB, id));
@@ -351,7 +391,7 @@ async function loadBoard(db: D1Database): Promise<Board> {
     db.prepare("SELECT id, name, position FROM board_columns ORDER BY position, id")
       .all<BoardColumn>(),
     db.prepare(
-      `SELECT id, column_id, title, description, position, created_at, updated_at,
+      `SELECT ${CARD_COLUMNS},
          (SELECT COUNT(*) FROM board_card_notes n WHERE n.card_id = board_cards.id) AS note_count
        FROM board_cards ORDER BY position, id`,
     ).all<Omit<BoardCard, "conversations">>(),
@@ -366,7 +406,7 @@ async function loadBoard(db: D1Database): Promise<Board> {
 async function loadCard(db: D1Database, id: number): Promise<BoardCard | null> {
   const [card, links] = await Promise.all([
     db.prepare(
-      `SELECT id, column_id, title, description, position, created_at, updated_at,
+      `SELECT ${CARD_COLUMNS},
          (SELECT COUNT(*) FROM board_card_notes n WHERE n.card_id = board_cards.id) AS note_count
        FROM board_cards WHERE id = ?`,
     )
@@ -378,6 +418,9 @@ async function loadCard(db: D1Database, id: number): Promise<BoardCard | null> {
   ]);
   return card ? withConversations([card], links.results)[0] : null;
 }
+
+const CARD_COLUMNS = `id, column_id, title, description, position, created_at, updated_at,
+  due_at, due_time_zone, reminder_minutes, reminder_sent_at`;
 
 type LinkRow = BoardCardConversation & { card_id: number };
 
@@ -437,6 +480,86 @@ function cardFields(
     fields.description = description || null;
   }
   return fields;
+}
+
+interface Schedule {
+  due_at: string | null;
+  due_time_zone: string | null;
+  reminder_minutes: number | null;
+  remind_at: string | null;
+  /** The due time has already passed, so no reminder will go out. */
+  expired: boolean;
+}
+
+const EMPTY_SCHEDULE: Schedule = {
+  due_at: null,
+  due_time_zone: null,
+  reminder_minutes: null,
+  remind_at: null,
+  expired: false,
+};
+
+const REMINDER_MINUTES = new Set(BOARD_REMINDER_OPTIONS.map((option) => option.minutes));
+const EARLIEST_DUE = Date.parse("2000-01-01T00:00:00Z");
+const LATEST_DUE = Date.parse("2100-01-01T00:00:00Z");
+
+/**
+ * The due time and reminder, sent together as due_at, due_time_zone and
+ * reminder_minutes. `set` is absent when the request doesn't change them.
+ */
+export function scheduleFields(
+  body: Record<string, unknown>,
+  now = Date.now(),
+): { set?: Schedule } | { error: string } {
+  if (body.due_at === undefined) {
+    if (body.reminder_minutes !== undefined || body.due_time_zone !== undefined) {
+      return { error: "Send due_at with the reminder" };
+    }
+    return {};
+  }
+  if (body.due_at === null) {
+    if (body.reminder_minutes !== undefined && body.reminder_minutes !== null) {
+      return { error: "Choose a due date before a reminder" };
+    }
+    return { set: EMPTY_SCHEDULE };
+  }
+  const due = typeof body.due_at === "string" ? Date.parse(body.due_at) : Number.NaN;
+  if (!Number.isFinite(due) || due < EARLIEST_DUE || due >= LATEST_DUE) {
+    return { error: "Enter a valid due date and time" };
+  }
+  let timeZone: string | null = null;
+  if (body.due_time_zone !== undefined && body.due_time_zone !== null) {
+    if (typeof body.due_time_zone !== "string" || !validTimeZone(body.due_time_zone)) {
+      return { error: "Unknown time zone" };
+    }
+    timeZone = body.due_time_zone;
+  }
+  const minutes = body.reminder_minutes ?? null;
+  if (minutes !== null && (typeof minutes !== "number" || !REMINDER_MINUTES.has(minutes))) {
+    return { error: "Choose when to be reminded" };
+  }
+  const dueAt = new Date(due).toISOString();
+  return {
+    set: {
+      due_at: dueAt,
+      due_time_zone: timeZone,
+      reminder_minutes: minutes,
+      remind_at: minutes === null ? null : reminderTime(dueAt, minutes),
+      // A reminder is for something still to come. A due time already in the
+      // past never reminds; one whose reminder time has passed reminds now.
+      expired: minutes !== null && due <= now,
+    },
+  };
+}
+
+function validTimeZone(value: string): boolean {
+  if (value.length > 64) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function idList(value: unknown, allowEmpty = false): number[] | null {

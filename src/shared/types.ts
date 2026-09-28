@@ -42,6 +42,18 @@ export interface GeneralSettings {
   auto_create_contacts: boolean;
   /** Signature (sanitized HTML) for every Inbox set to use the default. */
   default_signature_html: string | null;
+  /** Browser Notifications, while on, carry new email. */
+  browser_new_email: boolean;
+  /** Email Notifications, while on, carry new email. */
+  email_new_email: boolean;
+  /** Browser Notifications, while on, carry replies in existing Conversations. */
+  browser_replies: boolean;
+  /** Email Notifications, while on, carry replies in existing Conversations. */
+  email_replies: boolean;
+  /** Browser Notifications, while on, also carry Board Reminders. */
+  browser_board_reminders: boolean;
+  /** Email Notifications, while on, also carry Board Reminders. */
+  email_board_reminders: boolean;
 }
 
 export interface EmailNotificationTemplate {
@@ -231,6 +243,14 @@ export interface BoardCard {
   created_at: string;
   updated_at: string;
   note_count: number;
+  /** When the Item should be done (UTC ISO), or null. */
+  due_at: string | null;
+  /** IANA time zone the due time was picked in. */
+  due_time_zone: string | null;
+  /** Minutes before due_at to remind (0 = at the due time); null means no reminder. */
+  reminder_minutes: number | null;
+  /** When the reminder went out; null while it is still to come. */
+  reminder_sent_at: string | null;
   conversations: BoardCardConversation[];
 }
 
@@ -256,6 +276,10 @@ export interface BoardCardInput {
   title?: string;
   description?: string | null;
   thread_ids?: number[];
+  /** Send with reminder_minutes and due_time_zone; null clears the due time. */
+  due_at?: string | null;
+  due_time_zone?: string | null;
+  reminder_minutes?: number | null;
 }
 
 export type DraftRunStatus = "queued" | "generating" | "ready" | "failed" | "superseded";

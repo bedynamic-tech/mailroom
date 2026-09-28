@@ -10,6 +10,8 @@ interface StoredPushSubscription {
 
 export interface NewEmailNotificationInput {
   threadId: number;
+  /** The Message was added to an existing Conversation. */
+  isReply?: boolean;
   senderName: string | null;
   senderAddress: string;
   subject: string;
@@ -31,7 +33,7 @@ export function buildNewEmailNotification(
   const subject = input.subject.trim().replace(/\s+/g, " ").slice(0, 160);
 
   return {
-    title: `New email from ${sender}`,
+    title: `${input.isReply ? "Reply" : "New email"} from ${sender}`,
     body: subject || "(no subject)",
     tag: `conversation-${input.threadId}`,
     data: { url: `/inbox/${input.threadId}` },
@@ -73,19 +75,14 @@ export async function notifyNewEmail(
   input: NewEmailNotificationInput,
 ): Promise<void> {
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_JWK || !env.VAPID_SUBJECT) return;
-  const privateJWK = env.VAPID_PRIVATE_JWK;
-  const adminContact = env.VAPID_SUBJECT;
 
   const settings = await env.DB.prepare(
-    "SELECT browser_notifications_enabled FROM global_settings WHERE id = 1",
-  ).first<{ browser_notifications_enabled: number }>();
+    `SELECT browser_notifications_enabled, browser_new_email, browser_replies
+     FROM global_settings WHERE id = 1`,
+  ).first<{ browser_notifications_enabled: number; browser_new_email?: number; browser_replies?: number }>();
   if (!settings?.browser_notifications_enabled) return;
-
-  const { results } = await env.DB.prepare(
-    `SELECT endpoint, expiration_time, p256dh, auth
-     FROM push_subscriptions ORDER BY id`,
-  ).all<StoredPushSubscription>();
-  if (results.length === 0) return;
+  // The New email and Replies boxes under Browser Notifications.
+  if ((input.isReply ? settings.browser_replies : settings.browser_new_email) === 0) return;
 
   const payload = buildNewEmailNotification(input);
   const unread = await env.DB.prepare(
@@ -94,7 +91,42 @@ export async function notifyNewEmail(
     .first<{ count: number }>()
     .then((row) => row?.count ?? null)
     .catch(() => null);
+  await pushToSubscribedBrowsers(env, {
+    title: payload.title,
+    body: payload.body,
+    tag: payload.tag,
+    // The installed app shows this total as its OS badge.
+    data: unread === null ? { url: payload.data.url } : { url: payload.data.url, unread },
+    topic: `conversation-${input.threadId}`,
+  });
+}
+
+export interface PushMessage {
+  title: string;
+  body: string;
+  tag: string;
+  data: { url: string; unread?: number; kind?: string };
+  /** Replaces an undelivered push with the same topic. */
+  topic: string;
+}
+
+/**
+ * Sends one notification to every stored Push Subscription and forgets the
+ * ones the push service reports gone. Callers check their own setting first.
+ */
+export async function pushToSubscribedBrowsers(env: Env, message: PushMessage): Promise<number> {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_JWK || !env.VAPID_SUBJECT) return 0;
+  const privateJWK = env.VAPID_PRIVATE_JWK;
+  const adminContact = env.VAPID_SUBJECT;
+
+  const { results } = await env.DB.prepare(
+    `SELECT endpoint, expiration_time, p256dh, auth
+     FROM push_subscriptions ORDER BY id`,
+  ).all<StoredPushSubscription>();
+  if (results.length === 0) return 0;
+
   const deadEndpoints: string[] = [];
+  let delivered = 0;
 
   await Promise.all(
     results.map(async (subscription) => {
@@ -107,18 +139,12 @@ export async function notifyNewEmail(
           privateJWK,
           subscription: pushSubscription,
           message: {
-            payload: {
-              title: payload.title,
-              body: payload.body,
-              tag: payload.tag,
-              // The installed app shows this total as its OS badge.
-              data: unread === null ? { url: payload.data.url } : { url: payload.data.url, unread },
-            },
+            payload: { title: message.title, body: message.body, tag: message.tag, data: message.data },
             adminContact,
             options: {
               ttl: 60 * 60,
               urgency: "normal",
-              topic: `conversation-${input.threadId}`,
+              topic: message.topic,
             },
           },
         });
@@ -127,7 +153,10 @@ export async function notifyNewEmail(
           headers: request.headers,
           body: request.body,
         });
-        if (response.ok) return;
+        if (response.ok) {
+          delivered += 1;
+          return;
+        }
         if (response.status === 404 || response.status === 410) {
           deadEndpoints.push(subscription.endpoint);
           return;
@@ -153,6 +182,7 @@ export async function notifyNewEmail(
       ),
     );
   }
+  return delivered;
 }
 
 function endpointOrigin(endpoint: string): string {
