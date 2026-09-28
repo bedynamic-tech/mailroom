@@ -38,6 +38,7 @@ import { formatTime, splitQuotedTail } from "../lib";
 import { EmailAvatar } from "./EmailAvatar";
 import { EmailHtmlBody } from "./EmailHtmlBody";
 import { defaultDarkAppearance, type EmailAppearance } from "../email-html";
+import { inlineAttachmentIds } from "../inline-images";
 import { useResolvedTheme } from "../theme";
 import {
   ArchiveIcon,
@@ -1097,6 +1098,11 @@ function MessageCard({
     [dark, message.html_body],
   );
   const appearance: EmailAppearance = dark ? (chosenAppearance ?? defaultAppearance) : "original";
+  const attachments = useMemo(() => {
+    if (!message.html_body) return message.attachments;
+    const inline = inlineAttachmentIds(message.html_body, message.attachments);
+    return message.attachments.filter((attachment) => !inline.has(attachment.id));
+  }, [message.attachments, message.html_body]);
   const isOutbound = message.direction === "outbound";
   const displayName = isOutbound
     ? message.from_name || message.from_address
@@ -1205,9 +1211,9 @@ function MessageCard({
           <LinkifiedText text={main} />
         </div>
       )}
-      {message.attachments.length > 0 && (
+      {attachments.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Attachments">
-          {message.attachments.map((attachment) => (
+          {attachments.map((attachment) => (
             <a
               key={attachment.id}
               href={`/api/attachments/${attachment.id}`}

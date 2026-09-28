@@ -10,6 +10,7 @@ import {
   isBrightColor,
   isPaperBackground,
 } from "./email-colors";
+import { normalizeContentId } from "./inline-images";
 
 // Background colors on these mark words, not layout (a highlighted phrase).
 const INLINE_ELEMENTS = new Set(["span", "font", "mark", "b", "strong", "i", "em", "u", "a", "s", "small", "code"]);
@@ -254,19 +255,6 @@ function adaptColors(document: Document): void {
   for (const attribute of ["text", "link", "vlink", "alink"]) {
     const value = document.body.getAttribute(attribute);
     if (value) document.body.setAttribute(attribute, adaptTextColor(value));
-  }
-}
-
-function normalizeContentId(value: string): string {
-  const decoded = safeDecodeURIComponent(value.trim());
-  return decoded.replace(/^<|>$/g, "").trim().toLowerCase();
-}
-
-function safeDecodeURIComponent(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
   }
 }
 
