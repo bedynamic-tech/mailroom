@@ -34,6 +34,12 @@ Routing, D1, R2 and Web Push.
   Attachments and Cc or Bcc recipients stay with the reply.
 - **Search and triage.** Search message content, filter conversations, mark read
   or archive in bulk, and restore or permanently delete archived conversations.
+- **Universal search.** The search box in the top right (or Ctrl K / Cmd K,
+  and the search icon on phones) finds conversations by subject, message text,
+  sender or recipient, along with internal notes, board items and their notes,
+  rules (name, note, condition values and forward addresses) and contacts.
+  Results are grouped by type, every word must match, and choosing one opens
+  it: the conversation, the board item, the rule's editor or the contact.
 - **Contacts.** Keep names, companies, phone numbers and notes, see each
   contact's conversations, and autocomplete them in To, Cc and Bcc. Import from
   CSV or vCard.

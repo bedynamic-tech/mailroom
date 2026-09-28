@@ -110,6 +110,8 @@ test("only the notes API and deletions touch the notes table", () => {
     "src/worker/api/thread-notes.ts",
     // Mail Rules only insert notes; forwards never read them.
     "src/worker/email/mail-rules.ts",
+    // The web app's universal search reads notes only to show them to people.
+    "src/worker/api/universal-search.ts",
     "src/worker/inbox/delete.ts",
     "src/worker/inbox/delete-conversations.ts",
   ]);

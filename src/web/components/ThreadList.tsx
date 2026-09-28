@@ -31,6 +31,7 @@ import {
   XIcon,
 } from "./Icons";
 import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
+import { UniversalSearchButton } from "./UniversalSearch";
 
 export type ThreadFilter = "all" | "unread";
 export type ThreadScope = "all" | "archive" | "contacts" | number;
@@ -227,6 +228,7 @@ export function ThreadList(props: {
             <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.015em] text-foreground">
               {props.title}
             </h1>
+            <UniversalSearchButton className="-mr-1.5 md:hidden" />
           </div>
         </div>
 

@@ -31,6 +31,7 @@ import type {
   ThreadSummary,
   ThreadDetail,
   ThreadNote,
+  UniversalSearchResults,
 } from "../shared/types";
 
 export interface AccessHint {
@@ -288,6 +289,10 @@ export const searchThreads = (q: string, query: Omit<ThreadQuery, "status">) => 
   params.set("q", q);
   return request<ThreadSummary[]>(`/search?${params}`);
 };
+
+/** Searches conversations, internal notes, board items, rules and contacts at once. */
+export const searchEverything = (q: string) =>
+  request<UniversalSearchResults>(`/search/all?${new URLSearchParams({ q })}`);
 
 export type BulkThreadAction = "read" | "archive" | "unarchive" | "delete";
 

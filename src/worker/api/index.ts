@@ -7,6 +7,7 @@ import { contactsApi } from "./contacts.ts";
 import { blockedSendersApi } from "./blocked-senders.ts";
 import { mailRulesApi } from "./mail-rules.ts";
 import { listThreadNotes, threadNotesApi } from "./thread-notes.ts";
+import { universalSearchApi } from "./universal-search.ts";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
 import { MAX_SENDER_NAME_LENGTH, normalizeSenderName } from "../../shared/sender-name.ts";
 import { MAX_RICH_TEXT_HTML_LENGTH, normalizeMessageBody } from "../../shared/rich-text.ts";
@@ -81,6 +82,7 @@ api.route("/contacts", contactsApi);
 api.route("/blocked-senders", blockedSendersApi);
 api.route("/mail-rules", mailRulesApi);
 api.route("/threads", threadNotesApi);
+api.route("/search/all", universalSearchApi);
 
 api.get("/settings/general", async (c) => {
   const [settings, subscriptions] = await Promise.all([

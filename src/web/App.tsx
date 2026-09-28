@@ -32,6 +32,7 @@ import { InboxIcon } from "./components/Icons";
 import { MobileSidebar, Sidebar } from "./components/Sidebar";
 import { ThreadList, type ThreadFilter } from "./components/ThreadList";
 import { ThreadView } from "./components/ThreadView";
+import { UniversalSearchProvider, UniversalSearchTrigger } from "./components/UniversalSearch";
 import { useUnreadBadge } from "./pwa";
 
 type WorkspaceView = "inbox" | "archive" | "contacts" | "board" | "settings";
@@ -40,6 +41,7 @@ type SettingsSection = "general" | "inboxes" | "contacts" | "rules" | "spam" | "
 export function App() {
   return (
     <ComposeEmailProvider>
+    <UniversalSearchProvider>
     <Routes>
       <Route path="/" element={<Navigate to="/inbox" replace />} />
       <Route path="/inbox" element={<Workspace view="inbox" />} />
@@ -66,6 +68,10 @@ export function App() {
         element={<Workspace view="settings" settingsSection="contacts" />}
       />
       <Route path="/settings/rules" element={<Workspace view="settings" settingsSection="rules" />} />
+      <Route
+        path="/settings/rules/:ruleId"
+        element={<Workspace view="settings" settingsSection="rules" />}
+      />
       <Route path="/settings/spam" element={<Workspace view="settings" settingsSection="spam" />} />
       <Route path="/settings/ai" element={<Workspace view="settings" settingsSection="ai" />} />
       <Route
@@ -78,6 +84,7 @@ export function App() {
       />
       <Route path="*" element={<Navigate to="/inbox" replace />} />
     </Routes>
+    </UniversalSearchProvider>
     </ComposeEmailProvider>
   );
 }
@@ -96,6 +103,7 @@ function Workspace(props: {
     threadId?: string;
     contactId?: string;
     cardId?: string;
+    ruleId?: string;
   }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const autoSelectedScope = useRef<string | null>(null);
@@ -279,6 +287,11 @@ function Workspace(props: {
       <Sidebar {...sidebarNav} />
       <MobileSidebar {...sidebarNav} open={menuOpen} onOpenChange={setMenuOpen} />
 
+      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="hidden h-12 shrink-0 items-center justify-end border-b bg-background px-4 md:flex">
+        <UniversalSearchTrigger />
+      </div>
+      <div className="flex min-h-0 flex-1">
       {props.view === "contacts" ? (
         <main className="min-w-0 flex-1 overflow-hidden">
           <Contacts
@@ -338,6 +351,8 @@ function Workspace(props: {
             />
           ) : props.settingsSection === "rules" ? (
             <MailRulesSettings
+              ruleId={parseId(params.ruleId)}
+              onRuleOpened={() => navigate("/settings/rules", { replace: true })}
               onBack={() => navigate("/inbox")}
               onOpenGeneral={() => navigate("/settings/general")}
               onOpenInboxes={openInboxSettings}
@@ -427,6 +442,8 @@ function Workspace(props: {
           </main>
         </>
       )}
+      </div>
+      </div>
     </div>
   );
 }

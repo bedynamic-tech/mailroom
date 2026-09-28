@@ -84,6 +84,10 @@ function toInput(rule: MailRule): MailRuleInput {
 }
 
 export function MailRulesSettings(props: {
+  /** A rule to open for editing, such as one chosen in search. */
+  ruleId: number | null;
+  /** Called once ruleId has been handled, so the address can drop it. */
+  onRuleOpened: () => void;
   onBack: () => void;
   onOpenGeneral: () => void;
   onOpenInboxes: () => void;
@@ -94,6 +98,14 @@ export function MailRulesSettings(props: {
   const queryClient = useQueryClient();
   const rules = useQuery({ queryKey: ["mail-rules"], queryFn: fetchMailRules });
   const [editing, setEditing] = useState<MailRule | "new" | null>(null);
+  const { ruleId, onRuleOpened } = props;
+  // A rule opened from search arrives by its address; open its editor once it loads.
+  useEffect(() => {
+    if (ruleId === null || !rules.data) return;
+    const rule = rules.data.find((item) => item.id === ruleId);
+    if (rule) setEditing(rule);
+    onRuleOpened();
+  }, [ruleId, rules.data, onRuleOpened]);
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["mail-rules"] });
   const toggle = useMutation({
     mutationFn: (rule: MailRule) => saveMailRule({ ...toInput(rule), enabled: !rule.enabled, id: rule.id }),

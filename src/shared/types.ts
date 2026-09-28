@@ -467,3 +467,61 @@ export interface MailRule extends MailRuleInput {
   created_at: string;
   updated_at: string;
 }
+
+/** One Conversation found by the universal search. */
+export interface SearchConversationResult {
+  id: number;
+  subject: string;
+  status: ThreadSummary["status"];
+  mailbox_address: string;
+  /** The latest sender's name or address. */
+  from: string | null;
+  /** Text around the first match, or the Conversation's snippet. */
+  excerpt: string;
+  last_message_at: string;
+}
+
+/** One Internal Note found by the universal search. */
+export interface SearchNoteResult {
+  id: number;
+  thread_id: number;
+  thread_subject: string;
+  thread_status: ThreadSummary["status"];
+  mail_rule_name: string | null;
+  excerpt: string;
+  created_at: string;
+}
+
+/** One Board Item found by its title, description or one of its notes. */
+export interface SearchBoardItemResult {
+  id: number;
+  title: string;
+  column_name: string;
+  /** Text around the match in the description or a note, or empty when only the title matched. */
+  excerpt: string;
+  matched_note: boolean;
+}
+
+export interface SearchRuleResult {
+  id: number;
+  name: string;
+  enabled: boolean;
+  mailbox_address: string | null;
+  excerpt: string;
+}
+
+export interface SearchContactResult {
+  id: number;
+  address: string;
+  name: string | null;
+  company: string | null;
+}
+
+/** Everything the universal search found, grouped by kind. */
+export interface UniversalSearchResults {
+  conversations: SearchConversationResult[];
+  notes: SearchNoteResult[];
+  board_items: SearchBoardItemResult[];
+  rules: SearchRuleResult[];
+  contacts: SearchContactResult[];
+}
