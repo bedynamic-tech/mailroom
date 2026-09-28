@@ -788,7 +788,7 @@ export function AgentSettings(props: {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent fullScreenOnMobile className="sm:max-w-md">
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -1257,7 +1257,7 @@ function PlaybookEditor(props: {
 
   return (
     <Dialog open onOpenChange={(open) => !open && props.onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-hidden sm:max-w-2xl">
+      <DialogContent fullScreenOnMobile className="max-h-[calc(100dvh-2rem)] overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{props.state.id ? "Edit playbook" : "New playbook"}</DialogTitle>
         </DialogHeader>
@@ -1383,7 +1383,7 @@ function LabelEditor(props: {
 
   return (
     <Dialog open onOpenChange={(open) => !open && props.onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-hidden sm:max-w-xl">
+      <DialogContent fullScreenOnMobile className="max-h-[calc(100dvh-2rem)] overflow-hidden sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{props.state.id ? "Edit label" : "New label"}</DialogTitle>
         </DialogHeader>

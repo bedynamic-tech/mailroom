@@ -292,7 +292,7 @@ function MailRuleDialog(props: {
         if (!open && !save.isPending) props.onClose();
       }}
     >
-      <DialogContent showCloseButton={!save.isPending} className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent fullScreenOnMobile showCloseButton={!save.isPending} className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <form onSubmit={submit} className="min-w-0 space-y-6">
           <DialogHeader>
             <DialogTitle>{props.rule === "new" ? "New rule" : "Edit rule"}</DialogTitle>
