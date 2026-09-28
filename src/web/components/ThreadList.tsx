@@ -20,6 +20,7 @@ import { formatTime } from "../lib";
 import { EmailAvatar } from "./EmailAvatar";
 import {
   ArchiveIcon,
+  BoardIcon,
   InboxIcon,
   MenuIcon,
   SearchIcon,
@@ -618,6 +619,7 @@ function ThreadRow(props: {
             thread.catch_all_recipient ||
             hasDraft ||
             showArchivedBadge ||
+            thread.board_card_count > 0 ||
             thread.labels.length > 0) && (
             <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
               {showArchivedBadge && (
@@ -639,6 +641,16 @@ function ThreadRow(props: {
                   {label.name}
                 </Badge>
               ))}
+              {thread.board_card_count > 0 && (
+                <Badge
+                  variant="outline"
+                  className="h-5 shrink-0 gap-1 rounded-md px-1.5 text-xs font-normal text-foreground/75"
+                  title={`On the board: ${thread.board_card_count} ${thread.board_card_count === 1 ? "item" : "items"}`}
+                >
+                  <BoardIcon className="h-3 w-3 text-muted-foreground" />
+                  {thread.board_card_count === 1 ? "Board" : `Board ${thread.board_card_count}`}
+                </Badge>
+              )}
               {thread.catch_all_recipient ? (
                 <span
                   className="min-w-0 truncate text-xs text-muted-foreground"

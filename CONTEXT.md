@@ -60,6 +60,14 @@ _Avoid_: Filter, automation, playbook
 One Mail Rule's forward of one inbound Message, sent from the Inbox that received it with the original's headers and text, as many of its attachments as the send limits allow, and Reply-To set to the original sender. A rule forwards a Message at most once, never to one of the workspace's own Inboxes, and never forwards an email that is itself a Rule Forward, so rules cannot loop. Forwards count against a workspace-wide daily limit; a failed forward is recorded and shown on its rule, not retried.
 _Avoid_: Auto-forward, redirect
 
+**Board**:
+The workspace's one Kanban board, with Columns people add, rename, reorder and delete. It starts with To do, In progress and Done, and always keeps at least one Column. Deleting a Column deletes its Board Items but never their Conversations.
+_Avoid_: Project, pipeline, task list
+
+**Board Item**:
+A card on the Board with a title and an optional description, in one Column, ordered within it by dragging. It can link any number of Conversations, and a Conversation can be on any number of Board Items; each Conversation shows the Board Items it is on. "Create board item" on a Message starts one titled from the Conversation's subject and linked to it. Deleting a Conversation removes its links and keeps the Board Items.
+_Avoid_: Task, ticket, card
+
 **Agent Draft**:
 A proposed reply authored by the agent and held for human review before sending.
 _Avoid_: Auto-reply, suggestion

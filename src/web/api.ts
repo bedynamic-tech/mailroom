@@ -1,4 +1,8 @@
 import type {
+  Board,
+  BoardCard,
+  BoardCardInput,
+  BoardColumn,
   BlockedRecipient,
   BlockedSender,
   BlockRecipientResult,
@@ -456,3 +460,41 @@ export const blockRecipient = (address: string) =>
 
 export const unblockRecipient = (id: number) =>
   request<{ ok: true }>(`/blocked-recipients/${id}`, { method: "DELETE" });
+
+const jsonBody = (method: string, body: unknown): RequestInit => ({
+  method,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+export const fetchBoard = () => request<Board>("/board");
+
+export const createBoardColumn = (name: string) =>
+  request<BoardColumn>("/board/columns", jsonBody("POST", { name }));
+
+export const renameBoardColumn = (id: number, name: string) =>
+  request<BoardColumn>(`/board/columns/${id}`, jsonBody("PATCH", { name }));
+
+export const reorderBoardColumns = (ids: number[]) =>
+  request<Board>("/board/columns/order", jsonBody("PUT", { ids }));
+
+export const deleteBoardColumn = (id: number) =>
+  request<{ ok: true }>(`/board/columns/${id}`, { method: "DELETE" });
+
+export const createBoardCard = (input: BoardCardInput) =>
+  request<BoardCard>("/board/cards", jsonBody("POST", input));
+
+export const updateBoardCard = (id: number, input: Pick<BoardCardInput, "title" | "description">) =>
+  request<BoardCard>(`/board/cards/${id}`, jsonBody("PATCH", input));
+
+export const moveBoardCard = (id: number, columnId: number, index: number) =>
+  request<Board>(`/board/cards/${id}/move`, jsonBody("POST", { column_id: columnId, index }));
+
+export const deleteBoardCard = (id: number) =>
+  request<{ ok: true }>(`/board/cards/${id}`, { method: "DELETE" });
+
+export const linkBoardCard = (id: number, threadId: number) =>
+  request<BoardCard>(`/board/cards/${id}/conversations`, jsonBody("POST", { thread_id: threadId }));
+
+export const unlinkBoardCard = (id: number, threadId: number) =>
+  request<BoardCard>(`/board/cards/${id}/conversations/${threadId}`, { method: "DELETE" });

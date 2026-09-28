@@ -34,6 +34,13 @@ Routing, D1, R2 and Web Push.
   sign up to. Caught mail is badged and shows the address it was sent to,
   replies go out from that address, and any address can become its own inbox
   or be blocked if spammers find it.
+- **Board.** Track work on a Kanban board from the sidebar. Add, rename,
+  reorder and delete columns, and drag items between them on desktop or phone
+  (press and hold on a touch screen). Create an item from any message's menu in
+  a conversation, prefilled from the subject, or add the conversation to an
+  item already on the board. Items link back to their conversations, and
+  conversations show the items they are on, both in the list and above the
+  messages.
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.

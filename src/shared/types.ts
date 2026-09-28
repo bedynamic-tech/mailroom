@@ -124,6 +124,8 @@ export interface ThreadSummary {
   /** The address a catch-all Conversation was sent to; null when it reached the Inbox's own address. */
   catch_all_recipient: string | null;
   labels: ThreadLabel[];
+  /** How many Board Cards link this Conversation. */
+  board_card_count: number;
 }
 
 export interface Attachment {
@@ -173,6 +175,51 @@ export interface ThreadDetail {
   messages: Message[];
   drafts: Draft[];
   draft_run: DraftRun | null;
+  board_cards: ThreadBoardCard[];
+}
+
+/** A Board Card linked to a Conversation, as shown on that Conversation. */
+export interface ThreadBoardCard {
+  id: number;
+  title: string;
+  column_id: number;
+  column_name: string;
+}
+
+export interface BoardColumn {
+  id: number;
+  name: string;
+  position: number;
+}
+
+export interface BoardCardConversation {
+  id: number;
+  subject: string;
+  status: ThreadSummary["status"];
+  mailbox_address: string;
+}
+
+export interface BoardCard {
+  id: number;
+  column_id: number;
+  title: string;
+  description: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+  conversations: BoardCardConversation[];
+}
+
+export interface Board {
+  columns: BoardColumn[];
+  cards: BoardCard[];
+}
+
+export interface BoardCardInput {
+  column_id?: number;
+  title?: string;
+  description?: string | null;
+  thread_ids?: number[];
 }
 
 export type DraftRunStatus = "queued" | "generating" | "ready" | "failed" | "superseded";

@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
 import {
   archiveThread,
   blockThreadSender,
@@ -23,13 +24,21 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatTime, splitQuotedTail } from "../lib";
 import { EmailAvatar } from "./EmailAvatar";
 import { EmailHtmlBody } from "./EmailHtmlBody";
 import {
   ArchiveIcon,
   ArrowLeftIcon,
+  BoardIcon,
   InboxIcon,
+  MoreIcon,
   PaperclipIcon,
   SendIcon,
   PlusIcon,
@@ -41,6 +50,8 @@ import {
 } from "./Icons";
 import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
 import { BlockSenderDialog } from "./BlockSenderDialog";
+import { AddToBoardCardDialog, BoardCardDialog, type CardDialogTarget } from "./BoardDialogs";
+import { cardTitleFromSubject } from "../../shared/board";
 import { CatchAllBadge } from "./CatchAllBadge";
 import { BlockAddressDialog, CreateInboxFromAddressDialog } from "./CatchAllDialogs";
 import { LinkifiedText } from "./LinkifiedText";
@@ -74,6 +85,9 @@ export function ThreadView(props: {
   const [blockingSender, setBlockingSender] = useState(false);
   const [creatingInbox, setCreatingInbox] = useState(false);
   const [blockingAddress, setBlockingAddress] = useState(false);
+  const [boardTarget, setBoardTarget] = useState<CardDialogTarget | null>(null);
+  const [addingToCard, setAddingToCard] = useState(false);
+  const navigate = useNavigate();
   const seenDraftIds = useRef(new Set<number>());
   const markedRead = useRef<number | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
@@ -263,6 +277,18 @@ export function ThreadView(props: {
   }
 
   const { thread, messages, drafts } = detail.data;
+  const boardConversation = {
+    id: thread.id,
+    subject: thread.subject,
+    status: thread.status,
+    mailbox_address: thread.mailbox_address,
+  };
+  const createBoardItem = () =>
+    setBoardTarget({
+      kind: "create",
+      title: cardTitleFromSubject(thread.subject) || "Follow up",
+      conversation: boardConversation,
+    });
   const agentStatus = deriveAgentDraftStatus({
     pendingDraftCount: drafts.length,
     runStatus: detail.data.draft_run?.status ?? null,
@@ -535,16 +561,59 @@ export function ThreadView(props: {
         </div>
       )}
 
+      {detail.data.board_cards.length > 0 && (
+        <nav
+          aria-label="Board items"
+          className="flex shrink-0 items-center gap-2 overflow-x-auto border-b bg-background px-4 py-2 text-xs text-muted-foreground md:px-6"
+        >
+          <span className="flex shrink-0 items-center gap-1.5">
+            <BoardIcon className="h-3.5 w-3.5" />
+            On the board
+          </span>
+          {detail.data.board_cards.map((card) => (
+            <button
+              key={card.id}
+              type="button"
+              onClick={() => navigate(`/board/cards/${card.id}`)}
+              title={`${card.title} (${card.column_name})`}
+              className="inline-flex h-6 max-w-64 shrink-0 items-center gap-1.5 rounded-md border bg-background px-2 text-xs text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 touch:h-8"
+            >
+              <span className="min-w-0 truncate font-medium">{card.title}</span>
+              <span className="shrink-0 text-muted-foreground">{card.column_name}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+
       <div ref={conversationRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="mr-auto w-full max-w-[800px] px-4 py-5 sm:px-6 md:py-6">
           {messages.map((message, index) => (
             <Fragment key={message.id}>
               {index > 0 && <MessageConnector />}
-              <MessageCard message={message} catchAllRecipient={thread.catch_all_recipient} />
+              <MessageCard
+                message={message}
+                catchAllRecipient={thread.catch_all_recipient}
+                onCreateBoardItem={createBoardItem}
+                onAddToBoardItem={() => setAddingToCard(true)}
+              />
             </Fragment>
           ))}
         </div>
       </div>
+
+      <BoardCardDialog
+        target={boardTarget}
+        onOpenChange={(open) => !open && setBoardTarget(null)}
+      />
+      <AddToBoardCardDialog
+        open={addingToCard}
+        conversation={boardConversation}
+        onOpenChange={setAddingToCard}
+        onCreateNew={() => {
+          setAddingToCard(false);
+          createBoardItem();
+        }}
+      />
 
       <footer className="shrink-0 bg-canvas pt-1 pb-3 sm:pb-5">
         <div className="mr-auto w-full max-w-[800px] px-4 sm:px-6">
@@ -824,9 +893,13 @@ function MessageConnector() {
 function MessageCard({
   message,
   catchAllRecipient,
+  onCreateBoardItem,
+  onAddToBoardItem,
 }: {
   message: Message;
   catchAllRecipient: string | null;
+  onCreateBoardItem: () => void;
+  onAddToBoardItem: () => void;
 }) {
   const [showQuoted, setShowQuoted] = useState(false);
   const isOutbound = message.direction === "outbound";
@@ -880,6 +953,29 @@ function MessageCard({
         >
           {formatTime(message.created_at)}
         </time>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="-mt-0.5 -mr-1.5 text-muted-foreground"
+              aria-label="Message options"
+              title="More"
+            >
+              <MoreIcon className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onSelect={onCreateBoardItem}>
+              <PlusIcon />
+              Create board item
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onAddToBoardItem}>
+              <BoardIcon />
+              Add to board item
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {message.html_body ? (

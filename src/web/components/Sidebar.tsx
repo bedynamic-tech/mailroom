@@ -4,6 +4,7 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 import {
   ArchiveIcon,
+  BoardIcon,
   ChevronDownIcon,
   ContactsIcon,
   InboxIcon,
@@ -37,10 +38,11 @@ const writeCollapsed = (collapsed: boolean) => writeFlag(COLLAPSED_KEY, collapse
 type SidebarNavProps = {
   mailboxes: Mailbox[];
   selected: number | null;
-  activeView: "inbox" | "archive" | "contacts" | "settings";
+  activeView: "inbox" | "archive" | "contacts" | "board" | "settings";
   onSelect: (id: number | null) => void;
   onOpenArchive: () => void;
   onOpenContacts: () => void;
+  onOpenBoard: () => void;
   onOpenSettings: () => void;
 };
 
@@ -126,6 +128,7 @@ export function MobileSidebar(
             onSelect={(id) => close(() => nav.onSelect(id))()}
             onOpenArchive={close(nav.onOpenArchive)}
             onOpenContacts={close(nav.onOpenContacts)}
+            onOpenBoard={close(nav.onOpenBoard)}
             onOpenSettings={close(nav.onOpenSettings)}
             headerAction={
               <DialogPrimitive.Close
@@ -255,6 +258,15 @@ function SidebarContent(
             compact={compact}
             active={props.activeView === "contacts"}
             onClick={props.onOpenContacts}
+            onPeek={peek}
+          />
+          <SidebarItem
+            label="Board"
+            icon={<BoardIcon className="h-4 w-4" />}
+            unread={0}
+            compact={compact}
+            active={props.activeView === "board"}
+            onClick={props.onOpenBoard}
             onPeek={peek}
           />
         </div>

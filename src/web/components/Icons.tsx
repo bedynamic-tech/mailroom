@@ -197,3 +197,22 @@ export function ShieldBanIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function BoardIcon(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props}>
+      <rect x="3.5" y="4" width="17" height="16" rx="2" />
+      <path d="M9.5 4v16M14.5 4v16" />
+    </svg>
+  );
+}
+
+export function MoreIcon(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props}>
+      <circle cx="6" cy="12" r="0.9" fill="currentColor" />
+      <circle cx="12" cy="12" r="0.9" fill="currentColor" />
+      <circle cx="18" cy="12" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
