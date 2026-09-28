@@ -250,7 +250,7 @@ export function RecipientInput(props: {
                   setFocused(false);
                   if (add(draftRef.current)?.length === 0) props.onDismiss?.();
                 }}
-                className={cn("h-7 flex-1 bg-transparent text-sm text-foreground md:h-6 outline-none placeholder:text-muted-foreground", props.values.length > 0 ? "min-w-[6ch]" : "min-w-[12ch]")}
+                className={cn("h-7 flex-1 bg-transparent text-sm text-foreground md:h-6 outline-none placeholder:text-muted-foreground", props.values.length > 0 ? "min-w-[1ch]" : "min-w-[12ch]")}
               />
             )}
           </div>

@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
+import { cn } from "@/lib/utils";
 import {
   addThreadNote,
   archiveThread,
@@ -364,6 +365,10 @@ export function ThreadView(props: {
     latestInboundIsAutomated: Boolean(thread.latest_inbound_is_auto_submitted),
     lastMessageDirection: thread.last_message_direction,
   });
+  const draftError =
+    startDraft.isError && startDraft.error instanceof Error
+      ? startDraft.error.message
+      : detail.data.draft_run?.error ?? null;
 
   // To starts as the latest inbound Message's reply target (see sendReplyAttempt) and can be edited.
   const latestInbound = messages.filter((message) => message.direction === "inbound").at(-1);
@@ -738,75 +743,51 @@ export function ThreadView(props: {
       <footer className="shrink-0 bg-canvas pt-1 pb-3 sm:pb-5">
         <div className="mr-auto w-full max-w-[800px] px-4 sm:px-6">
           <Card className="gap-0 py-0 shadow-[0_1px_2px_oklch(0.2_0.012_265/0.04),0_4px_16px_-6px_oklch(0.2_0.012_265/0.08)] transition-shadow focus-within:ring-foreground/25">
-            <div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/70 py-1 pr-2 pl-3.5 text-xs text-muted-foreground">
-              <span className="flex min-w-0 flex-1 basis-48 items-center gap-1.5 py-1">
-                <span className="shrink-0">From</span>
-                <span
-                  className="truncate font-medium text-foreground/80"
-                  title={thread.catch_all_recipient ?? thread.mailbox_address}
-                >
-                  {thread.catch_all_recipient ?? thread.mailbox_address}
-                </span>
-                <span className="ml-1 flex shrink-0 items-center">
-                  {!showCc && (
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      className="text-muted-foreground"
-                      aria-label="Add Cc recipients"
-                      disabled={reply.isPending}
-                      onClick={() => openCopyRow("cc")}
-                    >
-                      Cc
-                    </Button>
-                  )}
-                  {!showBcc && (
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      className="text-muted-foreground"
-                      aria-label="Add Bcc recipients"
-                      disabled={reply.isPending}
-                      onClick={() => openCopyRow("bcc")}
-                    >
-                      Bcc
-                    </Button>
-                  )}
-                  {replyAllMissing.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      className="text-muted-foreground"
-                      title={`Copy everyone on the last email: ${replyAllMissing.join(", ")}`}
-                      disabled={reply.isPending || copyCapacity <= 0}
-                      onClick={replyAll}
-                    >
-                      Reply all
-                    </Button>
-                  )}
-                </span>
-              </span>
-              <DraftAssist
-                status={agentStatus}
-                draft={draft}
-                usingDraft={draft !== null && usedDraftId === draft.id}
-                error={
-                  startDraft.isError && startDraft.error instanceof Error
-                    ? startDraft.error.message
-                    : detail.data.draft_run?.error ?? null
-                }
-                busy={retryDraft.isPending || startDraft.isPending || discard.isPending}
-                disabled={reply.isPending}
-                onUse={() => draft && applyDraft(draft)}
-                onDiscard={() => draft && discard.mutate(draft.id)}
-                onRetry={() => {
-                  if (detail.data.draft_run) retryDraft.mutate(detail.data.draft_run.id);
-                }}
-                onStart={() => startDraft.mutate()}
-              />
-            </div>
             <div className="border-b border-border/70 text-xs">
-                <CopyRecipientsRow label="To" htmlFor="reply-to">
+                <CopyRecipientsRow
+                  label="To"
+                  htmlFor="reply-to"
+                  actions={
+                    <>
+                      {!showCc && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="text-muted-foreground"
+                          aria-label="Add Cc recipients"
+                          disabled={reply.isPending}
+                          onClick={() => openCopyRow("cc")}
+                        >
+                          Cc
+                        </Button>
+                      )}
+                      {!showBcc && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="text-muted-foreground"
+                          aria-label="Add Bcc recipients"
+                          disabled={reply.isPending}
+                          onClick={() => openCopyRow("bcc")}
+                        >
+                          Bcc
+                        </Button>
+                      )}
+                      {replyAllMissing.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="text-muted-foreground"
+                          title={`Copy everyone on the last email: ${replyAllMissing.join(", ")}`}
+                          disabled={reply.isPending || copyCapacity <= 0}
+                          onClick={replyAll}
+                        >
+                          Reply all
+                        </Button>
+                      )}
+                    </>
+                  }
+                >
                   <RecipientInput
                     ref={toField}
                     id="reply-to"
@@ -877,7 +858,32 @@ export function ThreadView(props: {
               placeholder="Write a reply…"
               ariaLabel="Reply"
               variant="bare"
-              contentClassName="max-h-[min(30dvh,200px)] min-h-[84px] px-3.5"
+              contentClassName="max-h-[min(40dvh,320px)] min-h-[132px] px-3.5"
+              toolbarEnd={
+                <DraftAssistButton
+                  status={agentStatus}
+                  hasDraft={draft !== null}
+                  busy={retryDraft.isPending || startDraft.isPending || discard.isPending}
+                  disabled={reply.isPending}
+                  error={draftError}
+                  onStart={() => startDraft.mutate()}
+                />
+              }
+              belowToolbar={
+                <DraftAssist
+                  status={agentStatus}
+                  draft={draft}
+                  usingDraft={draft !== null && usedDraftId === draft.id}
+                  error={draftError}
+                  busy={retryDraft.isPending || startDraft.isPending || discard.isPending}
+                  disabled={reply.isPending}
+                  onUse={() => draft && applyDraft(draft)}
+                  onDiscard={() => draft && discard.mutate(draft.id)}
+                  onRetry={() => {
+                    if (detail.data.draft_run) retryDraft.mutate(detail.data.draft_run.id);
+                  }}
+                />
+              }
             />
             {pendingFiles.length > 0 && (
               <div className="flex flex-wrap gap-1.5 px-3.5 pb-1" aria-label="Attachments to send">
@@ -1046,13 +1052,20 @@ export function ThreadView(props: {
   );
 }
 
-function CopyRecipientsRow(props: { label: string; htmlFor: string; children: ReactNode }) {
+function CopyRecipientsRow(props: {
+  label: string;
+  htmlFor: string;
+  children: ReactNode;
+  /** Controls at the right end of the row. */
+  actions?: ReactNode;
+}) {
   return (
-    <div className="flex items-start gap-2 px-3.5">
+    <div className={cn("flex items-start gap-2 pl-3.5", props.actions ? "pr-2" : "pr-3.5")}>
       <label htmlFor={props.htmlFor} className="w-8 shrink-0 py-2.5 text-muted-foreground">
         {props.label}
       </label>
       {props.children}
+      {props.actions && <span className="flex shrink-0 items-center py-1.5">{props.actions}</span>}
     </div>
   );
 }
@@ -1177,7 +1190,7 @@ function MessageCard({
         </div>
         <time
           dateTime={message.created_at}
-          className="mt-0.5 shrink-0 text-xs tabular-nums text-muted-foreground"
+          className="mt-0.5 shrink-0 text-[11px] tabular-nums sm:text-xs text-muted-foreground"
           title={new Date(message.created_at).toLocaleString()}
         >
           {formatTime(message.created_at)}
@@ -1299,7 +1312,7 @@ function NoteCard(props: { note: ThreadNote; deleting: boolean; onDelete: () => 
         </div>
         <time
           dateTime={note.created_at}
-          className="mt-0.5 shrink-0 self-start text-xs tabular-nums text-amber-800/80 dark:text-amber-300/80"
+          className="mt-0.5 shrink-0 self-start text-[11px] tabular-nums sm:text-xs text-amber-800/80 dark:text-amber-300/80"
           title={new Date(note.created_at).toLocaleString()}
         >
           {formatTime(note.created_at)}
@@ -1340,6 +1353,42 @@ function NoteCard(props: { note: ThreadNote; deleting: boolean; onDelete: () => 
   );
 }
 
+/** The AI draft button at the right end of the reply toolbar. */
+function DraftAssistButton(props: {
+  status: AgentDraftStatus;
+  hasDraft: boolean;
+  busy: boolean;
+  disabled: boolean;
+  error: string | null;
+  onStart: () => void;
+}) {
+  if (props.hasDraft) return null;
+  if (props.status === "processing") {
+    return (
+      <span role="status" title="Drafting with AI" className="flex size-7 items-center justify-center text-muted-foreground touch:size-8">
+        <SparklesIcon className="h-4 w-4 animate-pulse" />
+        <span className="sr-only">Drafting with AI</span>
+      </span>
+    );
+  }
+  if (props.status !== "not_processed") return null;
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className="shrink-0 text-muted-foreground hover:text-foreground touch:size-8"
+      onClick={props.onStart}
+      disabled={props.busy || props.disabled}
+      title={props.error ?? "Draft with AI"}
+      aria-label="Draft with AI"
+    >
+      <SparklesIcon className={cn("h-4 w-4", props.busy && "animate-pulse")} />
+    </Button>
+  );
+}
+
+/** A line under the reply toolbar while an AI draft is ready or has failed. */
 function DraftAssist(props: {
   status: AgentDraftStatus;
   draft: Draft | null;
@@ -1350,7 +1399,6 @@ function DraftAssist(props: {
   onUse: () => void;
   onDiscard: () => void;
   onRetry: () => void;
-  onStart: () => void;
 }) {
   const action = (label: string, onClick: () => void, title?: string) => (
     <Button
@@ -1364,6 +1412,7 @@ function DraftAssist(props: {
       {label}
     </Button>
   );
+  const row = "flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 border-b border-border/60 py-0.5 pr-2 pl-3.5 text-xs text-muted-foreground";
 
   if (props.draft) {
     const context = [
@@ -1373,7 +1422,7 @@ function DraftAssist(props: {
       .filter(Boolean)
       .join("\n\n");
     return (
-      <span className="flex min-w-0 max-w-full flex-wrap items-center gap-x-1 gap-y-0.5" title={context || undefined}>
+      <div className={row} title={context || undefined}>
         <span role="status" className="flex shrink-0 items-center gap-1 font-medium text-foreground/80">
           <SparklesIcon className="h-3 w-3" />
           {props.usingDraft ? "AI draft" : "New AI draft"}
@@ -1389,43 +1438,19 @@ function DraftAssist(props: {
         <span aria-hidden="true">·</span>
         {!props.usingDraft && action("Replace", props.onUse, "Replace reply with AI draft")}
         {action(props.busy ? "Discarding…" : "Discard", props.onDiscard, "Discard AI draft and clear reply")}
-      </span>
-    );
-  }
-
-  if (props.status === "processing") {
-    return (
-      <span className="flex shrink-0 items-center gap-1 px-1.5">
-        <SparklesIcon className="h-3 w-3 animate-pulse" />
-        Drafting…
-      </span>
+      </div>
     );
   }
 
   if (props.status === "failed") {
     return (
-      <span className="flex shrink-0 items-center gap-0.5">
-        <span className="px-1.5" title={props.error ?? undefined}>
+      <div className={row}>
+        <span className="flex items-center gap-1" title={props.error ?? undefined}>
+          <SparklesIcon className="h-3 w-3" />
           AI draft unavailable
         </span>
         {action(props.busy ? "Retrying…" : "Retry", props.onRetry)}
-      </span>
-    );
-  }
-
-  if (props.status === "not_processed") {
-    return (
-      <Button
-        variant="ghost"
-        size="xs"
-        className="shrink-0 text-muted-foreground hover:text-foreground"
-        onClick={props.onStart}
-        disabled={props.busy || props.disabled}
-        title={props.error ?? undefined}
-      >
-        <SparklesIcon className="h-3 w-3" />
-        {props.busy ? "Drafting…" : "Draft with AI"}
-      </Button>
+      </div>
     );
   }
 
