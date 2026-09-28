@@ -34,6 +34,9 @@ Routing, D1, R2 and Web Push.
   sign up to. Caught mail is badged and shows the address it was sent to,
   replies go out from that address, and any address can become its own inbox
   or be blocked if spammers find it.
+- **Light and dark mode.** Choose Light, Dark or System in **Settings >
+  General > Appearance**. System follows your device, and the choice is saved
+  on each device.
 
 <img width="2800" height="1800" alt="Catch-all conversations in Mailroom +" src="docs/images/catch-all.png" />
 
