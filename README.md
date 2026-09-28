@@ -64,6 +64,13 @@ Routing, D1, R2 and Web Push.
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.
+  In dark mode, simple emails are shown in dark colors, and emails that ship
+  their own dark styles use them. Designed emails with their own backgrounds
+  (newsletters, receipts) keep their original colors. Any email can be
+  switched from its **...** menu with **Show original colors** or **Show in
+  dark colors**.
+  Images an email shows in its body, such as signature logos, are not listed
+  again as attachments.
 
 <img width="2800" height="1800" alt="board" src="https://github.com/user-attachments/assets/175bb19f-b17e-4b3d-9ce5-6933fceb7198" />
 

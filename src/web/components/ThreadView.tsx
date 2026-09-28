@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import {
@@ -37,11 +37,15 @@ import {
 import { formatTime, splitQuotedTail } from "../lib";
 import { EmailAvatar } from "./EmailAvatar";
 import { EmailHtmlBody } from "./EmailHtmlBody";
+import { defaultDarkAppearance, type EmailAppearance } from "../email-html";
+import { inlineAttachmentIds } from "../inline-images";
+import { useResolvedTheme } from "../theme";
 import {
   ArchiveIcon,
   ArrowLeftIcon,
   BoardIcon,
   ChevronUpIcon,
+  ContrastIcon,
   InboxIcon,
   MoreIcon,
   NoteIcon,
@@ -1087,6 +1091,18 @@ function MessageCard({
   onBlockSender?: () => void;
 }) {
   const [showQuoted, setShowQuoted] = useState(false);
+  const dark = useResolvedTheme() === "dark";
+  const [chosenAppearance, setChosenAppearance] = useState<EmailAppearance | null>(null);
+  const defaultAppearance = useMemo(
+    () => (dark && message.html_body ? defaultDarkAppearance(message.html_body) : "original"),
+    [dark, message.html_body],
+  );
+  const appearance: EmailAppearance = dark ? (chosenAppearance ?? defaultAppearance) : "original";
+  const attachments = useMemo(() => {
+    if (!message.html_body) return message.attachments;
+    const inline = inlineAttachmentIds(message.html_body, message.attachments);
+    return message.attachments.filter((attachment) => !inline.has(attachment.id));
+  }, [message.attachments, message.html_body]);
   const isOutbound = message.direction === "outbound";
   const displayName = isOutbound
     ? message.from_name || message.from_address
@@ -1151,6 +1167,17 @@ function MessageCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
+            {dark && message.html_body && (
+              <>
+                <DropdownMenuItem
+                  onSelect={() => setChosenAppearance(appearance === "dark" ? "original" : "dark")}
+                >
+                  <ContrastIcon />
+                  {appearance === "dark" ? "Show original colors" : "Show in dark colors"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem onSelect={onCreateBoardItem}>
               <PlusIcon />
               Create board item
@@ -1177,15 +1204,16 @@ function MessageCard({
           html={message.html_body}
           attachments={message.attachments}
           sender={displayName}
+          appearance={appearance}
         />
       ) : (
         <div className="max-w-[72ch] break-words text-sm leading-6 whitespace-pre-wrap text-foreground touch:text-base">
           <LinkifiedText text={main} />
         </div>
       )}
-      {message.attachments.length > 0 && (
+      {attachments.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Attachments">
-          {message.attachments.map((attachment) => (
+          {attachments.map((attachment) => (
             <a
               key={attachment.id}
               href={`/api/attachments/${attachment.id}`}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { Attachment } from "../../shared/types";
-import { buildEmailHtmlDocument } from "../email-html";
+import { buildEmailHtmlDocument, type EmailAppearance } from "../email-html";
+import { cn } from "@/lib/utils";
 
 const MIN_EMAIL_HEIGHT = 80;
 const MAX_EMAIL_HEIGHT = 20_000;
@@ -9,16 +10,18 @@ export function EmailHtmlBody({
   html,
   attachments,
   sender,
+  appearance,
 }: {
   html: string;
   attachments: Attachment[];
   sender: string;
+  appearance: EmailAppearance;
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const sourceDocument = useMemo(
-    () => buildEmailHtmlDocument(html, attachments),
-    [attachments, html],
+    () => buildEmailHtmlDocument(html, attachments, appearance),
+    [appearance, attachments, html],
   );
 
   useEffect(
@@ -57,7 +60,10 @@ export function EmailHtmlBody({
       srcDoc={sourceDocument}
       sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads"
       onLoad={fitContent}
-      className="mt-3 block min-h-20 w-full border-0 bg-white"
+      className={cn(
+        "mt-3 block min-h-20 w-full border-0",
+        appearance === "original" ? "bg-white dark:rounded-md" : "bg-transparent",
+      )}
     />
   );
 }
