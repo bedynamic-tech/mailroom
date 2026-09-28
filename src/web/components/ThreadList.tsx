@@ -512,7 +512,8 @@ export function ThreadList(props: {
           onClick={props.onCompose}
           aria-label="Compose new message"
           title="Compose"
-          className="absolute right-4 bottom-4 z-10 h-14 w-14 rounded-2xl shadow-lg shadow-black/15 lg:hidden [&_svg:not([class*='size-'])]:size-5"
+          size="icon"
+          className="absolute right-4 bottom-4 z-10 size-14 touch:size-14 rounded-full shadow-lg shadow-black/15 lg:hidden [&_svg:not([class*='size-'])]:size-5"
         >
           <SquarePen />
         </Button>
