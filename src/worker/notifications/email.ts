@@ -15,6 +15,8 @@ const ADDRESS_PATTERN = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/;
 
 export interface EmailNotificationInput {
   threadId: number;
+  /** The Message was added to an existing Conversation. */
+  isReply?: boolean;
   inboxAddress: string;
   senderName: string | null;
   senderAddress: string;
@@ -107,8 +109,9 @@ export function buildEmailNotification(
 
 interface NotificationSettings extends StoredNotificationTemplate {
   email_notifications_enabled: number;
-  /** 0 when the New email box under Email Notifications is unchecked. */
+  /** 0 when the New email or Replies box under Email Notifications is unchecked. */
   email_new_email?: number;
+  email_replies?: number;
   email_notification_address: string | null;
   email_notification_origin: string | null;
   email_notification_from_mailbox_id: number | null;
@@ -120,7 +123,7 @@ export type EmailNotificationResult =
 
 async function loadSettings(env: { DB: D1Database }): Promise<NotificationSettings | null> {
   return env.DB.prepare(
-    `SELECT email_notifications_enabled, email_new_email, email_notification_address, email_notification_origin,
+    `SELECT email_notifications_enabled, email_new_email, email_replies, email_notification_address, email_notification_origin,
             email_notification_from_name, email_notification_from_mailbox_id,
             email_notification_subject, email_notification_body
      FROM global_settings WHERE id = 1`,
@@ -133,7 +136,8 @@ export async function notifyNewEmailByEmail(
 ): Promise<EmailNotificationResult> {
   const settings = await loadSettings(env);
   const recipient = settings?.email_notification_address;
-  if (!settings?.email_notifications_enabled || settings.email_new_email === 0 || !recipient) {
+  const typeOff = (input.isReply ? settings?.email_replies : settings?.email_new_email) === 0;
+  if (!settings?.email_notifications_enabled || typeOff || !recipient) {
     return { status: "skipped", reason: "off" };
   }
 

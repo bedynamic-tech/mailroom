@@ -46,6 +46,10 @@ export interface GeneralSettings {
   browser_new_email: boolean;
   /** Email Notifications, while on, carry new email. */
   email_new_email: boolean;
+  /** Browser Notifications, while on, carry replies in existing Conversations. */
+  browser_replies: boolean;
+  /** Email Notifications, while on, carry replies in existing Conversations. */
+  email_replies: boolean;
   /** Browser Notifications, while on, also carry Board Reminders. */
   browser_board_reminders: boolean;
   /** Email Notifications, while on, also carry Board Reminders. */

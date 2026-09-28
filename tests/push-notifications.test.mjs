@@ -33,6 +33,17 @@ test("falls back safely when sender and subject are empty", () => {
   assert.equal(payload.body, "(no subject)");
 });
 
+test("names a reply in an existing conversation as a reply", () => {
+  const payload = buildNewEmailNotification({
+    threadId: 7,
+    isReply: true,
+    senderName: "Alice",
+    senderAddress: "alice@example.com",
+    subject: "Re: Refund",
+  });
+  assert.equal(payload.title, "Reply from Alice");
+});
+
 test("accepts only complete HTTPS Push Subscriptions", () => {
   const valid = {
     endpoint: "https://push.example.com/subscriptions/abc",

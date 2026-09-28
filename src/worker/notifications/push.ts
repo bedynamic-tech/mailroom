@@ -10,6 +10,8 @@ interface StoredPushSubscription {
 
 export interface NewEmailNotificationInput {
   threadId: number;
+  /** The Message was added to an existing Conversation. */
+  isReply?: boolean;
   senderName: string | null;
   senderAddress: string;
   subject: string;
@@ -31,7 +33,7 @@ export function buildNewEmailNotification(
   const subject = input.subject.trim().replace(/\s+/g, " ").slice(0, 160);
 
   return {
-    title: `New email from ${sender}`,
+    title: `${input.isReply ? "Reply" : "New email"} from ${sender}`,
     body: subject || "(no subject)",
     tag: `conversation-${input.threadId}`,
     data: { url: `/inbox/${input.threadId}` },
@@ -75,9 +77,12 @@ export async function notifyNewEmail(
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_JWK || !env.VAPID_SUBJECT) return;
 
   const settings = await env.DB.prepare(
-    "SELECT browser_notifications_enabled, browser_new_email FROM global_settings WHERE id = 1",
-  ).first<{ browser_notifications_enabled: number; browser_new_email?: number }>();
-  if (!settings?.browser_notifications_enabled || settings.browser_new_email === 0) return;
+    `SELECT browser_notifications_enabled, browser_new_email, browser_replies
+     FROM global_settings WHERE id = 1`,
+  ).first<{ browser_notifications_enabled: number; browser_new_email?: number; browser_replies?: number }>();
+  if (!settings?.browser_notifications_enabled) return;
+  // The New email and Replies boxes under Browser Notifications.
+  if ((input.isReply ? settings.browser_replies : settings.browser_new_email) === 0) return;
 
   const payload = buildNewEmailNotification(input);
   const unread = await env.DB.prepare(

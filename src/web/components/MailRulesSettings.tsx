@@ -90,6 +90,7 @@ export function MailRulesSettings(props: {
   onRuleOpened: () => void;
   onBack: () => void;
   onOpenGeneral: () => void;
+  onOpenNotifications: () => void;
   onOpenInboxes: () => void;
   onOpenContacts: () => void;
   onOpenSpam: () => void;
@@ -120,6 +121,7 @@ export function MailRulesSettings(props: {
         active="rules"
         onBack={props.onBack}
         onOpenGeneral={props.onOpenGeneral}
+        onOpenNotifications={props.onOpenNotifications}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={props.onOpenContacts}
         onOpenRules={() => undefined}

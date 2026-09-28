@@ -117,9 +117,9 @@ The ordered email exchange grouped under one customer request. An archived Conve
 _Avoid_: Ticket, chat
 
 **Browser Notifications**:
-A workspace-wide opt-in that sends notifications to every subscribed browser: new email across all Inboxes and Board Reminders, each with its own checkbox (both checked by default). Each browser maintains its own Push Subscription; turning the global setting off disables delivery and clears all stored subscriptions.
+A workspace-wide opt-in that sends notifications to every subscribed browser: new email and replies across all Inboxes, and Board Reminders, each with its own checkbox (all checked by default). New email is a Message that opens a Conversation; a reply is one added to an existing Conversation. Each browser maintains its own Push Subscription; turning the global setting off disables delivery and clears all stored subscriptions.
 _Avoid_: Inbox notifications, notification channel
 
 **Email Notifications**:
-A workspace-wide opt-in that sends notifications to one external email address: a short notice of new email across all Inboxes and Board Reminders, each with its own checkbox (both checked by default). Its template (sender name, sending Inbox, subject and body with `{{placeholder}}` values) is editable; by default the notice is sent from the Inbox that received the email. It is marked auto-generated; mail from any Inbox never produces a notice.
+A workspace-wide opt-in that sends notifications to one external email address: a short notice of new email and replies across all Inboxes, and Board Reminders, each with its own checkbox (all checked by default). Its template (sender name, sending Inbox, subject and body with `{{placeholder}}` values) is editable; by default the notice is sent from the Inbox that received the email. It is marked auto-generated; mail from any Inbox never produces a notice.
 _Avoid_: Forwarding, digest, alert email

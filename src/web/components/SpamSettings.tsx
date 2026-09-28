@@ -32,6 +32,7 @@ const ALL_INBOXES = "all";
 export function SpamSettings(props: {
   onBack: () => void;
   onOpenGeneral: () => void;
+  onOpenNotifications: () => void;
   onOpenInboxes: () => void;
   onOpenContacts: () => void;
   onOpenRules: () => void;
@@ -91,6 +92,7 @@ export function SpamSettings(props: {
         active="spam"
         onBack={props.onBack}
         onOpenGeneral={props.onOpenGeneral}
+        onOpenNotifications={props.onOpenNotifications}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={props.onOpenContacts}
         onOpenRules={props.onOpenRules}

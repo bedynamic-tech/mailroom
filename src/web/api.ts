@@ -128,6 +128,8 @@ export const enableBrowserNotifications = (subscription: BrowserPushSubscription
 export type NotificationType =
   | "browser_new_email"
   | "email_new_email"
+  | "browser_replies"
+  | "email_replies"
   | "browser_board_reminders"
   | "email_board_reminders";
 

@@ -169,6 +169,18 @@ test("sends no new-email notice when its box is unchecked", async () => {
   assert.equal(env.sent.length, 0);
 });
 
+test("new email and replies each follow their own box", async () => {
+  const noReplies = fakeEnv({ address: "me@example.org", template: { email_replies: 0 } });
+  await notifyNewEmailByEmail(noReplies, { ...input, isReply: true });
+  assert.equal(noReplies.sent.length, 0);
+  await notifyNewEmailByEmail(noReplies, input);
+  assert.equal(noReplies.sent.length, 1);
+
+  const noNewEmail = fakeEnv({ address: "me@example.org", template: { email_new_email: 0 } });
+  await notifyNewEmailByEmail(noNewEmail, { ...input, isReply: true });
+  assert.equal(noNewEmail.sent.length, 1);
+});
+
 test("does nothing when email notifications are off", async () => {
   const env = fakeEnv({ address: null });
   await notifyNewEmailByEmail(env, input);

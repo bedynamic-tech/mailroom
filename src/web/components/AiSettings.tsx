@@ -4,6 +4,7 @@ import { SettingsHeader, SettingsPage } from "./SettingsNavigation";
 export function AiSettings(props: {
   onBack: () => void;
   onOpenGeneral: () => void;
+  onOpenNotifications: () => void;
   onOpenInboxes: () => void;
   onOpenContacts: () => void;
   onOpenRules: () => void;
@@ -15,6 +16,7 @@ export function AiSettings(props: {
         active="ai"
         onBack={props.onBack}
         onOpenGeneral={props.onOpenGeneral}
+        onOpenNotifications={props.onOpenNotifications}
         onOpenInboxes={props.onOpenInboxes}
         onOpenContacts={props.onOpenContacts}
         onOpenRules={props.onOpenRules}
