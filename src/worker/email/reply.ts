@@ -29,7 +29,9 @@ export interface ReplyIntent {
   text: string;
   /** Rich-text body; when set, `text` is derived from it. */
   html?: string | null;
-  /** Extra Cc/Bcc recipients; To is always the reviewed inbound reply target. */
+  /** To recipients chosen in the composer; when omitted, To is the latest inbound reply target. */
+  to?: string[];
+  /** Extra Cc/Bcc recipients. */
   cc?: string[];
   bcc?: string[];
   attachments?: OutboundAttachmentInput[];
@@ -150,8 +152,15 @@ export async function sendReplyAttempt(
     throw new ReplyIntentError("No inbound message to reply to", 400);
   }
 
-  const recipients = parseAddresses(lastInbound.reply_to_addresses);
-  if (recipients.length === 0) recipients.push(lastInbound.from_address);
+  const replyTarget = parseAddresses(lastInbound.reply_to_addresses);
+  if (replyTarget.length === 0) replyTarget.push(lastInbound.from_address);
+  // Retries keep the stored To; a new attempt uses the composer's To when it chose one.
+  const recipients = existing
+    ? parseAddresses(existing.to_addresses)
+    : chosenRecipients(intent) ?? replyTarget;
+  if (recipients.length === 0) {
+    throw new ReplyIntentError("Reply needs at least one To recipient", 400);
+  }
   if (recipients.length > 20) {
     throw new ReplyIntentError("Reply has too many recipients", 400);
   }
@@ -167,7 +176,7 @@ export async function sendReplyAttempt(
   }
   if (
     intent.expectedRecipients &&
-    !sameAddresses(recipients, intent.expectedRecipients)
+    !sameAddresses(replyTarget, intent.expectedRecipients)
   ) {
     throw new ReplyIntentError(
       "Reply recipient changed after it was reviewed; read the Conversation again",
@@ -385,6 +394,8 @@ function existingResult(
     (existing.html_body ?? null) !== (intent.html ?? null) ||
     existing.draft_id !== (intent.draftId ?? null) ||
     !sameCopies(existing, intent) ||
+    (intent.to !== undefined &&
+      !sameAddresses(parseAddresses(existing.to_addresses), chosenRecipients(intent) ?? [])) ||
     attachmentFingerprint(parseStagedAttachments(existing.attachments)) !==
       attachmentFingerprint(attachments) ||
     (intent.inboundMessageId !== undefined &&
@@ -415,6 +426,21 @@ function parseAddresses(raw: string): string[] {
   } catch {
     return [];
   }
+}
+
+/** The composer's To list, normalized and deduplicated, or null when it chose none. */
+function chosenRecipients(intent: ReplyIntent): string[] | null {
+  if (intent.to === undefined) return null;
+  const seen = new Set<string>();
+  const to: string[] = [];
+  for (const raw of intent.to) {
+    const address = normalizeEmailAddress(raw);
+    const key = address.toLowerCase();
+    if (!address || seen.has(key)) continue;
+    seen.add(key);
+    to.push(address);
+  }
+  return to;
 }
 
 function copyRecipients(to: string[], intent: ReplyIntent): { cc: string[]; bcc: string[] } {

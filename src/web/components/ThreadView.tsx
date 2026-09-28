@@ -84,6 +84,8 @@ export function ThreadView(props: {
   const queryClient = useQueryClient();
   const [replyText, setReplyText] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  // null until the To field is edited, so it keeps following the latest inbound reply target.
+  const [replyToEdit, setReplyToEdit] = useState<string[] | null>(null);
   const [replyCc, setReplyCc] = useState<string[]>([]);
   const [replyBcc, setReplyBcc] = useState<string[]>([]);
   // Cc/Bcc rows stay collapsed unless they hold an address or are being filled in.
@@ -106,6 +108,7 @@ export function ThreadView(props: {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ccInputRef = useRef<HTMLInputElement>(null);
   const bccInputRef = useRef<HTMLInputElement>(null);
+  const toField = useRef<RecipientInputHandle>(null);
   const ccField = useRef<RecipientInputHandle>(null);
   const bccField = useRef<RecipientInputHandle>(null);
   const attemptIds = useRef(new Map<string, { text: string; id: string }>());
@@ -138,6 +141,7 @@ export function ThreadView(props: {
   useEffect(() => {
     setReplyText("");
     setPendingFiles([]);
+    setReplyToEdit(null);
     setReplyCc([]);
     setReplyBcc([]);
     setAddingCc(false);
@@ -172,6 +176,7 @@ export function ThreadView(props: {
       attemptKey: string;
       draftId?: number;
       files?: File[];
+      to: string[];
       cc: string[];
       bcc: string[];
     }) =>
@@ -181,13 +186,14 @@ export function ThreadView(props: {
         args.attemptId,
         args.draftId,
         args.files ?? [],
-        { cc: args.cc, bcc: args.bcc },
+        { to: args.to, cc: args.cc, bcc: args.bcc },
         args.html,
       ),
     onSuccess: (result, args) => {
       if (result.status === "sent") {
         setReplyText("");
         setPendingFiles([]);
+        setReplyToEdit(null);
         setReplyCc([]);
         setReplyBcc([]);
         setAddingCc(false);
@@ -359,14 +365,15 @@ export function ThreadView(props: {
     lastMessageDirection: thread.last_message_direction,
   });
 
-  // Replies always go to the latest inbound Message's reply target (see sendReplyAttempt).
+  // To starts as the latest inbound Message's reply target (see sendReplyAttempt) and can be edited.
   const latestInbound = messages.filter((message) => message.direction === "inbound").at(-1);
-  const replyTargets = latestInbound
+  const inboundReplyTarget = latestInbound
     ? (() => {
         const replyTo = parseAddressList(latestInbound.reply_to_addresses);
         return replyTo.length ? replyTo : [latestInbound.from_address];
       })()
     : [];
+  const replyTargets = replyToEdit ?? inboundReplyTarget;
   const copyCapacity =
     MAX_RECIPIENTS_PER_MESSAGE - replyTargets.length - replyCc.length - replyBcc.length;
   const lowered = (values: string[]) => values.map((value) => value.toLowerCase());
@@ -413,15 +420,21 @@ export function ThreadView(props: {
     const text = html ? richTextToPlainText(html) : "";
     if ((text || pendingFiles.length > 0) && !reply.isPending && !discard.isPending) {
       // Add any address still being typed; stop if one of them is invalid.
+      const to = toField.current ? toField.current.commit() : replyTargets;
       const cc = ccField.current ? ccField.current.commit() : replyCc;
       const bcc = bccField.current ? bccField.current.commit() : replyBcc;
-      if (!cc || !bcc) return;
-      const fingerprint = `${html} ${pendingFiles.map((file) => `${file.name}:${file.size}`).join(",")} cc:${cc.join(",")} bcc:${bcc.join(",")}`;
+      if (!to || !cc || !bcc) return;
+      if (to.length === 0) {
+        setSendNotice("Add at least one To recipient.");
+        return;
+      }
+      const fingerprint = `${html} ${pendingFiles.map((file) => `${file.name}:${file.size}`).join(",")} to:${to.join(",")} cc:${cc.join(",")} bcc:${bcc.join(",")}`;
       const attemptKey = usedDraftId === null ? "manual" : `draft-${usedDraftId}`;
       reply.mutate({
         text,
         html,
         files: pendingFiles,
+        to,
         cc,
         bcc,
         draftId: usedDraftId ?? undefined,
@@ -727,7 +740,7 @@ export function ThreadView(props: {
           <Card className="gap-0 py-0 shadow-[0_1px_2px_oklch(0.2_0.012_265/0.04),0_4px_16px_-6px_oklch(0.2_0.012_265/0.08)] transition-shadow focus-within:ring-foreground/25">
             <div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/70 py-1 pr-2 pl-3.5 text-xs text-muted-foreground">
               <span className="flex min-w-0 flex-1 basis-48 items-center gap-1.5 py-1">
-                <span className="shrink-0">Replying from</span>
+                <span className="shrink-0">From</span>
                 <span
                   className="truncate font-medium text-foreground/80"
                   title={thread.catch_all_recipient ?? thread.mailbox_address}
@@ -792,8 +805,24 @@ export function ThreadView(props: {
                 onStart={() => startDraft.mutate()}
               />
             </div>
-            {(showCc || showBcc) && (
-              <div className="border-b border-border/70 text-xs">
+            <div className="border-b border-border/70 text-xs">
+                <CopyRecipientsRow label="To" htmlFor="reply-to">
+                  <RecipientInput
+                    ref={toField}
+                    id="reply-to"
+                    label="To"
+                    values={replyTargets}
+                    onChange={(values) => {
+                      setReplyToEdit(values);
+                      setSendNotice(null);
+                    }}
+                    capacity={copyCapacity}
+                    taken={new Set(lowered([...replyCc, ...replyBcc]))}
+                    disabled={reply.isPending}
+                    placeholder="Add To recipients"
+                    onSubmitShortcut={submitReply}
+                  />
+                </CopyRecipientsRow>
                 {showCc && (
                   <CopyRecipientsRow label="Cc" htmlFor="reply-cc">
                     <RecipientInput
@@ -835,8 +864,7 @@ export function ThreadView(props: {
                     This reply has reached the limit of {MAX_RECIPIENTS_PER_MESSAGE} recipients.
                   </p>
                 )}
-              </div>
-            )}
+            </div>
             <RichTextEditor
               id={`reply-${props.threadId}`}
               value={replyText}

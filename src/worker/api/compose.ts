@@ -88,8 +88,8 @@ composeApi.post("/", bodyLimit({ maxSize: 4 * 1024 * 1024 }), async (c) => {
   }
 });
 
-/** Reads repeated `cc`/`bcc` form fields, ignoring blank entries. */
-export function copyAddresses(form: FormData, field: "cc" | "bcc"): unknown[] {
+/** Reads repeated `to`/`cc`/`bcc` form fields, ignoring blank entries. */
+export function copyAddresses(form: FormData, field: "to" | "cc" | "bcc"): unknown[] {
   return form.getAll(field).map((value) => (typeof value === "string" ? value.trim() : value))
     .filter((value) => value !== "");
 }

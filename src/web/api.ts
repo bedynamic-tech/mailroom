@@ -337,13 +337,17 @@ export const sendReply = (
   attemptId: string,
   draftId?: number,
   attachments: File[] = [],
-  copies: { cc: string[]; bcc: string[] } = { cc: [], bcc: [] },
+  copies: { to?: string[]; cc: string[]; bcc: string[] } = { cc: [], bcc: [] },
   html?: string,
 ) => {
   const form = new FormData();
   form.set("text", text);
   if (html) form.set("html", html);
   form.set("attempt_id", attemptId);
+  if (copies.to) {
+    form.set("to_set", "1");
+    for (const address of copies.to) form.append("to", address);
+  }
   for (const address of copies.cc) form.append("cc", address);
   for (const address of copies.bcc) form.append("bcc", address);
   if (draftId !== undefined) form.set("draft_id", String(draftId));
