@@ -171,7 +171,7 @@ function SidebarContent(
             alt=""
             width={20}
             height={20}
-            className="h-5 w-5 shrink-0 object-contain"
+            className="h-5 w-5 shrink-0 object-contain dark:invert"
           />
           <p className="min-w-0 flex-1 truncate text-sm font-semibold tracking-[-0.01em] whitespace-nowrap text-foreground">
             Mailroom +

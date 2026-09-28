@@ -1,8 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Monitor as MonitorIcon, Moon as MoonIcon, Sun as SunIcon } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import {
   disableBrowserNotifications,
   enableBrowserNotifications,
@@ -20,6 +22,7 @@ import {
   unsubscribeCurrentBrowser,
 } from "../push-notifications";
 import { isIosBrowser, useInstallState } from "../pwa";
+import { setTheme, useTheme, type ThemeChoice } from "../theme";
 import { BellIcon, MailIcon } from "./Icons";
 import { EmailTemplateEditor } from "./EmailTemplateEditor";
 import { RichTextEditor } from "./RichTextEditor";
@@ -172,6 +175,8 @@ export function GeneralSettings(props: {
           onOpenInboxes={props.onOpenInboxes}
         />
 
+        <AppearanceSetting />
+
         <AppSettings />
       </SettingsPage>
     </div>
@@ -256,6 +261,60 @@ function DefaultSignatureSetting(props: {
   );
 }
 
+const THEME_OPTIONS: { value: ThemeChoice; label: string; icon: typeof SunIcon }[] = [
+  { value: "light", label: "Light", icon: SunIcon },
+  { value: "dark", label: "Dark", icon: MoonIcon },
+  { value: "system", label: "System", icon: MonitorIcon },
+];
+
+function AppearanceSetting() {
+  const theme = useTheme();
+
+  return (
+    <SettingsBlock
+      id="appearance-settings-heading"
+      title="Appearance"
+      description="Saved on this device. System follows your device's light or dark setting."
+    >
+      <SettingsPanel>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
+          <p id="theme-label" className="text-sm font-medium text-foreground">
+            Theme
+          </p>
+          <div
+            role="radiogroup"
+            aria-labelledby="theme-label"
+            className="inline-flex rounded-lg bg-muted p-[3px]"
+          >
+            {THEME_OPTIONS.map((option) => {
+              const selected = theme === option.value;
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => setTheme(option.value)}
+                  className={cn(
+                    "inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none touch:h-9",
+                    selected
+                      ? "bg-background text-foreground shadow-sm dark:bg-accent"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Icon className="h-4 w-4" aria-hidden />
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </SettingsPanel>
+    </SettingsBlock>
+  );
+}
+
 function AppSettings() {
   const install = useInstallState();
   const ios = isIosBrowser();
@@ -268,13 +327,15 @@ function AppSettings() {
     >
       <SettingsPanel>
         <div className="flex items-center gap-4 px-4 py-4 sm:px-5">
-          <img
-            src="/icons/icon-192.png"
-            alt=""
-            width={40}
-            height={40}
-            className="h-10 w-10 shrink-0 rounded-[10px] border"
-          />
+          <span className="h-10 w-10 shrink-0 overflow-hidden rounded-[10px] border">
+            <img
+              src="/icons/icon-192.png"
+              alt=""
+              width={40}
+              height={40}
+              className="h-full w-full dark:invert"
+            />
+          </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-foreground">Mailroom + app</p>
             <p className="mt-0.5 text-sm leading-5 text-muted-foreground">
