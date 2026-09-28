@@ -70,26 +70,26 @@ export async function resolveInboundTarget(
 }
 
 /**
- * Makes an Inbox the catch-all for its Domain, replacing any other catch-all
- * there, or stops it being one.
+ * Sets which Inbox receives a Domain's mail for addresses that have no Inbox
+ * of their own, or turns the Domain's catch-all off with null. The Inbox must
+ * be on that Domain.
  */
-export async function setCatchAll(env: Db, mailboxId: number, enabled: boolean): Promise<void> {
-  const inbox = await env.DB.prepare("SELECT id, domain_id FROM mailboxes WHERE id = ?")
-    .bind(mailboxId)
-    .first<{ id: number; domain_id: number | null }>();
-  if (!inbox) throw new CatchAllError("Inbox not found", 404);
-  if (inbox.domain_id === null) throw new CatchAllError("This inbox has no domain", 409);
-  if (enabled) {
-    await env.DB.prepare("UPDATE domains SET catch_all_mailbox_id = ? WHERE id = ?")
-      .bind(inbox.id, inbox.domain_id)
-      .run();
-  } else {
-    await env.DB.prepare(
-      "UPDATE domains SET catch_all_mailbox_id = NULL WHERE id = ? AND catch_all_mailbox_id = ?",
-    )
-      .bind(inbox.domain_id, inbox.id)
-      .run();
+export async function setDomainCatchAll(
+  env: Db,
+  domainId: number,
+  mailboxId: number | null,
+): Promise<void> {
+  const domain = await env.DB.prepare("SELECT id FROM domains WHERE id = ?").bind(domainId).first();
+  if (!domain) throw new CatchAllError("Domain not found", 404);
+  if (mailboxId !== null) {
+    const inbox = await env.DB.prepare("SELECT id FROM mailboxes WHERE id = ? AND domain_id = ?")
+      .bind(mailboxId, domainId)
+      .first();
+    if (!inbox) throw new CatchAllError("Choose an inbox on this domain", 400);
   }
+  await env.DB.prepare("UPDATE domains SET catch_all_mailbox_id = ? WHERE id = ?")
+    .bind(mailboxId, domainId)
+    .run();
 }
 
 /** The addresses an Inbox has caught mail for, most recently active first. */

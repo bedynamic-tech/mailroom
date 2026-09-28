@@ -8,7 +8,7 @@ import {
   createInboxFromCatchAll,
   listCatchAllAddresses,
   resolveInboundTarget,
-  setCatchAll,
+  setDomainCatchAll,
   unblockRecipient,
 } from "../src/worker/inbox/catch-all.ts";
 import { deleteInbox, purgeInboxObjects } from "../src/worker/inbox/delete.ts";
@@ -54,7 +54,7 @@ test("mail for an unregistered address is rejected until the domain has a catch-
   const { env } = fixture(t);
   assert.equal((await resolveInboundTarget(env, "bitwarden@acme.com")).kind, "unknown");
 
-  await setCatchAll(env, 2, true);
+  await setDomainCatchAll(env, 1, 2);
   const target = await resolveInboundTarget(env, " Bitwarden@Acme.com ");
   assert.equal(target.kind, "caught");
   assert.equal(target.mailbox.id, 2);
@@ -70,22 +70,21 @@ test("mail for an unregistered address is rejected until the domain has a catch-
   assert.equal((await resolveInboundTarget(env, "anyone@other.com")).kind, "unknown");
 });
 
-test("one inbox per domain is the catch-all, and turning it off only clears its own", async (t) => {
+test("each domain has at most one catch-all inbox, which must be on that domain", async (t) => {
   const { env, db } = fixture(t);
   const catchAllOf = () => db.prepare("SELECT catch_all_mailbox_id AS id FROM domains WHERE id = 1").get().id;
-  await setCatchAll(env, 2, true);
-  await setCatchAll(env, 1, true);
+  await setDomainCatchAll(env, 1, 2);
+  await setDomainCatchAll(env, 1, 1);
   assert.equal(catchAllOf(), 1);
-  await setCatchAll(env, 2, false);
-  assert.equal(catchAllOf(), 1);
-  await setCatchAll(env, 1, false);
+  await setDomainCatchAll(env, 1, null);
   assert.equal(catchAllOf(), null);
-  await assert.rejects(setCatchAll(env, 99, true), (error) => error instanceof CatchAllError && error.status === 404);
+  await assert.rejects(setDomainCatchAll(env, 2, 1), (error) => error instanceof CatchAllError && error.status === 400);
+  await assert.rejects(setDomainCatchAll(env, 99, null), (error) => error instanceof CatchAllError && error.status === 404);
 });
 
 test("blocking an address rejects its mail, counts it and archives its open conversations", async (t) => {
   const { env, db } = fixture(t);
-  await setCatchAll(env, 2, true);
+  await setDomainCatchAll(env, 1, 2);
   caught(db, { thread: 1, recipient: "leaked@acme.com" });
   caught(db, { thread: 2, recipient: "leaked@acme.com", status: "archived" });
   caught(db, { thread: 3, recipient: "bitwarden@acme.com", at: "2026-01-02T00:00:00.000Z" });
@@ -123,7 +122,7 @@ test("an inbox address or an address off the workspace's domains cannot be block
 
 test("creating an inbox from a caught address can move its conversations over", async (t) => {
   const { env, db } = fixture(t);
-  await setCatchAll(env, 2, true);
+  await setDomainCatchAll(env, 1, 2);
   caught(db, { thread: 1, recipient: "bitwarden@acme.com" });
   caught(db, { thread: 2, recipient: "bitwarden@acme.com" });
   caught(db, { thread: 3, recipient: "github@acme.com" });
@@ -165,7 +164,7 @@ test("creating an inbox without moving leaves caught conversations in the catch-
 
 test("deleting the catch-all inbox keeps files of conversations moved out of it", async (t) => {
   const { env, db } = fixture(t);
-  await setCatchAll(env, 2, true);
+  await setDomainCatchAll(env, 1, 2);
   caught(db, { thread: 1, recipient: "bitwarden@acme.com" });
   caught(db, { thread: 2, recipient: "spam@acme.com" });
   await createInboxFromCatchAll(env, { address: "bitwarden@acme.com", moveConversations: true });

@@ -1,47 +1,111 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { fetchCatchAllAddresses, setCatchAll, unblockRecipient } from "../api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { fetchCatchAllAddresses, fetchDomains, fetchMailboxes, setDomainCatchAll, unblockRecipient } from "../api";
 import { formatTime } from "../lib";
 import type { CatchAllAddress, Domain, Mailbox } from "../../shared/types";
 import { BlockAddressDialog, CreateInboxFromAddressDialog } from "./CatchAllDialogs";
 import { MailIcon, PlusIcon, ShieldBanIcon } from "./Icons";
 import { SettingsBlock, SettingsPanel } from "./SettingsNavigation";
 
-/** Turns an Inbox into its Domain's catch-all and manages the addresses it has caught. */
-export function CatchAllSettings(props: {
-  mailbox: Mailbox;
-  mailboxes: Mailbox[];
-  domains: Domain[];
-  onOpenInbox: (id: number) => void;
-}) {
-  const queryClient = useQueryClient();
+const OFF = "off";
+
+/** Chooses, for each Domain, the Inbox that receives mail for addresses without their own Inbox. */
+export function CatchAllSettings(props: { onOpenInbox: (id: number) => void }) {
   // The row a dialog acts on stays set while the dialog animates closed.
   const [creating, setCreating] = useState<CatchAllAddress | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [blocking, setBlocking] = useState("");
   const [blockOpen, setBlockOpen] = useState(false);
-  const { mailbox } = props;
-  const domain = props.domains.find((item) => item.id === mailbox.domain_id);
-  const domainName = domain?.name ?? mailbox.address.slice(mailbox.address.lastIndexOf("@") + 1);
-  const otherCatchAll =
-    domain?.catch_all_mailbox_id && domain.catch_all_mailbox_id !== mailbox.id
-      ? props.mailboxes.find((item) => item.id === domain.catch_all_mailbox_id)
-      : undefined;
+  const domains = useQuery({ queryKey: ["domains"], queryFn: fetchDomains });
+  const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes });
 
-  const toggle = useMutation({
-    mutationFn: (enabled: boolean) => setCatchAll(mailbox.id, enabled),
+  const withInboxes = (domains.data ?? []).filter(
+    (domain) => domain.status === "active" && domain.inbox_count > 0,
+  );
+
+  return (
+    <SettingsBlock
+      id="catch-all-heading"
+      title="Catch-all"
+      description="Collect mail sent to any address on a domain that doesn’t have its own inbox, such as a different address for each service you sign up to. Replies go out from the address the mail was sent to."
+    >
+      <SettingsPanel>
+        {domains.isLoading || mailboxes.isLoading ? (
+          <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">Loading…</p>
+        ) : domains.isError || mailboxes.isError ? (
+          <p className="px-4 py-6 text-sm text-destructive sm:px-5" role="alert">
+            Couldn’t load your domains.
+          </p>
+        ) : withInboxes.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">
+            Add an inbox first. Each domain with an inbox can have a catch-all.
+          </p>
+        ) : (
+          <ul className="divide-y">
+            {withInboxes.map((domain) => (
+              <DomainCatchAll
+                key={domain.id}
+                domain={domain}
+                inboxes={(mailboxes.data ?? []).filter((mailbox) => mailbox.domain_id === domain.id)}
+                onCreateInbox={(row) => {
+                  setCreating(row);
+                  setCreateOpen(true);
+                }}
+                onBlock={(address) => {
+                  setBlocking(address);
+                  setBlockOpen(true);
+                }}
+              />
+            ))}
+          </ul>
+        )}
+      </SettingsPanel>
+
+      <CreateInboxFromAddressDialog
+        open={createOpen}
+        address={creating?.address ?? ""}
+        conversationCount={creating?.conversation_count}
+        onOpenChange={setCreateOpen}
+        onCreated={(created) => props.onOpenInbox(created.id)}
+      />
+      <BlockAddressDialog open={blockOpen} address={blocking} onOpenChange={setBlockOpen} />
+    </SettingsBlock>
+  );
+}
+
+function DomainCatchAll(props: {
+  domain: Domain;
+  inboxes: Mailbox[];
+  onCreateInbox: (row: CatchAllAddress) => void;
+  onBlock: (address: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  const { domain } = props;
+  const selectId = `catch-all-${domain.id}`;
+
+  const choose = useMutation({
+    mutationFn: (mailboxId: number | null) => setDomainCatchAll(domain.id, mailboxId),
     onSettled: () =>
       Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["mailboxes"] }),
         queryClient.invalidateQueries({ queryKey: ["domains"] }),
+        queryClient.invalidateQueries({ queryKey: ["mailboxes"] }),
       ]),
   });
 
+  const catchAllId = choose.isPending ? choose.variables : domain.catch_all_mailbox_id;
+
   const addresses = useQuery({
-    queryKey: ["catch-all-addresses", mailbox.id],
-    queryFn: () => fetchCatchAllAddresses(mailbox.id),
+    queryKey: ["catch-all-addresses", catchAllId],
+    queryFn: () => fetchCatchAllAddresses(catchAllId!),
+    enabled: catchAllId !== null,
   });
 
   const unblock = useMutation({
@@ -53,52 +117,52 @@ export function CatchAllSettings(props: {
       ]),
   });
 
-  const enabled = toggle.isPending ? toggle.variables : mailbox.is_catch_all;
-  const caught = addresses.data ?? [];
+  const caught = catchAllId !== null ? (addresses.data ?? []) : [];
 
   return (
-    <SettingsBlock
-      id="catch-all-heading"
-      title="Catch-all"
-      description={`Collect mail sent to any address on ${domainName} that doesn’t have its own inbox, such as a different address for each service you sign up to.`}
-    >
-      <SettingsPanel>
-        <div className="flex items-start gap-4 px-4 py-4 sm:px-5">
-          <div className="min-w-0 flex-1">
-            <label htmlFor="catch-all" className="text-sm font-medium text-foreground">
-              Receive mail for any address on {domainName}
-            </label>
-            <p className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">
-              Each conversation shows the address it was sent to, and replies go out from that
-              address.
-              {otherCatchAll && !enabled && (
-                <> {otherCatchAll.address} is the catch-all now. Turning this on replaces it.</>
-              )}
+    <li>
+      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
+        <div className="min-w-0 flex-1">
+          <label htmlFor={selectId} className="text-sm font-medium text-foreground">
+            {domain.name}
+          </label>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {catchAllId === null
+              ? "Mail to addresses without an inbox is rejected."
+              : "Mail to any other address on this domain goes to the chosen inbox."}
+          </p>
+          {choose.isError && (
+            <p className="mt-1 text-xs text-destructive" role="alert">
+              {choose.error instanceof Error ? choose.error.message : "Couldn’t update the catch-all."}
             </p>
-            {toggle.isError && (
-              <p className="mt-2 text-xs text-destructive" role="alert">
-                {toggle.error instanceof Error ? toggle.error.message : "Couldn’t update the catch-all."}
-              </p>
-            )}
-          </div>
-          <Switch
-            id="catch-all"
-            checked={enabled}
-            onCheckedChange={(checked) => toggle.mutate(checked)}
-            disabled={toggle.isPending}
-            className="mt-0.5"
-          />
+          )}
         </div>
+        <Select
+          value={catchAllId === null ? OFF : String(catchAllId)}
+          onValueChange={(value) => choose.mutate(value === OFF ? null : Number(value))}
+          disabled={choose.isPending}
+        >
+          <SelectTrigger id={selectId} className="w-full shrink-0 sm:w-72">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={OFF}>Off</SelectItem>
+            {props.inboxes.map((inbox) => (
+              <SelectItem key={inbox.id} value={String(inbox.id)}>
+                Deliver to {inbox.address}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-        {enabled && (
+      {catchAllId !== null && (
+        <>
           <p className="border-t bg-muted/30 px-4 py-3 text-xs leading-5 text-muted-foreground sm:px-5">
-            In Cloudflare, open Email Routing for {domainName}. Under Routing rules, set the
+            In Cloudflare, open Email Routing for {domain.name}. Under Routing rules, set the
             Catch-all address action to <span className="font-medium text-foreground">Send to a Worker</span>{" "}
             and choose this Worker. Addresses with their own inbox keep working as before.
           </p>
-        )}
-
-        {(enabled || caught.length > 0) && (
           <div className="border-t">
             <p className="px-4 pt-3 pb-1 text-xs font-medium text-muted-foreground sm:px-5">
               Addresses received
@@ -134,10 +198,7 @@ export function CatchAllSettings(props: {
                       </p>
                     </div>
                     <div className="flex shrink-0 gap-2">
-                      <Button variant="outline" size="sm" onClick={() => {
-                          setCreating(row);
-                          setCreateOpen(true);
-                        }}>
+                      <Button variant="outline" size="sm" onClick={() => props.onCreateInbox(row)}>
                         <PlusIcon className="h-3.5 w-3.5" />
                         Create inbox
                       </Button>
@@ -156,10 +217,7 @@ export function CatchAllSettings(props: {
                           variant="ghost"
                           size="sm"
                           className="text-muted-foreground"
-                          onClick={() => {
-                            setBlocking(row.address);
-                            setBlockOpen(true);
-                          }}
+                          onClick={() => props.onBlock(row.address)}
                         >
                           <ShieldBanIcon className="h-3.5 w-3.5" />
                           Block
@@ -171,21 +229,8 @@ export function CatchAllSettings(props: {
               </ul>
             )}
           </div>
-        )}
-      </SettingsPanel>
-
-      <CreateInboxFromAddressDialog
-        open={createOpen}
-        address={creating?.address ?? ""}
-        conversationCount={creating?.conversation_count}
-        onOpenChange={setCreateOpen}
-        onCreated={(created) => props.onOpenInbox(created.id)}
-      />
-      <BlockAddressDialog
-        open={blockOpen}
-        address={blocking}
-        onOpenChange={setBlockOpen}
-      />
-    </SettingsBlock>
+        </>
+      )}
+    </li>
   );
 }

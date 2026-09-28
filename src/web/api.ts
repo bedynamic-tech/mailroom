@@ -428,11 +428,11 @@ export const saveMailRule = (input: MailRuleInput & { id?: number }) => {
 export const deleteMailRule = (id: number) =>
   request<{ ok: true }>(`/mail-rules/${id}`, { method: "DELETE" });
 
-export const setCatchAll = (mailboxId: number, enabled: boolean) =>
-  request<{ ok: true }>(`/mailboxes/${mailboxId}/catch-all`, {
+export const setDomainCatchAll = (domainId: number, mailboxId: number | null) =>
+  request<{ ok: true }>(`/domains/${domainId}/catch-all`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ enabled }),
+    body: JSON.stringify({ mailbox_id: mailboxId }),
   });
 
 export const fetchCatchAllAddresses = (mailboxId: number) =>
