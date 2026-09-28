@@ -4,7 +4,7 @@ A fork of the original Mailroom, but with a massive amount of features added for
 
 Runs entirely on Cloudflare: Workers, Email Routing, D1, R2, and Web Push.
 
-<img width="2880" height="1800" alt="image" src="https://github.com/user-attachments/assets/34079ed5-8eff-41fc-86c6-d51013dd5d16" />
+<img width="2560" height="1640" alt="Mailroom + conversation view" src="docs/images/screenshot.png" />
 
 ## Features
 
