@@ -327,15 +327,13 @@ function AppSettings() {
     >
       <SettingsPanel>
         <div className="flex items-center gap-4 px-4 py-4 sm:px-5">
-          <span className="h-10 w-10 shrink-0 overflow-hidden rounded-[10px] border">
-            <img
-              src="/icons/icon-192.png"
-              alt=""
-              width={40}
-              height={40}
-              className="h-full w-full dark:invert"
-            />
-          </span>
+          <img
+            src="/icons/icon-192.png"
+            alt=""
+            width={40}
+            height={40}
+            className="h-10 w-10 shrink-0"
+          />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-foreground">Mailroom + app</p>
             <p className="mt-0.5 text-sm leading-5 text-muted-foreground">
