@@ -901,15 +901,16 @@ function BoardCardDetailDialog(props: {
                   )}
                 </section>
 
-                <section className="space-y-1.5 border-t pt-4">
-                  <h3 className="text-sm font-medium text-foreground">Related conversations</h3>
-                  <LinkedConversations
-                    conversations={card.conversations}
-                    disabled={false}
-                    onOpen={props.onOpenConversation}
-                    emptyText="None yet. Use Edit to link conversations."
-                  />
-                </section>
+                {card.conversations.length > 0 && (
+                  <section className="space-y-1.5 border-t pt-4">
+                    <h3 className="text-sm font-medium text-foreground">Related conversations</h3>
+                    <LinkedConversations
+                      conversations={card.conversations}
+                      disabled={false}
+                      onOpen={props.onOpenConversation}
+                    />
+                  </section>
+                )}
               </>
             )}
           </>
