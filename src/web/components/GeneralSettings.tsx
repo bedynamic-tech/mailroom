@@ -332,7 +332,7 @@ function AppSettings() {
             alt=""
             width={40}
             height={40}
-            className="h-10 w-10 shrink-0 rounded-[10px]"
+            className="h-10 w-10 shrink-0"
           />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-foreground">Mailroom + app</p>
