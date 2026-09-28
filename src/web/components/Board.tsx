@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { UniversalSearchButton } from "./UniversalSearch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   closestCenter,
@@ -254,6 +255,7 @@ export function Board(props: {
         <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.015em] text-foreground">
           Board
         </h1>
+        <UniversalSearchButton className="-mr-1.5 md:hidden" />
       </header>
 
       {board.isLoading ? (
