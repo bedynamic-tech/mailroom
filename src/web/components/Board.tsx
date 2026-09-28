@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  closestCorners,
+  closestCenter,
   DndContext,
   DragOverlay,
   KeyboardSensor,
@@ -9,7 +9,10 @@ import {
   TouchSensor,
   useDroppable,
   useSensor,
+  pointerWithin,
+  rectIntersection,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -60,6 +63,30 @@ const columnKey = (id: number) => `column-${id}`;
 const parseKey = (key: string | number) => {
   const [kind, id] = String(key).split("-");
   return { kind: kind as "card" | "column", id: Number(id) };
+};
+
+// Find the column under the pointer first, then the nearest card inside it.
+// Measuring against every card on the board let a short or empty column lose
+// to the cards in the columns beside it.
+const collisionDetection: CollisionDetection = (args) => {
+  const hits = pointerWithin(args);
+  const collisions = hits.length > 0 ? hits : rectIntersection(args);
+  const card = collisions.find((collision) => parseKey(collision.id).kind === "card");
+  if (card) return [card];
+  const column = collisions.find((collision) => parseKey(collision.id).kind === "column");
+  if (!column) return closestCenter(args);
+  const bounds = args.droppableRects.get(column.id);
+  const inColumn = args.droppableContainers.filter((container) => {
+    const rect = args.droppableRects.get(container.id);
+    return (
+      parseKey(container.id).kind === "card" &&
+      rect !== undefined &&
+      bounds !== undefined &&
+      rect.left >= bounds.left - 1 &&
+      rect.right <= bounds.right + 1
+    );
+  });
+  return inColumn.length > 0 ? closestCenter({ ...args, droppableContainers: inColumn }) : [column];
 };
 
 function layoutOf(board: BoardData): Layout {
@@ -244,7 +271,8 @@ export function Board(props: {
       ) : (
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={collisionDetection}
+          autoScroll={{ acceleration: 1.5, threshold: { x: 0.15, y: 0.2 } }}
           onDragStart={onDragStart}
           onDragOver={onDragOver}
           onDragEnd={onDragEnd}
@@ -253,7 +281,13 @@ export function Board(props: {
             setDragLayout(null);
           }}
         >
-          <div className="min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain sm:snap-none">
+          <div
+            className={cn(
+              "min-h-0 flex-1 snap-x overflow-x-auto overflow-y-hidden overscroll-x-contain sm:snap-none",
+              // Snapping fights the scroll that follows a dragged item to the edge.
+              activeCard === null && "snap-mandatory",
+            )}
+          >
             <div className="flex h-full w-max items-stretch gap-3 px-4 py-4 md:px-6">
               {columns.map((column, index) => (
                 <BoardColumnView
