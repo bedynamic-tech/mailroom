@@ -163,6 +163,12 @@ test("sends from the receiving inbox as auto-generated mail", async () => {
   assert.equal(env.sent[0].headers["Auto-Submitted"], "auto-generated");
 });
 
+test("sends no new-email notice when its box is unchecked", async () => {
+  const env = fakeEnv({ address: "me@example.org", template: { email_new_email: 0 } });
+  await notifyNewEmailByEmail(env, input);
+  assert.equal(env.sent.length, 0);
+});
+
 test("does nothing when email notifications are off", async () => {
   const env = fakeEnv({ address: null });
   await notifyNewEmailByEmail(env, input);

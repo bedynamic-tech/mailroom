@@ -90,7 +90,8 @@ api.get("/settings/general", async (c) => {
       `SELECT browser_notifications_enabled, email_notifications_enabled, email_notification_address,
               email_notification_from_name, email_notification_from_mailbox_id,
               email_notification_subject, email_notification_body, auto_create_contacts,
-              default_signature_html, browser_board_reminders, email_board_reminders
+              default_signature_html, browser_new_email, email_new_email,
+              browser_board_reminders, email_board_reminders
        FROM global_settings WHERE id = 1`,
     ).first<
       StoredNotificationTemplate & {
@@ -100,6 +101,8 @@ api.get("/settings/general", async (c) => {
         email_notification_from_mailbox_id: number | null;
         auto_create_contacts: number;
         default_signature_html: string | null;
+        browser_new_email: number;
+        email_new_email: number;
         browser_board_reminders: number;
         email_board_reminders: number;
       }
@@ -126,6 +129,8 @@ api.get("/settings/general", async (c) => {
     },
     auto_create_contacts: Boolean(settings?.auto_create_contacts ?? 1),
     default_signature_html: settings?.default_signature_html ?? null,
+    browser_new_email: Boolean(settings?.browser_new_email ?? 1),
+    email_new_email: Boolean(settings?.email_new_email ?? 1),
     browser_board_reminders: Boolean(settings?.browser_board_reminders ?? 1),
     email_board_reminders: Boolean(settings?.email_board_reminders ?? 1),
   };
@@ -184,26 +189,30 @@ api.delete("/settings/browser-notifications", async (c) => {
   return c.json({ ok: true });
 });
 
-/** Whether Browser and Email Notifications also carry Board Reminders. */
-api.put("/settings/board-reminders", async (c) => {
-  const body = await c.req.json<{ browser?: unknown; email?: unknown }>().catch(() => null);
-  const browser = body?.browser;
-  const email = body?.email;
+const NOTIFICATION_TYPE_COLUMNS = {
+  browser_new_email: "browser_new_email",
+  email_new_email: "email_new_email",
+  browser_board_reminders: "browser_board_reminders",
+  email_board_reminders: "email_board_reminders",
+} as const;
+
+/** What Browser and Email Notifications carry: new email and/or Board Reminders. */
+api.put("/settings/notification-types", async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const entries = Object.entries(body ?? {});
   if (
-    (browser !== undefined && typeof browser !== "boolean") ||
-    (email !== undefined && typeof email !== "boolean") ||
-    (browser === undefined && email === undefined)
+    entries.length === 0 ||
+    entries.some(([key, value]) => !(key in NOTIFICATION_TYPE_COLUMNS) || typeof value !== "boolean")
   ) {
-    return c.json({ error: "browser and email must be true or false" }, 400);
+    return c.json({ error: "Send notification types as true or false" }, 400);
   }
   await c.env.DB.prepare(
     `UPDATE global_settings
-     SET browser_board_reminders = COALESCE(?, browser_board_reminders),
-         email_board_reminders = COALESCE(?, email_board_reminders),
+     SET ${entries.map(([key]) => `${NOTIFICATION_TYPE_COLUMNS[key as keyof typeof NOTIFICATION_TYPE_COLUMNS]} = ?`).join(", ")},
          updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
      WHERE id = 1`,
   )
-    .bind(browser === undefined ? null : browser ? 1 : 0, email === undefined ? null : email ? 1 : 0)
+    .bind(...entries.map(([, value]) => (value ? 1 : 0)))
     .run();
   return c.json({ ok: true });
 });

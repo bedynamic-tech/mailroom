@@ -12,11 +12,12 @@ import {
   fetchGeneralSettings,
   sendTestEmailNotification,
   setEmailNotificationsEnabled,
-  updateBoardReminders,
+  updateNotificationTypes,
+  type NotificationType,
   updateDefaultSignature,
   updateEmailNotifications,
 } from "../api";
-import type { EmailNotificationTemplate } from "../../shared/types";
+import type { EmailNotificationTemplate, GeneralSettings as GeneralSettingsData } from "../../shared/types";
 import {
   BrowserPushError,
   createBrowserPushSubscription,
@@ -148,12 +149,8 @@ export function GeneralSettings(props: {
                   </p>
                 )}
 
-                {globalEnabled && (
-                  <BoardRemindersCheckbox
-                    kind="browser"
-                    checked={Boolean(settings.data?.browser_board_reminders)}
-                    disabled={busy}
-                  />
+                {globalEnabled && settings.data && (
+                  <NotificationTypeChecks channel="browser" settings={settings.data} disabled={busy} />
                 )}
               </div>
               <Switch
@@ -167,11 +164,11 @@ export function GeneralSettings(props: {
                 className="mt-0.5"
               />
               <span id="browser-notifications-description" className="sr-only">
-                Applies to new email received by every inbox in this workspace.
+                Turns this kind of notification on for the whole workspace.
               </span>
             </div>
             <EmailNotificationSetting
-              boardReminders={Boolean(settings.data?.email_board_reminders)}
+              settings={settings.data ?? null}
               enabled={Boolean(settings.data?.email_notifications_enabled)}
               savedAddress={settings.data?.email_notification_address ?? null}
               template={settings.data?.email_notification_template ?? null}
@@ -272,37 +269,57 @@ function DefaultSignatureSetting(props: {
   );
 }
 
-/** A checkbox under a notification toggle: whether it also carries Board Reminders. */
-function BoardRemindersCheckbox(props: { kind: "browser" | "email"; checked: boolean; disabled: boolean }) {
+const NOTIFICATION_TYPES = [
+  { key: "new_email", label: "New email", detail: "When any inbox receives a new email." },
+  { key: "board_reminders", label: "Board reminders", detail: "When a board item's reminder is due." },
+] as const;
+
+/** Checkboxes under a notification toggle: which notifications that channel sends. */
+function NotificationTypeChecks(props: {
+  channel: "browser" | "email";
+  settings: GeneralSettingsData;
+  disabled: boolean;
+}) {
   const queryClient = useQueryClient();
-  const id = `${props.kind}-board-reminders`;
   const save = useMutation({
-    mutationFn: (checked: boolean) => updateBoardReminders({ [props.kind]: checked }),
+    mutationFn: (input: { type: NotificationType; checked: boolean }) =>
+      updateNotificationTypes({ [input.type]: input.checked }),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["settings", "general"] }),
   });
-  const checked = save.isPending ? Boolean(save.variables) : props.checked;
+  const labelId = `${props.channel}-notification-types`;
   return (
-    <div className="mt-3">
-      <label htmlFor={id} className="flex w-fit items-center gap-2 text-sm text-foreground">
-        <Checkbox
-          id={id}
-          checked={checked}
-          onCheckedChange={(value) => save.mutate(value === true)}
-          disabled={props.disabled || save.isPending}
-        />
-        Board reminders
-      </label>
-      <p className="mt-1 ml-6 text-xs leading-5 text-muted-foreground">
-        {props.kind === "browser"
-          ? "Also send a browser notification when a board item's reminder is due."
-          : "Also email this address when a board item's reminder is due."}
+    <fieldset className="mt-3" aria-labelledby={labelId}>
+      <p id={labelId} className="text-xs font-medium text-muted-foreground">
+        Send notifications for
       </p>
+      <div className="mt-2 space-y-2">
+        {NOTIFICATION_TYPES.map((type) => {
+          const key = `${props.channel}_${type.key}` as NotificationType;
+          const checked =
+            save.isPending && save.variables?.type === key ? save.variables.checked : props.settings[key];
+          return (
+            <label key={key} htmlFor={key} className="flex w-fit items-start gap-2">
+              <Checkbox
+                id={key}
+                checked={checked}
+                onCheckedChange={(value) => save.mutate({ type: key, checked: value === true })}
+                disabled={props.disabled || save.isPending}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="block text-sm text-foreground">{type.label}</span>
+                <span className="block text-xs leading-5 text-muted-foreground">{type.detail}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
       {save.error && (
-        <p className="mt-1 ml-6 text-xs leading-5 text-destructive" role="alert">
+        <p className="mt-1 text-xs leading-5 text-destructive" role="alert">
           {save.error.message || "Couldn’t save. Try again."}
         </p>
       )}
-    </div>
+    </fieldset>
   );
 }
 
@@ -403,7 +420,7 @@ function AppSettings() {
 }
 
 function EmailNotificationSetting(props: {
-  boardReminders: boolean;
+  settings: GeneralSettingsData | null;
   enabled: boolean;
   savedAddress: string | null;
   template: EmailNotificationTemplate | null;
@@ -451,9 +468,9 @@ function EmailNotificationSetting(props: {
             </label>
             <p className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">
               {!props.savedAddress
-                ? "Add an email address to get a notice when any inbox receives a new email."
+                ? "Add an email address to get notifications by email."
                 : props.enabled
-                  ? `A notice is sent to ${props.savedAddress} when any inbox receives a new email.`
+                  ? `Notifications are sent to ${props.savedAddress}.`
                   : `Notices to ${props.savedAddress} are paused.`}
             </p>
           </div>
@@ -466,7 +483,7 @@ function EmailNotificationSetting(props: {
             className="mt-0.5"
           />
           <span id="email-notifications-description" className="sr-only">
-            Applies to new email received by every inbox in this workspace.
+            Turns this kind of notification on for the whole workspace.
           </span>
         </div>
 
@@ -492,8 +509,8 @@ function EmailNotificationSetting(props: {
           </Button>
         </div>
 
-        {props.enabled && props.savedAddress && (
-          <BoardRemindersCheckbox kind="email" checked={props.boardReminders} disabled={busy} />
+        {props.enabled && props.savedAddress && props.settings && (
+          <NotificationTypeChecks channel="email" settings={props.settings} disabled={busy} />
         )}
 
         {props.savedAddress && (
@@ -505,7 +522,7 @@ function EmailNotificationSetting(props: {
               onClick={() => setEditorOpen(true)}
               disabled={!props.template}
             >
-              Customize email
+              Customize new email notice
             </Button>
             <Button
               type="button"
@@ -564,10 +581,10 @@ function notificationDescription(state: {
   if (!state.supported) return "This browser does not support push notifications.";
   if (state.blocked) return "Notifications are blocked in this browser's site settings.";
   if (state.globalEnabled && state.subscribed) {
-    return "This browser will notify you when any inbox receives a new email.";
+    return "This browser shows the notifications checked below.";
   }
   if (state.globalEnabled) return "Notifications are on, but this browser is not subscribed yet.";
-  return "Get notified when any inbox receives a new email.";
+  return "Get notifications in this browser.";
 }
 
 function notificationErrorMessage(error: Error): string {

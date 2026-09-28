@@ -42,6 +42,10 @@ export interface GeneralSettings {
   auto_create_contacts: boolean;
   /** Signature (sanitized HTML) for every Inbox set to use the default. */
   default_signature_html: string | null;
+  /** Browser Notifications, while on, carry new email. */
+  browser_new_email: boolean;
+  /** Email Notifications, while on, carry new email. */
+  email_new_email: boolean;
   /** Browser Notifications, while on, also carry Board Reminders. */
   browser_board_reminders: boolean;
   /** Email Notifications, while on, also carry Board Reminders. */

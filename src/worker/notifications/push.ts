@@ -75,9 +75,9 @@ export async function notifyNewEmail(
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_JWK || !env.VAPID_SUBJECT) return;
 
   const settings = await env.DB.prepare(
-    "SELECT browser_notifications_enabled FROM global_settings WHERE id = 1",
-  ).first<{ browser_notifications_enabled: number }>();
-  if (!settings?.browser_notifications_enabled) return;
+    "SELECT browser_notifications_enabled, browser_new_email FROM global_settings WHERE id = 1",
+  ).first<{ browser_notifications_enabled: number; browser_new_email?: number }>();
+  if (!settings?.browser_notifications_enabled || settings.browser_new_email === 0) return;
 
   const payload = buildNewEmailNotification(input);
   const unread = await env.DB.prepare(

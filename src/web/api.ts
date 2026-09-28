@@ -125,8 +125,14 @@ export const enableBrowserNotifications = (subscription: BrowserPushSubscription
     body: JSON.stringify(subscription),
   });
 
-export const updateBoardReminders = (input: { browser?: boolean; email?: boolean }) =>
-  request<{ ok: true }>("/settings/board-reminders", {
+export type NotificationType =
+  | "browser_new_email"
+  | "email_new_email"
+  | "browser_board_reminders"
+  | "email_board_reminders";
+
+export const updateNotificationTypes = (input: Partial<Record<NotificationType, boolean>>) =>
+  request<{ ok: true }>("/settings/notification-types", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
