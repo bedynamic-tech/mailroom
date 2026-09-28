@@ -7,8 +7,6 @@ type NotesEnv = { Bindings: { DB: D1Database } };
 /** Longest plain-text Internal Note accepted. */
 export const MAX_THREAD_NOTE_LENGTH = 20_000;
 
-const NOTE_COLUMNS = "id, thread_id, text_body, html_body, created_at";
-
 /**
  * Internal Notes on a Conversation. They are stored apart from messages and
  * only ever returned to the web app, so nothing that sends, quotes, forwards,
@@ -31,7 +29,7 @@ threadNotesApi.post("/:id/notes", async (c) => {
   if (!thread) return c.json({ error: "Conversation not found" }, 404);
   const saved = await c.env.DB.prepare(
     `INSERT INTO thread_notes (thread_id, text_body, html_body) VALUES (?, ?, ?)
-     RETURNING ${NOTE_COLUMNS}`,
+     RETURNING id, thread_id, text_body, html_body, mail_rule_id, NULL AS mail_rule_name, created_at`,
   )
     .bind(threadId, note.text, note.html)
     .first<ThreadNote>();
@@ -52,7 +50,11 @@ threadNotesApi.delete("/:id/notes/:noteId", async (c) => {
 /** Internal Notes on one Conversation, oldest first. */
 export async function listThreadNotes(db: D1Database, threadId: number): Promise<ThreadNote[]> {
   const { results } = await db
-    .prepare(`SELECT ${NOTE_COLUMNS} FROM thread_notes WHERE thread_id = ? ORDER BY created_at, id`)
+    .prepare(
+      `SELECT n.id, n.thread_id, n.text_body, n.html_body, n.mail_rule_id, r.name AS mail_rule_name, n.created_at
+       FROM thread_notes n LEFT JOIN mail_rules r ON r.id = n.mail_rule_id
+       WHERE n.thread_id = ? ORDER BY n.created_at, n.id`,
+    )
     .bind(threadId)
     .all<ThreadNote>();
   return results;

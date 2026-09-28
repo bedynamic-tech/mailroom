@@ -188,6 +188,10 @@ export interface ThreadNote {
   thread_id: number;
   text_body: string;
   html_body: string | null;
+  /** The Mail Rule that added the note; null when a person wrote it. */
+  mail_rule_id: number | null;
+  /** That rule's current name, or null once it is deleted. */
+  mail_rule_name: string | null;
   created_at: string;
 }
 
@@ -436,6 +440,8 @@ export interface MailRuleActions {
    * the Conversation, unless the Conversation is already on the Board.
    */
   board_column_id: number | null;
+  /** Add this plain text as an Internal Note on the Conversation; null for none. */
+  note: string | null;
 }
 
 export interface MailRuleInput extends MailRuleActions {

@@ -108,6 +108,8 @@ test("only the notes API and deletions touch the notes table", () => {
   // ever picking up an Internal Note.
   const allowed = new Set([
     "src/worker/api/thread-notes.ts",
+    // Mail Rules only insert notes; forwards never read them.
+    "src/worker/email/mail-rules.ts",
     "src/worker/inbox/delete.ts",
     "src/worker/inbox/delete-conversations.ts",
   ]);

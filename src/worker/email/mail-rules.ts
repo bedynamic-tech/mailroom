@@ -68,8 +68,8 @@ export async function createMailRule(env: Db, body: unknown): Promise<MailRule> 
   const result = await env.DB.prepare(
     `INSERT INTO mail_rules
        (mailbox_id, name, enabled, conditions, label_id, mark_read, archive, skip_draft,
-        skip_notifications, forward_to, forward_cc, forward_bcc, board_column_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        skip_notifications, forward_to, forward_cc, forward_bcc, board_column_id, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(...ruleValues(input))
     .run();
@@ -84,7 +84,7 @@ export async function updateMailRule(env: Db, id: number, body: unknown): Promis
     `UPDATE mail_rules
      SET mailbox_id = ?, name = ?, enabled = ?, conditions = ?, label_id = ?, mark_read = ?,
          archive = ?, skip_draft = ?, skip_notifications = ?, forward_to = ?, forward_cc = ?,
-         forward_bcc = ?, board_column_id = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         forward_bcc = ?, board_column_id = ?, note = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
      WHERE id = ?`,
   )
     .bind(...ruleValues(input), id)
@@ -150,6 +150,7 @@ function ruleValues(input: MailRuleInput): unknown[] {
     JSON.stringify(input.forward_cc),
     JSON.stringify(input.forward_bcc),
     input.board_column_id,
+    input.note,
   ];
 }
 
@@ -194,8 +195,8 @@ export const NO_MAIL_RULES: AppliedMailRules = {
 /**
  * Evaluates the enabled Mail Rules for the Inbox `mailboxId` (and those for
  * all Inboxes) against a stored inbound Message, applies the Labels, read,
- * archive and board item actions of every match to its Conversation, and
- * records the matches. The caller honours the returned skips and sends the forwards.
+ * archive, note and board item actions of every match to its Conversation,
+ * and records the matches. The caller honours the returned skips and sends the forwards.
  */
 export async function applyMailRules(
   env: Db,
@@ -219,6 +220,16 @@ export async function applyMailRules(
       ).bind(args.threadId, labelId, args.mailboxId),
     ),
   ];
+  // Each rule adds its own Internal Note. Notes stay in the workspace: they
+  // are never part of a forward, reply or notification.
+  for (const rule of matched) {
+    if (rule.note === null) continue;
+    statements.push(
+      env.DB.prepare(
+        "INSERT INTO thread_notes (thread_id, text_body, mail_rule_id, created_at) VALUES (?, ?, ?, ?)",
+      ).bind(args.threadId, rule.note, rule.id, now),
+    );
+  }
   if (actions.mark_read || actions.archive) {
     statements.push(
       env.DB.prepare(

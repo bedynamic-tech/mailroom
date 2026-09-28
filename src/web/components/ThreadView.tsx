@@ -1236,7 +1236,9 @@ function NoteCard(props: { note: ThreadNote; deleting: boolean; onDelete: () => 
         <div className="min-w-0 flex-1">
           <span className="text-sm font-semibold text-amber-900 dark:text-amber-200">Internal note</span>
           <div className="mt-0.5 truncate text-xs text-amber-800/80 dark:text-amber-300/80">
-            Only visible to your team
+            {note.mail_rule_id !== null
+              ? `Added by rule ${note.mail_rule_name ? `“${note.mail_rule_name}”` : "(deleted)"}`
+              : "Only visible to your team"}
           </div>
         </div>
         <time

@@ -27,7 +27,8 @@ Routing, D1, R2 and Web Push.
 - **Internal notes.** Leave notes for your team on any conversation. Write in
   the reply box, then choose **Add internal note** from the arrow next to
   **Send reply**. Notes appear in yellow between the messages, in the order
-  they were written, and can be deleted from their menu. They are stored
+  they were written, and can be deleted from their menu. Rules can add notes
+  automatically. They are stored
   apart from email, so they are never sent, quoted in replies, forwarded by
   rules, read by AI drafts or the MCP server, or included in notifications.
   Attachments and Cc or Bcc recipients stay with the reply.
@@ -72,9 +73,11 @@ Routing, D1, R2 and Web Push.
 - **Automatic labels.** Organize incoming mail with natural-language rules.
 - **Rules.** Build IF / AND / OR conditions on sender, recipients, subject, body
   and attachments, then label, mark read, archive, skip drafts or
-  notifications, forward, or create a board item. A board item goes in the
-  column the rule picks, takes its name from the subject and links the
-  conversation; a conversation already on the board gets no second item.
+  notifications, forward, create a board item, or add a note. A board item
+  goes in the column the rule picks, takes its name from the subject and links
+  the conversation; a conversation already on the board gets no second item.
+  **Add a note** opens a text box, and each matching email adds that text to
+  its conversation as an internal note marked with the rule's name.
 - **Spam blocking.** Block a sender by address or whole domain, on one inbox or
   all of them, from any message's menu. When a message has several people on
   it, such as Cc'd addresses, you choose which one to block. Blocked mail is

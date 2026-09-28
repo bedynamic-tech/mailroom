@@ -16,6 +16,8 @@ export const MAX_MAIL_RULE_TEXT_LENGTH = 200;
 export const MAX_MAIL_RULES = 100;
 /** Conditions across the whole rule, counting those inside groups. */
 export const MAX_MAIL_RULE_CONDITIONS = 20;
+/** Longest Internal Note a rule can add. */
+export const MAX_MAIL_RULE_NOTE_LENGTH = 2_000;
 /** To, Cc and Bcc recipients of one rule's forward, combined. */
 export const MAX_MAIL_RULE_FORWARD_RECIPIENTS = 20;
 
@@ -126,6 +128,14 @@ export function parseMailRuleInput(value: unknown): MailRuleInput | { error: str
   const forward = parseForward(body);
   if ("error" in forward) return forward;
 
+  const rawNote = body.note ?? null;
+  if (rawNote !== null && typeof rawNote !== "string") return { error: "Invalid note" };
+  const note = rawNote === null ? null : rawNote.replace(/\r\n?/g, "\n").trim();
+  if (note === "") return { error: "Write the note this rule adds" };
+  if (note !== null && note.length > MAX_MAIL_RULE_NOTE_LENGTH) {
+    return { error: `Rule notes can be at most ${MAX_MAIL_RULE_NOTE_LENGTH.toLocaleString("en-US")} characters` };
+  }
+
   const rule: MailRuleInput = {
     mailbox_id: mailboxId as number | null,
     name,
@@ -138,6 +148,7 @@ export function parseMailRuleInput(value: unknown): MailRuleInput | { error: str
     skip_notifications: flags.skip_notifications as boolean,
     ...forward,
     board_column_id: boardColumnId as number | null,
+    note,
   };
   if (!hasAction(rule)) return { error: "Choose at least one action" };
   return rule;
@@ -241,7 +252,8 @@ export function hasAction(rule: MailRuleActions): boolean {
       rule.skip_draft ||
       rule.skip_notifications ||
       rule.forward_to.length > 0 ||
-      rule.board_column_id !== null,
+      rule.board_column_id !== null ||
+      rule.note !== null,
   );
 }
 
