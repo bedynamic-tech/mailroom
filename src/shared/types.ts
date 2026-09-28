@@ -14,6 +14,9 @@ export interface Mailbox {
   /** The signature this Inbox currently appends to outgoing email, if any. */
   effective_signature_html: string | null;
   unread_count: number;
+  domain_id: number | null;
+  /** Whether this Inbox receives mail for addresses on its Domain that have no Inbox. */
+  is_catch_all: boolean;
 }
 
 export interface Domain {
@@ -21,6 +24,8 @@ export interface Domain {
   name: string;
   status: "pending" | "active";
   inbox_count: number;
+  /** The Inbox receiving mail for unregistered addresses on this Domain, if any. */
+  catch_all_mailbox_id: number | null;
   created_at: string;
   activated_at: string | null;
 }
@@ -116,6 +121,8 @@ export interface ThreadSummary {
   last_message_at: string;
   last_from: string | null;
   last_from_address: string | null;
+  /** The address a catch-all Conversation was sent to; null when it reached the Inbox's own address. */
+  catch_all_recipient: string | null;
   labels: ThreadLabel[];
 }
 
@@ -254,6 +261,31 @@ export interface BlockedSender {
   blocked_count: number;
   last_blocked_at: string | null;
   created_at: string;
+}
+
+/** An address the catch-all has received mail for. */
+export interface CatchAllAddress {
+  address: string;
+  conversation_count: number;
+  unread_count: number;
+  last_message_at: string;
+  /** The Blocked Address rule for it, if it is blocked. */
+  blocked_id: number | null;
+}
+
+/** An address on one of the workspace's Domains whose mail the catch-all rejects. */
+export interface BlockedRecipient {
+  id: number;
+  address: string;
+  blocked_count: number;
+  last_blocked_at: string | null;
+  created_at: string;
+}
+
+export interface BlockRecipientResult {
+  blocked: BlockedRecipient;
+  /** Caught Conversations for the address that were archived. */
+  archived: number;
 }
 
 export interface BlockSenderResult {

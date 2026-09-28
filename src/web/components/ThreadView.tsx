@@ -32,6 +32,7 @@ import {
   InboxIcon,
   PaperclipIcon,
   SendIcon,
+  PlusIcon,
   ShieldBanIcon,
   SparklesIcon,
   TagIcon,
@@ -40,6 +41,8 @@ import {
 } from "./Icons";
 import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
 import { BlockSenderDialog } from "./BlockSenderDialog";
+import { CatchAllBadge } from "./CatchAllBadge";
+import { BlockAddressDialog, CreateInboxFromAddressDialog } from "./CatchAllDialogs";
 import { LinkifiedText } from "./LinkifiedText";
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
 import { RichTextEditor, richTextSummary } from "./RichTextEditor";
@@ -69,6 +72,8 @@ export function ThreadView(props: {
   const [usedDraftId, setUsedDraftId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [blockingSender, setBlockingSender] = useState(false);
+  const [creatingInbox, setCreatingInbox] = useState(false);
+  const [blockingAddress, setBlockingAddress] = useState(false);
   const seenDraftIds = useRef(new Set<number>());
   const markedRead = useRef<number | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
@@ -285,6 +290,7 @@ export function ThreadView(props: {
         replyTargets,
         ownAddresses: [
           thread.mailbox_address,
+          ...(thread.catch_all_recipient ? [thread.catch_all_recipient] : []),
           ...(mailboxes.data ?? []).map((mailbox) => mailbox.address),
         ],
       }).filter((address) => !alreadyCopied.has(address.toLowerCase()))
@@ -374,7 +380,11 @@ export function ThreadView(props: {
             {thread.subject || "(no subject)"}
           </h1>
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="truncate">{thread.mailbox_address}</span>
+            <span className="truncate">
+              {thread.catch_all_recipient
+                ? `${thread.catch_all_recipient} via ${thread.mailbox_address}`
+                : thread.mailbox_address}
+            </span>
             <span aria-hidden="true">·</span>
             <span className="shrink-0 tabular-nums">
               {thread.message_count} {thread.message_count === 1 ? "message" : "messages"}
@@ -490,12 +500,47 @@ export function ThreadView(props: {
         )}
       </header>
 
+      {thread.catch_all_recipient && (
+        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-muted/40 px-4 py-2 text-xs text-muted-foreground md:px-6">
+          <p className="min-w-0 flex-1 basis-56">
+            Sent to <span className="font-medium break-all text-foreground">{thread.catch_all_recipient}</span>,
+            which has no inbox of its own.
+          </p>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" size="sm" className="h-7" onClick={() => setCreatingInbox(true)}>
+              <PlusIcon className="h-3.5 w-3.5" />
+              Create inbox
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-muted-foreground"
+              onClick={() => setBlockingAddress(true)}
+            >
+              <ShieldBanIcon className="h-3.5 w-3.5" />
+              Block address
+            </Button>
+          </div>
+          <CreateInboxFromAddressDialog
+            open={creatingInbox}
+            address={thread.catch_all_recipient}
+            onOpenChange={setCreatingInbox}
+          />
+          <BlockAddressDialog
+            open={blockingAddress}
+            address={thread.catch_all_recipient}
+            onOpenChange={setBlockingAddress}
+            onBlocked={props.onMoved}
+          />
+        </div>
+      )}
+
       <div ref={conversationRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="mr-auto w-full max-w-[800px] px-4 py-5 sm:px-6 md:py-6">
           {messages.map((message, index) => (
             <Fragment key={message.id}>
               {index > 0 && <MessageConnector />}
-              <MessageCard message={message} />
+              <MessageCard message={message} catchAllRecipient={thread.catch_all_recipient} />
             </Fragment>
           ))}
         </div>
@@ -507,8 +552,11 @@ export function ThreadView(props: {
             <div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/70 py-1 pr-2 pl-3.5 text-xs text-muted-foreground">
               <span className="flex min-w-0 flex-1 basis-48 items-center gap-1.5 py-1">
                 <span className="shrink-0">Replying from</span>
-                <span className="truncate font-medium text-foreground/80" title={thread.mailbox_address}>
-                  {thread.mailbox_address}
+                <span
+                  className="truncate font-medium text-foreground/80"
+                  title={thread.catch_all_recipient ?? thread.mailbox_address}
+                >
+                  {thread.catch_all_recipient ?? thread.mailbox_address}
                 </span>
                 <span className="ml-1 flex shrink-0 items-center">
                   {!showCc && (
@@ -773,7 +821,13 @@ function MessageConnector() {
   );
 }
 
-function MessageCard({ message }: { message: Message }) {
+function MessageCard({
+  message,
+  catchAllRecipient,
+}: {
+  message: Message;
+  catchAllRecipient: string | null;
+}) {
   const [showQuoted, setShowQuoted] = useState(false);
   const isOutbound = message.direction === "outbound";
   const displayName = isOutbound
@@ -798,6 +852,7 @@ function MessageCard({ message }: { message: Message }) {
             <span className="truncate text-sm font-semibold text-foreground">{displayName}</span>
             {message.sent_by === "agent" && <AuthorBadge tone="agent">Agent</AuthorBadge>}
             {isOutbound && message.sent_by === "human" && <AuthorBadge tone="human">You</AuthorBadge>}
+            {!isOutbound && catchAllRecipient && <CatchAllBadge address={catchAllRecipient} />}
           </div>
           <div className="mt-0.5 truncate text-xs text-muted-foreground">
             {isOutbound ? `to ${to.join(", ")}` : message.from_address}

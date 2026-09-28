@@ -83,8 +83,10 @@ export async function sendReplyAttempt(
     }
   }
 
+  // A caught Conversation replies from the address it was sent to.
   const thread = await env.DB.prepare(
-    `SELECT t.id, t.mailbox_id, t.subject, m.address AS mailbox_address,
+    `SELECT t.id, t.mailbox_id, t.subject,
+       COALESCE(t.catch_all_recipient, m.address) AS mailbox_address,
        m.display_name AS mailbox_display_name,
        m.signature_mode AS mailbox_signature_mode,
        m.signature_html AS mailbox_signature_html,

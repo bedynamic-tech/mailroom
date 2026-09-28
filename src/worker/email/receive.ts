@@ -6,6 +6,7 @@ import { recordSender } from "../contacts/contacts";
 import { notifyNewEmail } from "../notifications/push";
 import { notifyNewEmailByEmail } from "../notifications/email";
 import { matchBlockedSender } from "../spam/blocklist";
+import { resolveInboundTarget } from "../inbox/catch-all";
 import { applyMailRules, matchingMailRules, NO_MAIL_RULES } from "./mail-rules";
 import type { MailRuleAddress, MailRuleSubject } from "../../shared/mail-rules";
 import { sendRuleForward, type ForwardedOriginal } from "./rule-forward";
@@ -26,12 +27,17 @@ export async function receiveEmail(
   env: Env,
   ctx: ExecutionContext,
 ): Promise<void> {
-  const inboxAddress = message.to.trim().toLowerCase();
-  const mailbox = await findMailbox(env, inboxAddress);
-  if (!mailbox) {
+  const target = await resolveInboundTarget(env, message.to);
+  if (target.kind === "unknown") {
     message.setReject("Inbox not configured");
     return;
   }
+  if (target.kind === "blocked") {
+    console.log("Rejected catch-all mail to a blocked address", { ruleId: target.ruleId });
+    message.setReject("Address blocked by recipient");
+    return;
+  }
+  const { mailbox, catchAllRecipient } = target;
 
   // Blocked Senders are rejected before anything is stored, whether the rule
   // matches the envelope sender or the From header people see in the app.
@@ -75,6 +81,7 @@ export async function receiveEmail(
     subject,
     referencesIds,
     sender,
+    catchAllRecipient,
   );
   const now = new Date().toISOString();
   const snippet = splitQuotedTail(textBody).main.replace(/\s+/g, " ").trim().slice(0, 140);
@@ -82,6 +89,7 @@ export async function receiveEmail(
   const stored = existingThreadId === null
     ? await storeNewConversation(env, {
         mailboxId: mailbox.id,
+        catchAllRecipient,
         messageId,
         parsed,
         subject,
@@ -181,7 +189,7 @@ export async function receiveEmail(
     ctx.waitUntil(
       notifyNewEmailByEmail(env, {
         threadId: stored.threadId,
-        inboxAddress,
+        inboxAddress: mailbox.address,
         senderName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
         senderAddress: sender,
         subject,
@@ -274,21 +282,13 @@ async function enqueueIfExternal(
   if (!fromOurAddress) await enqueueDraftRun(env, threadId, inboundMessageId);
 }
 
-async function findMailbox(
-  env: Env,
-  address: string,
-): Promise<{ id: number; agent_mode: string } | null> {
-  return env.DB.prepare("SELECT id, agent_mode FROM mailboxes WHERE address = ?")
-    .bind(address)
-    .first<{ id: number; agent_mode: string }>();
-}
-
 async function resolveThread(
   env: Env,
   mailboxId: number,
   subject: string,
   referencesIds: string[],
   sender: string,
+  catchAllRecipient: string | null,
 ): Promise<number | null> {
   if (referencesIds.length > 0) {
     const placeholders = referencesIds.map(() => "?").join(", ");
@@ -308,6 +308,7 @@ async function resolveThread(
   const bySubjectAndSender = await env.DB.prepare(
     `SELECT t.id FROM threads t
      WHERE t.mailbox_id = ? AND t.normalized_subject = ?
+       AND t.catch_all_recipient IS ?
        AND t.last_message_at > datetime('now', '-2 days')
        AND EXISTS (
          SELECT 1 FROM messages msg
@@ -316,7 +317,7 @@ async function resolveThread(
        )
      ORDER BY t.last_message_at DESC LIMIT 1`,
   )
-    .bind(mailboxId, normalized, sender)
+    .bind(mailboxId, normalized, catchAllRecipient, sender)
     .first<{ id: number }>();
   return bySubjectAndSender?.id ?? null;
 }
@@ -341,13 +342,21 @@ async function appendToConversation(
 
 async function storeNewConversation(
   env: Env,
-  args: StoredMessageInput & { mailboxId: number; snippet: string },
+  args: StoredMessageInput & { mailboxId: number; catchAllRecipient: string | null; snippet: string },
 ): Promise<{ threadId: number; messageId: number }> {
   const thread = await env.DB.prepare(
-    `INSERT INTO threads (mailbox_id, subject, normalized_subject, snippet, message_count, last_message_at)
-     VALUES (?, ?, ?, ?, 1, ?) RETURNING id`,
+    `INSERT INTO threads
+       (mailbox_id, catch_all_recipient, subject, normalized_subject, snippet, message_count, last_message_at)
+     VALUES (?, ?, ?, ?, ?, 1, ?) RETURNING id`,
   )
-    .bind(args.mailboxId, args.subject, normalizeSubject(args.subject), args.snippet, args.now)
+    .bind(
+      args.mailboxId,
+      args.catchAllRecipient,
+      args.subject,
+      normalizeSubject(args.subject),
+      args.snippet,
+      args.now,
+    )
     .first<{ id: number }>();
   if (!thread) throw new Error("Conversation was not created");
 

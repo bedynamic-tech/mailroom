@@ -29,6 +29,13 @@ Routing, D1, R2 and Web Push.
 - **Contacts.** Keep names, companies, phone numbers and notes, see each
   contact's conversations, and autocomplete them in To, Cc and Bcc. Import from
   CSV or vCard.
+- **Catch-all.** Make one inbox per domain receive mail for any address that
+  has no inbox of its own, such as a different address for each service you
+  sign up to. Caught mail is badged and shows the address it was sent to,
+  replies go out from that address, and any address can become its own inbox
+  or be blocked if spammers find it.
+
+<img width="2800" height="1800" alt="Catch-all conversations in Mailroom +" src="docs/images/catch-all.png" />
 
 ### Automation
 
