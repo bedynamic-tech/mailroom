@@ -475,11 +475,16 @@ function ContactDetails(props: {
           save.mutate();
         }}
       >
-        <AddressFields
-          addresses={addresses}
-          onChange={(next) => { setAddresses(next); if (save.isSuccess || save.isError) save.reset(); }}
+        <ContactFields
+          form={form}
+          onChange={(next) => { setForm(next); if (save.isSuccess) save.reset(); }}
+          beforeNotes={
+            <AddressFields
+              addresses={addresses}
+              onChange={(next) => { setAddresses(next); if (save.isSuccess || save.isError) save.reset(); }}
+            />
+          }
         />
-        <ContactFields form={form} onChange={(next) => { setForm(next); if (save.isSuccess) save.reset(); }} />
         {save.isError && (
           <p role="alert" className="text-sm text-destructive">
             {save.error instanceof Error ? save.error.message : "Couldn’t save this contact"}
@@ -676,7 +681,12 @@ function AddressFields(props: { addresses: string[]; onChange: (addresses: strin
   );
 }
 
-function ContactFields(props: { form: ContactForm; onChange: (form: ContactForm) => void }) {
+function ContactFields(props: {
+  form: ContactForm;
+  onChange: (form: ContactForm) => void;
+  /** Shown below Company and Phone, above Notes. */
+  beforeNotes?: ReactNode;
+}) {
   const set = (field: keyof ContactForm) => (value: string) =>
     props.onChange({ ...props.form, [field]: value });
   return (
@@ -701,6 +711,7 @@ function ContactFields(props: { form: ContactForm; onChange: (form: ContactForm)
           />
         </Field>
       </div>
+      {props.beforeNotes}
       <Field label="Notes">
         <Textarea
           value={props.form.notes}
