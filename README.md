@@ -84,13 +84,6 @@ idempotency key, and are capped by `MCP_DAILY_SEND_LIMIT`. Set
 `MCP_SEND_ENABLED=false` to turn them off for every client. Setup details are in
 [connect an AI agent over MCP](docs/deployment.md#optional-connect-an-ai-agent-over-mcp).
 
-## Roadmap
-
-- [x] Per-inbox auto labels on new inbound mail
-- [x] Full-text search in the conversation list
-- [ ] External tools for the draft agent (for example Stripe or product databases)
-- [ ] Delivery and bounce status inside the conversation
-
 ## License
 
 [Apache-2.0](LICENSE)
