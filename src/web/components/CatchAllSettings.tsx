@@ -2,6 +2,13 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -90,6 +97,7 @@ function DomainCatchAll(props: {
   const queryClient = useQueryClient();
   const { domain } = props;
   const selectId = `catch-all-${domain.id}`;
+  const [listOpen, setListOpen] = useState(false);
 
   const choose = useMutation({
     mutationFn: (mailboxId: number | null) => setDomainCatchAll(domain.id, mailboxId),
@@ -127,9 +135,22 @@ function DomainCatchAll(props: {
             {domain.name}
           </label>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {catchAllId === null
-              ? "Mail to addresses without an inbox is rejected."
-              : "Mail to any other address on this domain goes to the chosen inbox."}
+            {catchAllId === null ? (
+              "Mail to addresses without an inbox is rejected."
+            ) : (
+              <>
+                Mail to any other address on this domain goes to the chosen inbox.{" "}
+                <button
+                  type="button"
+                  onClick={() => setListOpen(true)}
+                  className="rounded-sm font-medium text-foreground underline underline-offset-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  {addresses.data
+                    ? `View ${caught.length} ${caught.length === 1 ? "address" : "addresses"} received`
+                    : "View addresses received"}
+                </button>
+              </>
+            )}
           </p>
           {choose.isError && (
             <p className="mt-1 text-xs text-destructive" role="alert">
@@ -156,25 +177,28 @@ function DomainCatchAll(props: {
         </Select>
       </div>
 
-      {catchAllId !== null && (
-        <>
-          <p className="border-t bg-muted/30 px-4 py-3 text-xs leading-5 text-muted-foreground sm:px-5">
+      <Dialog open={listOpen} onOpenChange={setListOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="pr-6 break-words">Addresses received on {domain.name}</DialogTitle>
+            <DialogDescription>
+              Create an inbox for an address you use, or block one that spammers found.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="rounded-lg bg-muted/60 px-3 py-2.5 text-xs leading-5 text-muted-foreground">
             In Cloudflare, open Email Routing for {domain.name}. Under Routing rules, set the
             Catch-all address action to <span className="font-medium text-foreground">Send to a Worker</span>{" "}
             and choose this Worker. Addresses with their own inbox keep working as before.
           </p>
-          <div className="border-t">
-            <p className="px-4 pt-3 pb-1 text-xs font-medium text-muted-foreground sm:px-5">
-              Addresses received
-            </p>
+          <div className="-mx-4 -mb-4 max-h-[60dvh] overflow-y-auto border-t">
             {addresses.isLoading ? (
-              <p className="px-4 py-4 text-sm text-muted-foreground sm:px-5">Loading…</p>
+              <p className="px-4 py-4 text-sm text-muted-foreground">Loading…</p>
             ) : addresses.isError ? (
-              <p className="px-4 py-4 text-sm text-destructive sm:px-5" role="alert">
+              <p className="px-4 py-4 text-sm text-destructive" role="alert">
                 Couldn’t load the addresses.
               </p>
             ) : caught.length === 0 ? (
-              <p className="flex items-center gap-2 px-4 pt-1 pb-4 text-sm text-muted-foreground sm:px-5">
+              <p className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground">
                 <MailIcon className="h-4 w-4" />
                 No mail caught yet
               </p>
@@ -183,7 +207,7 @@ function DomainCatchAll(props: {
                 {caught.map((row) => (
                   <li
                     key={row.address}
-                    className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 sm:px-5"
+                    className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-foreground" title={row.address}>
@@ -229,8 +253,8 @@ function DomainCatchAll(props: {
               </ul>
             )}
           </div>
-        </>
-      )}
+        </DialogContent>
+      </Dialog>
     </li>
   );
 }
