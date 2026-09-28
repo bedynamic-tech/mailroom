@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { useDeferredValue, useEffect, useId, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -816,42 +817,6 @@ function BoardCardDetailDialog(props: {
                     onLink={(conversation) => link.mutate(conversation)}
                   />
                 </div>
-                <div className="border-t pt-4">
-                  {confirmingDelete ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Delete this item and its notes?</span>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => remove.mutate()}
-                        disabled={busy}
-                      >
-                        {remove.isPending ? "Deleting…" : "Delete"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setConfirmingDelete(false)}
-                        disabled={busy}
-                      >
-                        Keep
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="-ml-2.5 text-destructive hover:text-destructive"
-                      onClick={() => setConfirmingDelete(true)}
-                      disabled={busy}
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                      Delete item
-                    </Button>
-                  )}
-                </div>
               </form>
             ) : (
               <>
@@ -957,15 +922,53 @@ function BoardCardDetailDialog(props: {
         )}
 
         {card && (
-          <DialogFooter className="border-t pt-4 max-sm:mt-auto">
+          <DialogFooter className={cn("border-t pt-4 max-sm:mt-auto", editing && "sm:justify-between")}>
             {editing ? (
               <>
-                <Button variant="outline" onClick={() => setEditing(false)} disabled={busy}>
-                  Cancel
-                </Button>
-                <Button type="submit" form="board-card-edit" disabled={busy || !title.trim()}>
-                  {save.isPending ? "Saving…" : "Save"}
-                </Button>
+                {confirmingDelete ? (
+                  <div className="flex flex-wrap items-center gap-2 max-sm:order-last max-sm:justify-center">
+                    <span className="text-sm text-muted-foreground max-sm:w-full max-sm:text-center">
+                      Delete this item and its notes?
+                    </span>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => remove.mutate()}
+                      disabled={busy}
+                    >
+                      {remove.isPending ? "Deleting…" : "Delete"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmingDelete(false)}
+                      disabled={busy}
+                    >
+                      Keep
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive max-sm:order-last sm:-ml-2.5"
+                    onClick={() => setConfirmingDelete(true)}
+                    disabled={busy}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                    Delete item
+                  </Button>
+                )}
+                <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                  <Button variant="outline" onClick={() => setEditing(false)} disabled={busy}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" form="board-card-edit" disabled={busy || !title.trim()}>
+                    {save.isPending ? "Saving…" : "Save"}
+                  </Button>
+                </div>
               </>
             ) : (
               <Button variant="outline" onClick={props.onClose}>
