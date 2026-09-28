@@ -178,7 +178,7 @@ function DomainCatchAll(props: {
       </div>
 
       <Dialog open={listOpen} onOpenChange={setListOpen}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent fullScreenOnMobile className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="pr-6 break-words">Addresses received on {domain.name}</DialogTitle>
             <DialogDescription>

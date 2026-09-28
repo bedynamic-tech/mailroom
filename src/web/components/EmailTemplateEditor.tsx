@@ -136,7 +136,7 @@ export function EmailTemplateEditor(props: {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl">
+      <DialogContent fullScreenOnMobile className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-4xl">
         <form
           onSubmit={(event) => {
             event.preventDefault();
