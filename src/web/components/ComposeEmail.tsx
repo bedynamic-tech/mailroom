@@ -20,7 +20,22 @@ export const useCompose = () => useContext(ComposeContext);
  * Address rows lead into an unboxed writing area; send/attachments stay in the
  * footer. Closing preserves the draft for this page session, including files.
  */
+/** Phones get the full-screen editor, where field names sit inside the fields. */
+const PHONE_QUERY = "(max-width: 639px)";
+
+function useIsPhone() {
+  const [phone, setPhone] = useState(() => window.matchMedia(PHONE_QUERY).matches);
+  useEffect(() => {
+    const query = window.matchMedia(PHONE_QUERY);
+    const update = () => setPhone(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return phone;
+}
+
 export function ComposeEmailProvider({ children }: { children: ReactNode }) {
+  const phone = useIsPhone();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -206,8 +221,8 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                   </select>
                 </div>
                 <div className="flex min-h-12 items-start gap-2 border-b sm:gap-3">
-                  <label htmlFor="compose-to" className="shrink-0 sm:w-14 py-3.5 text-sm text-muted-foreground">To</label>
-                  <RecipientInput ref={toField} inputRef={toRef} id="compose-to" label="To" values={to} onChange={setTo} capacity={Math.min(1 - to.length, remaining)} taken={takenBy(cc, bcc)} placeholder="recipient@example.com" className="py-1.5 sm:px-2.5" />
+                  <label htmlFor="compose-to" className="shrink-0 sm:w-14 py-3.5 text-sm text-muted-foreground max-sm:sr-only">To</label>
+                  <RecipientInput ref={toField} inputRef={toRef} id="compose-to" label="To" values={to} onChange={setTo} capacity={Math.min(1 - to.length, remaining)} taken={takenBy(cc, bcc)} placeholder={phone ? "To" : "recipient@example.com"} className="py-1.5 sm:px-2.5" />
                   {(!showCc || !showBcc) && (
                     <span className="flex shrink-0 items-center py-2.5">
                       {!showCc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Cc recipients" onClick={() => { setAddingCc(true); requestAnimationFrame(() => ccRef.current?.focus()); }}>Cc</Button>}
@@ -217,14 +232,14 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                 </div>
                 {showCc && (
                   <div className="flex min-h-12 items-start gap-2 border-b sm:gap-3">
-                    <label htmlFor="compose-cc" className="shrink-0 sm:w-14 py-3.5 text-sm text-muted-foreground">Cc</label>
-                    <RecipientInput ref={ccField} inputRef={ccRef} id="compose-cc" label="Cc" values={cc} onChange={setCc} capacity={copyCapacity} taken={takenBy(to, bcc)} placeholder="Add Cc recipients" onDismiss={() => setAddingCc(false)} className="py-1.5 sm:px-2.5" />
+                    <label htmlFor="compose-cc" className="shrink-0 sm:w-14 py-3.5 text-sm text-muted-foreground max-sm:sr-only">Cc</label>
+                    <RecipientInput ref={ccField} inputRef={ccRef} id="compose-cc" label="Cc" values={cc} onChange={setCc} capacity={copyCapacity} taken={takenBy(to, bcc)} placeholder={phone ? "Cc" : "Add Cc recipients"} onDismiss={() => setAddingCc(false)} className="py-1.5 sm:px-2.5" />
                   </div>
                 )}
                 {showBcc && (
                   <div className="flex min-h-12 items-start gap-2 border-b sm:gap-3">
-                    <label htmlFor="compose-bcc" className="shrink-0 sm:w-14 py-3.5 text-sm text-muted-foreground">Bcc</label>
-                    <RecipientInput ref={bccField} inputRef={bccRef} id="compose-bcc" label="Bcc" values={bcc} onChange={setBcc} capacity={copyCapacity} taken={takenBy(to, cc)} placeholder="Add Bcc recipients" onDismiss={() => setAddingBcc(false)} className="py-1.5 sm:px-2.5" />
+                    <label htmlFor="compose-bcc" className="shrink-0 sm:w-14 py-3.5 text-sm text-muted-foreground max-sm:sr-only">Bcc</label>
+                    <RecipientInput ref={bccField} inputRef={bccRef} id="compose-bcc" label="Bcc" values={bcc} onChange={setBcc} capacity={copyCapacity} taken={takenBy(to, cc)} placeholder={phone ? "Bcc" : "Add Bcc recipients"} onDismiss={() => setAddingBcc(false)} className="py-1.5 sm:px-2.5" />
                   </div>
                 )}
                 {copyCapacity <= 0 && (
@@ -233,8 +248,8 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                   </p>
                 )}
                 <div className="flex min-h-12 items-center gap-2 border-b sm:gap-3">
-                  <label htmlFor="compose-subject" className="shrink-0 sm:w-14 text-sm text-muted-foreground">Subject</label>
-                  <Input id="compose-subject" required maxLength={MAX_SUBJECT_CHARS} placeholder="Add a subject" value={subject} onChange={(event) => setSubject(event.target.value)} className="min-w-0 border-0 px-0 shadow-none max-sm:focus-visible:ring-0 sm:px-2.5" />
+                  <label htmlFor="compose-subject" className="shrink-0 sm:w-14 text-sm text-muted-foreground max-sm:sr-only">Subject</label>
+                  <Input id="compose-subject" required maxLength={MAX_SUBJECT_CHARS} placeholder={phone ? "Subject" : "Add a subject"} value={subject} onChange={(event) => setSubject(event.target.value)} className="min-w-0 border-0 px-0 shadow-none max-sm:focus-visible:ring-0 sm:px-2.5" />
                 </div>
                 <RichTextEditor id="compose-body" ariaLabel="Message" value={html} onChange={setHtml} variant="bare" placeholder="Write your message…" className="mt-1" contentClassName="min-h-44 px-0 sm:min-h-64 sm:px-2" />
                 {sender?.effective_signature_html && (
