@@ -1,5 +1,8 @@
 import type {
+  BlockedRecipient,
   BlockedSender,
+  BlockRecipientResult,
+  CatchAllAddress,
   BrowserPushSubscription,
   ComposeAttemptResult,
   Contact,
@@ -424,3 +427,32 @@ export const saveMailRule = (input: MailRuleInput & { id?: number }) => {
 
 export const deleteMailRule = (id: number) =>
   request<{ ok: true }>(`/mail-rules/${id}`, { method: "DELETE" });
+
+export const setCatchAll = (mailboxId: number, enabled: boolean) =>
+  request<{ ok: true }>(`/mailboxes/${mailboxId}/catch-all`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+
+export const fetchCatchAllAddresses = (mailboxId: number) =>
+  request<CatchAllAddress[]>(`/mailboxes/${mailboxId}/catch-all/addresses`);
+
+export const createInboxFromCatchAll = (input: { address: string; moveConversations: boolean }) =>
+  request<{ mailbox: Mailbox; moved: number }>("/catch-all/inboxes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address: input.address, move_conversations: input.moveConversations }),
+  });
+
+export const fetchBlockedRecipients = () => request<BlockedRecipient[]>("/blocked-recipients");
+
+export const blockRecipient = (address: string) =>
+  request<BlockRecipientResult>("/blocked-recipients", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address }),
+  });
+
+export const unblockRecipient = (id: number) =>
+  request<{ ok: true }>(`/blocked-recipients/${id}`, { method: "DELETE" });

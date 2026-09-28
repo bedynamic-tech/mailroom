@@ -609,7 +609,11 @@ function ThreadRow(props: {
             {thread.snippet}
           </span>
 
-          {(props.showMailbox || hasDraft || showArchivedBadge || thread.labels.length > 0) && (
+          {(props.showMailbox ||
+            thread.catch_all_recipient ||
+            hasDraft ||
+            showArchivedBadge ||
+            thread.labels.length > 0) && (
             <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
               {showArchivedBadge && (
                 <Badge
@@ -630,10 +634,19 @@ function ThreadRow(props: {
                   {label.name}
                 </Badge>
               ))}
-              {props.showMailbox && (
-                <span className="min-w-0 truncate text-xs text-muted-foreground">
-                  {thread.mailbox_address}
+              {thread.catch_all_recipient ? (
+                <span
+                  className="min-w-0 truncate text-xs text-muted-foreground"
+                  title={`Sent to ${thread.catch_all_recipient} via ${thread.mailbox_address}`}
+                >
+                  To {thread.catch_all_recipient}
                 </span>
+              ) : (
+                props.showMailbox && (
+                  <span className="min-w-0 truncate text-xs text-muted-foreground">
+                    {thread.mailbox_address}
+                  </span>
+                )
               )}
               {hasDraft && (
                 <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">

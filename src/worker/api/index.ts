@@ -21,6 +21,16 @@ import {
 } from "../email/attachments";
 import { ReplyIntentError, sendReplyAttempt } from "../email/reply";
 import {
+  blockRecipient,
+  CatchAllError,
+  createInboxFromCatchAll,
+  listBlockedRecipients,
+  listCatchAllAddresses,
+  setCatchAll,
+  unblockRecipient,
+} from "../inbox/catch-all";
+import { createInbox, InboxCreationError, type StoredMailbox } from "../inbox/create";
+import {
   deleteInbox,
   InboxDeletionError,
   purgeInboxObjects,
@@ -300,12 +310,19 @@ api.get("/mailboxes", async (c) => {
     `SELECT m.*,
        (SELECT COUNT(*) FROM threads t
         WHERE t.mailbox_id = m.id AND t.is_read = 0 AND t.status != 'archived') AS unread_count,
-       (SELECT default_signature_html FROM global_settings WHERE id = 1) AS default_signature_html
+       (SELECT default_signature_html FROM global_settings WHERE id = 1) AS default_signature_html,
+       EXISTS (SELECT 1 FROM domains d WHERE d.catch_all_mailbox_id = m.id) AS is_catch_all
      FROM mailboxes m ORDER BY m.address`,
-  ).all<Omit<Mailbox, "effective_signature_html"> & { default_signature_html: string | null }>();
+  ).all<
+    Omit<Mailbox, "effective_signature_html" | "is_catch_all"> & {
+      default_signature_html: string | null;
+      is_catch_all: number;
+    }
+  >();
   return c.json(
     results.map(({ default_signature_html, ...mailbox }): Mailbox => ({
       ...mailbox,
+      is_catch_all: Boolean(mailbox.is_catch_all),
       effective_signature_html: effectiveSignature(
         mailbox.signature_mode,
         mailbox.signature_html,
@@ -366,63 +383,88 @@ api.post("/domains/:id/activate", async (c) => {
 
 api.post("/mailboxes", async (c) => {
   const body = await c.req.json<{ local_part?: string; domain_id?: number }>();
-  const localPart = body.local_part?.trim().toLowerCase() ?? "";
-  const domainId = Number(body.domain_id);
-
-  if (!isLocalPart(localPart)) {
-    return c.json({ error: "Use letters, numbers, dots, dashes, or underscores" }, 400);
-  }
-  if (!Number.isInteger(domainId) || domainId <= 0) {
-    return c.json({ error: "Choose a domain" }, 400);
-  }
-
-  const domain = await c.env.DB.prepare(
-    "SELECT id, name, status FROM domains WHERE id = ?",
-  )
-    .bind(domainId)
-    .first<{ id: number; name: string; status: "pending" | "active" }>();
-  if (!domain) return c.json({ error: "Domain not found" }, 404);
-  if (domain.status !== "active") {
-    return c.json({ error: "Finish setting up this domain first" }, 409);
-  }
-
-  const address = `${localPart}@${domain.name}`;
-
-  const existing = await c.env.DB.prepare("SELECT id FROM mailboxes WHERE address = ?")
-    .bind(address)
-    .first();
-  if (existing) return c.json({ error: "This inbox already exists" }, 409);
-
-  let mailbox: Mailbox | null;
   try {
-    mailbox = await c.env.DB.prepare(
-      `INSERT INTO mailboxes (address, domain_id)
-       VALUES (?, ?) RETURNING *`,
-    )
-      .bind(address, domain.id)
-      .first<Mailbox>();
+    const mailbox = await createInbox(c.env, {
+      localPart: body.local_part ?? "",
+      domainId: Number(body.domain_id),
+    });
+    return c.json(await newMailboxResponse(c.env, mailbox), 201);
   } catch (error) {
-    if (error instanceof Error && error.message.includes("UNIQUE")) {
-      return c.json({ error: "This inbox already exists" }, 409);
-    }
+    if (error instanceof InboxCreationError) return c.json({ error: error.message }, error.status);
     throw error;
   }
+});
 
-  const defaults = await c.env.DB.prepare(
+async function newMailboxResponse(env: Env, mailbox: StoredMailbox): Promise<Mailbox> {
+  const defaults = await env.DB.prepare(
     "SELECT default_signature_html FROM global_settings WHERE id = 1",
   ).first<{ default_signature_html: string | null }>();
-  return c.json(
-    {
-      ...mailbox!,
-      unread_count: 0,
-      effective_signature_html: effectiveSignature(
-        mailbox!.signature_mode,
-        mailbox!.signature_html,
-        defaults?.default_signature_html,
-      ),
-    },
-    201,
-  );
+  return {
+    ...mailbox,
+    unread_count: 0,
+    is_catch_all: false,
+    effective_signature_html: effectiveSignature(
+      mailbox.signature_mode,
+      mailbox.signature_html,
+      defaults?.default_signature_html,
+    ),
+  };
+}
+
+api.put("/mailboxes/:id/catch-all", async (c) => {
+  const id = parsePositiveId(c.req.param("id"));
+  if (id === null) return c.json({ error: "Invalid inbox" }, 400);
+  const body = await c.req.json<{ enabled?: unknown }>().catch(() => null);
+  if (typeof body?.enabled !== "boolean") return c.json({ error: "enabled must be true or false" }, 400);
+  try {
+    await setCatchAll(c.env, id, body.enabled);
+    return c.json({ ok: true });
+  } catch (error) {
+    if (error instanceof CatchAllError) return c.json({ error: error.message }, error.status);
+    throw error;
+  }
+});
+
+api.get("/mailboxes/:id/catch-all/addresses", async (c) => {
+  const id = parsePositiveId(c.req.param("id"));
+  if (id === null) return c.json({ error: "Invalid inbox" }, 400);
+  return c.json(await listCatchAllAddresses(c.env, id));
+});
+
+api.post("/catch-all/inboxes", async (c) => {
+  const body = await c.req.json<{ address?: unknown; move_conversations?: unknown }>().catch(() => null);
+  try {
+    const created = await createInboxFromCatchAll(c.env, {
+      address: body?.address,
+      moveConversations: body?.move_conversations === true,
+    });
+    return c.json(
+      { mailbox: await newMailboxResponse(c.env, created.mailbox), moved: created.moved },
+      201,
+    );
+  } catch (error) {
+    if (error instanceof CatchAllError) return c.json({ error: error.message }, error.status);
+    throw error;
+  }
+});
+
+api.get("/blocked-recipients", async (c) => c.json(await listBlockedRecipients(c.env)));
+
+api.post("/blocked-recipients", async (c) => {
+  const body = await c.req.json<{ address?: unknown }>().catch(() => null);
+  try {
+    return c.json(await blockRecipient(c.env, body?.address), 201);
+  } catch (error) {
+    if (error instanceof CatchAllError) return c.json({ error: error.message }, error.status);
+    throw error;
+  }
+});
+
+api.delete("/blocked-recipients/:id", async (c) => {
+  const id = parsePositiveId(c.req.param("id"));
+  if (id === null) return c.json({ error: "Invalid blocked address" }, 400);
+  if (!(await unblockRecipient(c.env, id))) return c.json({ error: "Blocked address not found" }, 404);
+  return c.json({ ok: true });
 });
 
 api.patch("/mailboxes/:id", async (c) => {
@@ -492,7 +534,7 @@ api.delete("/mailboxes/:id", async (c) => {
       confirmAddress: body.confirm_address,
     });
     c.executionCtx.waitUntil(
-      purgeInboxObjects(c.env.RAW, deleted.id).catch((error) => {
+      purgeInboxObjects(c.env.RAW, deleted.id, c.env.DB).catch((error) => {
         console.error("Inbox object cleanup failed", {
           inboxId: deleted.id,
           error,
@@ -1263,17 +1305,6 @@ function isDomainName(name: string): boolean {
       label.length > 0 &&
       label.length <= 63 &&
       /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label),
-  );
-}
-
-function isLocalPart(value: string): boolean {
-  return (
-    value.length > 0 &&
-    value.length <= 64 &&
-    !value.startsWith(".") &&
-    !value.endsWith(".") &&
-    !value.includes("..") &&
-    /^[a-z0-9._+-]+$/.test(value)
   );
 }
 

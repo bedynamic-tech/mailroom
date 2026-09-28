@@ -5,7 +5,7 @@ Mailroom is a shared email workspace where people and agents handle customer con
 ## Language
 
 **Inbox**:
-A manually registered customer-facing email address under one ready Domain, with its own agent configuration and collection of conversations. The address is its sole identity; mail sent to an unregistered address is not part of the workspace. An Inbox may carry a Sender Name (for example "Jane Doe from Acme") that recipients see in the From header of every reply and new email it sends; without one, mail shows only the address.
+A manually registered customer-facing email address under one ready Domain, with its own agent configuration and collection of conversations. The address is its sole identity; mail sent to an unregistered address is not part of the workspace unless its Domain has a Catch-all. An Inbox may carry a Sender Name (for example "Jane Doe from Acme") that recipients see in the From header of every reply and new email it sends; without one, mail shows only the address.
 _Avoid_: Mailbox, account, inbox account
 
 **Signature**:
@@ -43,6 +43,14 @@ _Avoid_: Customer, address book entry, sender
 **Blocked Sender**:
 A rule naming one sender address or one domain (which also covers its subdomains), applying to one Inbox or to all Inboxes. Inbound mail to a covered Inbox whose envelope sender or From address matches is rejected before anything is stored, so it never opens a Conversation, drafts, labels or notifies. "Block sender" on a Conversation, after confirmation, blocks its latest sender's address or domain on that Conversation's Inbox or on all Inboxes, and archives the Conversation along with the sender's other open Conversations in that scope. A rule for all Inboxes replaces the same sender's per-Inbox rules. A rule can never cover one of the workspace's own Inboxes or a public mailbox provider such as gmail.com.
 _Avoid_: Spam filter, blacklist, banned sender
+
+**Catch-all**:
+The one Inbox per Domain that receives mail sent to any address on that Domain without an Inbox of its own, such as a different address for each service someone signs up to. Each caught Conversation records the address it was sent to, shows it, and replies from it. From a caught address, "Create inbox" registers it as its own Inbox and can move its caught Conversations over (their Labels stay behind), and "Block address" makes it a Blocked Address. Without a Catch-all, mail to unregistered addresses is rejected.
+_Avoid_: Wildcard inbox, alias inbox
+
+**Blocked Address**:
+An address on one of the workspace's own Domains whose mail the Catch-all rejects before anything is stored, whoever sends it, for an address that leaked to spammers. Blocking it archives the open Conversations caught for it. An address with its own Inbox can't be blocked this way, and creating an Inbox for a Blocked Address removes the block.
+_Avoid_: Blocked recipient, blacklisted alias
 
 **Mail Rule**:
 A deterministic filter for one Inbox or all Inboxes, checked against every stored inbound Message. Its conditions read as a flow: IF a list of conditions joined by AND (all must hold) or OR (any may hold), where an item can be a group joined by the other connector, as in "From is at domain vendor.com AND (Subject contains invoice OR Attachment name ends with .pdf)". A condition compares From, To, Cc, Subject, Body or Attachment name (contains, does not contain, is, is not, starts with, ends with, and "is at domain" for addresses, covering subdomains), or asks whether the Message has an attachment; inline images never count and text matching ignores case. A match applies every action it names: apply one of its Inbox's Labels, mark the Conversation read, archive it, skip the Draft Run, skip Browser and Email Notifications, or forward the Message to To, Cc and Bcc recipients. Actions of all matching rules combine, and run before drafting and notifications. Unlike a Label's natural-language condition, a Mail Rule never calls a model; unlike a Blocked Sender, the Message is still stored. Deleting a rule's Label leaves the rule without that action; deleting its Inbox deletes the rule.

@@ -1,3 +1,5 @@
+import { unreferencedKeys } from "./delete-conversations.ts";
+
 export interface InboxDeletionEnv {
   DB: D1Database;
   RAW: R2Bucket;
@@ -96,19 +98,29 @@ export async function deleteInbox(
   return { id: inbox.id, address: inbox.address, domainId: inbox.domain_id };
 }
 
-export async function purgeInboxObjects(bucket: R2Bucket, inboxId: number): Promise<void> {
+/**
+ * Deletes a deleted Inbox's stored emails and attachments. With `db`, objects
+ * still referenced elsewhere are kept: Conversations moved out of a catch-all
+ * Inbox keep their files under the catch-all's prefix.
+ */
+export async function purgeInboxObjects(
+  bucket: R2Bucket,
+  inboxId: number,
+  db?: D1Database,
+): Promise<void> {
   await Promise.all([
-    purgePrefix(bucket, `raw/${inboxId}/`),
-    purgePrefix(bucket, `attachments/${inboxId}/`),
+    purgePrefix(bucket, `raw/${inboxId}/`, db),
+    purgePrefix(bucket, `attachments/${inboxId}/`, db),
   ]);
 }
 
-async function purgePrefix(bucket: R2Bucket, prefix: string): Promise<void> {
+async function purgePrefix(bucket: R2Bucket, prefix: string, db?: D1Database): Promise<void> {
   let cursor: string | undefined;
 
   do {
     const page = await bucket.list({ prefix, cursor, limit: 1_000 });
-    const keys = page.objects.map((object) => object.key);
+    const listed = page.objects.map((object) => object.key);
+    const keys = db && listed.length > 0 ? await unreferencedKeys(db, listed) : listed;
     if (keys.length > 0) await bucket.delete(keys);
     cursor = page.truncated ? page.cursor : undefined;
   } while (cursor);

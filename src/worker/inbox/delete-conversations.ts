@@ -194,7 +194,7 @@ export async function purgeConversationObjects(
 }
 
 /** Drops keys that are still referenced by a Message or Attempt that was kept. */
-async function unreferencedKeys(db: D1Database, keys: string[]): Promise<string[]> {
+export async function unreferencedKeys(db: D1Database, keys: string[]): Promise<string[]> {
   const unique = [...new Set(keys)];
   const referenced = new Set<string>();
 
