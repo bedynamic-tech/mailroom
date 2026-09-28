@@ -35,18 +35,18 @@ Routing, D1, R2 and Web Push.
   replies go out from that address, and any address can become its own inbox
   or be blocked if spammers find it.
 - **Board.** Track work on a Kanban board from the sidebar. Add, rename,
-  reorder and delete columns, and drag items between them on desktop or phone
-  (press and hold on a touch screen). Create an item from any message's menu in
-  a conversation, prefilled from the subject, or add the conversation to an
-  item already on the board. Opening an item shows its name, description and
-  date added, a column picker, and timestamped notes you can add over time;
-  an Edit button changes the name and description. Each item's Related
-  conversations section links
-  more conversations by search, and suggests new mail from the senders it
-  already tracks; a conversation from one of those senders offers to link
-  itself to their item. Items link back to their conversations, and
-  conversations show the items they are on, both in the list and above the
-  messages.
+  reorder and delete columns, add items with the plus on any column, and drag
+  items between columns on desktop or phone (press and hold on a touch
+  screen). Create an item from any message's menu in a conversation,
+  prefilled from the subject, or add the conversation to an item already on
+  the board. Opening an item shows its name, description, date added, column,
+  timestamped notes you can add over time, and its related conversations. The
+  Edit button changes the name, description and column, links or unlinks
+  conversations, and deletes the item. Linking searches your mail and
+  suggests new mail from the senders the item already tracks; a conversation
+  from one of those senders offers to link itself to their item. Items link
+  back to their conversations, and conversations show the items they are on,
+  both in the list and above the messages.
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.

@@ -227,51 +227,6 @@ export function Board(props: {
         <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.015em] text-foreground">
           Board
         </h1>
-        <Button
-          variant="outline"
-          size="sm"
-          className="hidden sm:inline-flex"
-          onClick={() => setAddingColumn(true)}
-          disabled={!board.data || columns.length >= MAX_BOARD_COLUMNS}
-        >
-          <PlusIcon className="h-3.5 w-3.5" />
-          Add column
-        </Button>
-        <Button
-          size="sm"
-          className="hidden sm:inline-flex"
-          onClick={() => setCreating({ kind: "create", columnId: columns[0]?.id })}
-          disabled={!board.data}
-        >
-          <PlusIcon className="h-3.5 w-3.5" />
-          New item
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="-mr-1.5 text-muted-foreground sm:hidden"
-              aria-label="Board options"
-              disabled={!board.data}
-            >
-              <MoreIcon className="h-5 w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent onCloseAutoFocus={(event) => event.preventDefault()}>
-            <DropdownMenuItem onSelect={() => setCreating({ kind: "create", columnId: columns[0]?.id })}>
-              <PlusIcon />
-              New item
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={columns.length >= MAX_BOARD_COLUMNS}
-              onSelect={() => setAddingColumn(true)}
-            >
-              <BoardIcon />
-              Add column
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </header>
 
       {board.isLoading ? (
@@ -440,14 +395,6 @@ function BoardColumnView(props: {
             const card = props.cards.get(id);
             return card ? <SortableCard key={id} card={card} onOpen={() => props.onOpenCard(id)} /> : null;
           })}
-          <button
-            type="button"
-            onClick={props.onAddCard}
-            className="flex h-8 w-full items-center gap-1.5 rounded-lg px-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 touch:h-10"
-          >
-            <PlusIcon className="h-3.5 w-3.5" />
-            Add item
-          </button>
         </div>
       </SortableContext>
     </section>

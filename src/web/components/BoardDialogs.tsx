@@ -39,7 +39,7 @@ import {
   MAX_BOARD_NOTE_LENGTH,
 } from "../../shared/board";
 import type { BoardCard, BoardCardConversation } from "../../shared/types";
-import { ArchiveIcon, MailIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, XIcon } from "./Icons";
+import { ArchiveIcon, BoardIcon, MailIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, XIcon } from "./Icons";
 
 /** Refreshes everything that shows Board Cards or their links. */
 export function useInvalidateBoard() {
@@ -569,10 +569,15 @@ function LinkedConversations(props: {
   conversations: BoardCardConversation[];
   disabled: boolean;
   onOpen?: (conversation: BoardCardConversation) => void;
-  onUnlink: (conversation: BoardCardConversation) => void;
+  onUnlink?: (conversation: BoardCardConversation) => void;
+  emptyText?: string;
 }) {
   if (props.conversations.length === 0) {
-    return <p className="text-xs leading-5 text-muted-foreground">None yet. Search below to link one.</p>;
+    return (
+      <p className="text-xs leading-5 text-muted-foreground">
+        {props.emptyText ?? "None yet. Search below to link one."}
+      </p>
+    );
   }
   return (
     <ul className="divide-y rounded-lg border">
@@ -597,18 +602,20 @@ function LinkedConversations(props: {
               </span>
             </span>
           </button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="shrink-0 text-muted-foreground"
-            aria-label={`Unlink ${conversation.subject || "conversation"}`}
-            title="Unlink"
-            disabled={props.disabled}
-            onClick={() => props.onUnlink(conversation)}
-          >
-            <XIcon className="h-3.5 w-3.5" />
-          </Button>
+          {props.onUnlink && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0 text-muted-foreground"
+              aria-label={`Unlink ${conversation.subject || "conversation"}`}
+              title="Unlink"
+              disabled={props.disabled}
+              onClick={() => props.onUnlink?.(conversation)}
+            >
+              <XIcon className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </li>
       ))}
     </ul>
@@ -644,6 +651,7 @@ function BoardCardDetailDialog(props: {
     ]);
 
   const [editing, setEditing] = useState(false);
+  const [columnId, setColumnId] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [note, setNote] = useState("");
@@ -656,22 +664,23 @@ function BoardCardDetailDialog(props: {
     if (!card) return;
     setTitle(card.title);
     setDescription(card.description ?? "");
+    setColumnId(card.column_id);
+    setConfirmingDelete(false);
     setEditing(true);
   };
 
   const save = useMutation({
-    mutationFn: () => updateBoardCard(props.cardId, { title, description }),
+    mutationFn: async () => {
+      await updateBoardCard(props.cardId, { title, description });
+      if (card && columnId !== null && columnId !== card.column_id) {
+        const end = board.data?.cards.filter((item) => item.column_id === columnId).length ?? 0;
+        await moveBoardCard(props.cardId, columnId, end);
+      }
+    },
     onSuccess: async () => {
       await invalidate();
       setEditing(false);
     },
-  });
-  const move = useMutation({
-    mutationFn: (columnId: number) => {
-      const end = board.data?.cards.filter((item) => item.column_id === columnId).length ?? 0;
-      return moveBoardCard(props.cardId, columnId, end);
-    },
-    onSuccess: invalidate,
   });
   const addNote = useMutation({
     mutationFn: () => addBoardCardNote(props.cardId, note),
@@ -702,7 +711,7 @@ function BoardCardDetailDialog(props: {
   });
 
   const busy = save.isPending || remove.isPending;
-  const error = [save, move, addNote, removeNote, link, unlink, remove].find((m) => m.isError)?.error;
+  const error = [save, addNote, removeNote, link, unlink, remove].find((m) => m.isError)?.error;
   const submitNote = (event?: FormEvent) => {
     event?.preventDefault();
     if (note.trim() && !addNote.isPending) addNote.mutate();
@@ -735,14 +744,17 @@ function BoardCardDetailDialog(props: {
           <>
             {editing ? (
               <form
+                id="board-card-edit"
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (title.trim() && !busy) save.mutate();
                 }}
-                className="space-y-3 pr-8"
+                className="space-y-4 pr-8"
               >
-                <DialogTitle className="sr-only">Edit board item</DialogTitle>
-                <DialogDescription className="sr-only">Change the item’s name and description.</DialogDescription>
+                <DialogTitle>Edit board item</DialogTitle>
+                <DialogDescription className="sr-only">
+                  Change the item’s name, description, column and related conversations.
+                </DialogDescription>
                 <div className="space-y-1.5">
                   <label htmlFor={titleId} className="text-sm font-medium text-foreground">
                     Name
@@ -771,130 +783,170 @@ function BoardCardDetailDialog(props: {
                     className="min-h-24"
                   />
                 </div>
-                <div className="flex gap-2">
-                  <Button type="submit" size="sm" disabled={busy || !title.trim()}>
-                    {save.isPending ? "Saving…" : "Save"}
-                  </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={busy}>
-                    Cancel
-                  </Button>
+                <div className="space-y-1.5">
+                  <span className="text-sm font-medium text-foreground">Column</span>
+                  <Select
+                    value={columnId === null ? "" : String(columnId)}
+                    onValueChange={(value) => setColumnId(Number(value))}
+                    disabled={busy || columns.length === 0}
+                  >
+                    <SelectTrigger aria-label="Column" className="w-full">
+                      <SelectValue placeholder="Choose a column" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {columns.map((column) => (
+                        <SelectItem key={column.id} value={String(column.id)}>
+                          {column.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-sm font-medium text-foreground">Related conversations</span>
+                  <LinkedConversations
+                    conversations={card.conversations}
+                    disabled={busy || unlink.isPending}
+                    onUnlink={(conversation) => unlink.mutate(conversation)}
+                  />
+                  <RelatedConversationPicker
+                    cardId={card.id}
+                    linkedIds={new Set(card.conversations.map((conversation) => conversation.id))}
+                    disabled={busy || link.isPending}
+                    onLink={(conversation) => link.mutate(conversation)}
+                  />
+                </div>
+                <div className="border-t pt-4">
+                  {confirmingDelete ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Delete this item and its notes?</span>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => remove.mutate()}
+                        disabled={busy}
+                      >
+                        {remove.isPending ? "Deleting…" : "Delete"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfirmingDelete(false)}
+                        disabled={busy}
+                      >
+                        Keep
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="-ml-2.5 text-destructive hover:text-destructive"
+                      onClick={() => setConfirmingDelete(true)}
+                      disabled={busy}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                      Delete item
+                    </Button>
+                  )}
                 </div>
               </form>
             ) : (
-              <div className="space-y-2 pr-8">
-                <div className="flex items-start gap-2">
-                  <DialogTitle className="min-w-0 flex-1 text-lg leading-7 font-semibold break-words">
-                    {card.title}
-                  </DialogTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    onClick={startEditing}
-                    title="Edit name and description"
-                  >
-                    <PencilIcon className="h-3.5 w-3.5" />
-                    Edit
-                  </Button>
+              <>
+                <div className="space-y-2 pr-8">
+                  <div className="flex items-start gap-2">
+                    <DialogTitle className="min-w-0 flex-1 text-lg leading-7 font-semibold break-words">
+                      {card.title}
+                    </DialogTitle>
+                    <Button variant="outline" size="sm" className="shrink-0" onClick={startEditing}>
+                      <PencilIcon className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                  </div>
+                  <DialogDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                    <span>
+                      Added <time dateTime={card.created_at}>{formatDateTime(card.created_at)}</time>
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <BoardIcon className="h-3 w-3" />
+                      {columns.find((column) => column.id === card.column_id)?.name ?? ""}
+                    </span>
+                  </DialogDescription>
+                  {card.description ? (
+                    <p className="text-sm leading-6 break-words whitespace-pre-wrap text-foreground">
+                      {card.description}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No description.</p>
+                  )}
                 </div>
-                <DialogDescription className="text-xs">
-                  Added <time dateTime={card.created_at}>{formatDateTime(card.created_at)}</time>
-                </DialogDescription>
-                {card.description ? (
-                  <p className="text-sm leading-6 break-words whitespace-pre-wrap text-foreground">{card.description}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No description.</p>
-                )}
-              </div>
+
+                <section aria-labelledby={noteId} className="space-y-2 border-t pt-4">
+                  <h3 id={noteId} className="text-sm font-medium text-foreground">
+                    Notes
+                  </h3>
+                  <form onSubmit={submitNote} className="space-y-2">
+                    <Textarea
+                      value={note}
+                      maxLength={MAX_BOARD_NOTE_LENGTH}
+                      onChange={(event) => setNote(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) submitNote();
+                      }}
+                      placeholder="Add a note"
+                      aria-label="New note"
+                      disabled={addNote.isPending}
+                      className="min-h-16"
+                    />
+                    <Button type="submit" size="sm" disabled={!note.trim() || addNote.isPending}>
+                      {addNote.isPending ? "Adding…" : "Add note"}
+                    </Button>
+                  </form>
+                  {card.notes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No notes yet.</p>
+                  ) : (
+                    <ol className="space-y-2">
+                      {[...card.notes].reverse().map((entry) => (
+                        <li key={entry.id} className="rounded-lg bg-muted/50 px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <time dateTime={entry.created_at} className="flex-1 text-xs text-muted-foreground">
+                              {formatDateTime(entry.created_at)}
+                            </time>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              className="text-muted-foreground"
+                              aria-label={`Delete note from ${formatDateTime(entry.created_at)}`}
+                              title="Delete note"
+                              disabled={removeNote.isPending}
+                              onClick={() => removeNote.mutate(entry.id)}
+                            >
+                              <TrashIcon className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                          <p className="mt-0.5 text-sm leading-6 break-words whitespace-pre-wrap text-foreground">
+                            {entry.body}
+                          </p>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </section>
+
+                <section className="space-y-1.5 border-t pt-4">
+                  <h3 className="text-sm font-medium text-foreground">Related conversations</h3>
+                  <LinkedConversations
+                    conversations={card.conversations}
+                    disabled={false}
+                    onOpen={props.onOpenConversation}
+                    emptyText="None yet. Use Edit to link conversations."
+                  />
+                </section>
+              </>
             )}
-
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-foreground">Column</span>
-              <Select
-                value={String(card.column_id)}
-                onValueChange={(value) => move.mutate(Number(value))}
-                disabled={move.isPending || columns.length === 0}
-              >
-                <SelectTrigger aria-label="Column" className="min-w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  {columns.map((column) => (
-                    <SelectItem key={column.id} value={String(column.id)}>
-                      {column.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <section aria-labelledby={noteId} className="space-y-2 border-t pt-4">
-              <h3 id={noteId} className="text-sm font-medium text-foreground">
-                Notes
-              </h3>
-              <form onSubmit={submitNote} className="space-y-2">
-                <Textarea
-                  value={note}
-                  maxLength={MAX_BOARD_NOTE_LENGTH}
-                  onChange={(event) => setNote(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) submitNote();
-                  }}
-                  placeholder="Add a note"
-                  aria-label="New note"
-                  disabled={addNote.isPending}
-                  className="min-h-16"
-                />
-                <Button type="submit" size="sm" disabled={!note.trim() || addNote.isPending}>
-                  {addNote.isPending ? "Adding…" : "Add note"}
-                </Button>
-              </form>
-              {card.notes.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No notes yet.</p>
-              ) : (
-                <ol className="space-y-2">
-                  {[...card.notes].reverse().map((entry) => (
-                    <li key={entry.id} className="group rounded-lg bg-muted/50 px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <time dateTime={entry.created_at} className="flex-1 text-xs text-muted-foreground">
-                          {formatDateTime(entry.created_at)}
-                        </time>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          className="text-muted-foreground"
-                          aria-label={`Delete note from ${formatDateTime(entry.created_at)}`}
-                          title="Delete note"
-                          disabled={removeNote.isPending}
-                          onClick={() => removeNote.mutate(entry.id)}
-                        >
-                          <TrashIcon className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                      <p className="mt-0.5 text-sm leading-6 break-words whitespace-pre-wrap text-foreground">
-                        {entry.body}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </section>
-
-            <section className="space-y-1.5 border-t pt-4">
-              <h3 className="text-sm font-medium text-foreground">Related conversations</h3>
-              <LinkedConversations
-                conversations={card.conversations}
-                disabled={unlink.isPending}
-                onOpen={props.onOpenConversation}
-                onUnlink={(conversation) => unlink.mutate(conversation)}
-              />
-              <RelatedConversationPicker
-                cardId={card.id}
-                linkedIds={new Set(card.conversations.map((conversation) => conversation.id))}
-                disabled={link.isPending}
-                onLink={(conversation) => link.mutate(conversation)}
-              />
-            </section>
           </>
         )}
 
@@ -905,31 +957,21 @@ function BoardCardDetailDialog(props: {
         )}
 
         {card && (
-          <DialogFooter className="border-t pt-4 max-sm:mt-auto sm:justify-between">
-            {confirmingDelete ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Delete this item?</span>
-                <Button variant="destructive" size="sm" onClick={() => remove.mutate()} disabled={busy}>
-                  {remove.isPending ? "Deleting…" : "Delete"}
+          <DialogFooter className="border-t pt-4 max-sm:mt-auto">
+            {editing ? (
+              <>
+                <Button variant="outline" onClick={() => setEditing(false)} disabled={busy}>
+                  Cancel
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={busy}>
-                  Keep
+                <Button type="submit" form="board-card-edit" disabled={busy || !title.trim()}>
+                  {save.isPending ? "Saving…" : "Save"}
                 </Button>
-              </div>
+              </>
             ) : (
-              <Button
-                variant="ghost"
-                className="text-destructive hover:text-destructive"
-                onClick={() => setConfirmingDelete(true)}
-                disabled={busy}
-              >
-                <TrashIcon className="h-4 w-4" />
-                Delete item
+              <Button variant="outline" onClick={props.onClose}>
+                Close
               </Button>
             )}
-            <Button variant="outline" onClick={props.onClose} disabled={busy}>
-              Close
-            </Button>
           </DialogFooter>
         )}
       </DialogContent>
