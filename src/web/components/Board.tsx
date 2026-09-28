@@ -230,22 +230,48 @@ export function Board(props: {
         <Button
           variant="outline"
           size="sm"
+          className="hidden sm:inline-flex"
           onClick={() => setAddingColumn(true)}
           disabled={!board.data || columns.length >= MAX_BOARD_COLUMNS}
         >
           <PlusIcon className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Add column</span>
-          <span className="sm:hidden">Column</span>
+          Add column
         </Button>
         <Button
           size="sm"
+          className="hidden sm:inline-flex"
           onClick={() => setCreating({ kind: "create", columnId: columns[0]?.id })}
           disabled={!board.data}
         >
           <PlusIcon className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">New item</span>
-          <span className="sm:hidden">Item</span>
+          New item
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-mr-1.5 text-muted-foreground sm:hidden"
+              aria-label="Board options"
+              disabled={!board.data}
+            >
+              <MoreIcon className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent onCloseAutoFocus={(event) => event.preventDefault()}>
+            <DropdownMenuItem onSelect={() => setCreating({ kind: "create", columnId: columns[0]?.id })}>
+              <PlusIcon />
+              New item
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={columns.length >= MAX_BOARD_COLUMNS}
+              onSelect={() => setAddingColumn(true)}
+            >
+              <BoardIcon />
+              Add column
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
 
       {board.isLoading ? (
@@ -491,6 +517,15 @@ function CardFace({
 function NewColumnForm(props: { onDone: () => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
+  // The form opens after the last column, which can be off screen on a phone.
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    formRef.current?.scrollIntoView({ behavior: "smooth", inline: "end", block: "nearest" });
+    // A menu that opened the form returns focus to its trigger as it closes; take it back.
+    const frame = requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const create = useMutation({
     mutationFn: () => createBoardColumn(name),
     onSuccess: async () => {
@@ -504,11 +539,12 @@ function NewColumnForm(props: { onDone: () => void }) {
   };
   return (
     <form
+      ref={formRef}
       onSubmit={submit}
       className="w-[min(82vw,18rem)] shrink-0 snap-start self-start rounded-xl bg-muted/50 p-2 ring-1 ring-foreground/5 sm:w-72 dark:bg-muted/30"
     >
       <Input
-        autoFocus
+        ref={inputRef}
         value={name}
         maxLength={MAX_BOARD_COLUMN_NAME_LENGTH}
         onChange={(event) => setName(event.target.value)}

@@ -41,7 +41,7 @@ A workspace-wide record of a person the Inboxes correspond with, identified by e
 _Avoid_: Customer, address book entry, sender
 
 **Blocked Sender**:
-A rule naming one sender address or one domain (which also covers its subdomains), applying to one Inbox or to all Inboxes. Inbound mail to a covered Inbox whose envelope sender or From address matches is rejected before anything is stored, so it never opens a Conversation, drafts, labels or notifies. "Block sender" on a Conversation, after confirmation, blocks its latest sender's address or domain on that Conversation's Inbox or on all Inboxes, and archives the Conversation along with the sender's other open Conversations in that scope. A rule for all Inboxes replaces the same sender's per-Inbox rules. A rule can never cover one of the workspace's own Inboxes or a public mailbox provider such as gmail.com.
+A rule naming one sender address or one domain (which also covers its subdomains), applying to one Inbox or to all Inboxes. Inbound mail to a covered Inbox whose envelope sender or From address matches is rejected before anything is stored, so it never opens a Conversation, drafts, labels or notifies. "Block sender" in a Message's menu, after confirmation, blocks the address or domain of that Message's sender, or of another address on it such as a Cc'd one, on that Conversation's Inbox or on all Inboxes, and archives the blocked sender's open Conversations in that scope, this one included when they wrote to it. A rule for all Inboxes replaces the same sender's per-Inbox rules. A rule can never cover one of the workspace's own Inboxes or a public mailbox provider such as gmail.com.
 _Avoid_: Spam filter, blacklist, banned sender
 
 **Catch-all**:
@@ -65,7 +65,7 @@ The workspace's one Kanban board, with Columns people add, rename, reorder and d
 _Avoid_: Project, pipeline, task list
 
 **Board Item**:
-A card on the Board with a title and an optional description, in one Column, ordered within it by dragging. It can link any number of Conversations, and a Conversation can be on any number of Board Items; each Conversation shows the Board Items it is on. "Create board item" on a Message starts one titled from the Conversation's subject and linked to it. Deleting a Conversation removes its links and keeps the Board Items.
+A card on the Board with a title and an optional description, in one Column, ordered within it by dragging. It can link any number of Conversations, and a Conversation can be on any number of Board Items; each Conversation shows the Board Items it is on. A Board Item suggests newer Conversations from the senders of the Conversations it links, and a Conversation offers the Board Items that track its latest sender. "Create board item" on a Message starts one titled from the Conversation's subject and linked to it. Deleting a Conversation removes its links and keeps the Board Items.
 _Avoid_: Task, ticket, card
 
 **Agent Draft**:

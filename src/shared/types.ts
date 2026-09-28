@@ -176,6 +176,8 @@ export interface ThreadDetail {
   drafts: Draft[];
   draft_run: DraftRun | null;
   board_cards: ThreadBoardCard[];
+  /** Board Cards linking other Conversations from this Conversation's latest sender. */
+  suggested_board_cards: ThreadBoardCard[];
 }
 
 /** A Board Card linked to a Conversation, as shown on that Conversation. */
@@ -197,6 +199,12 @@ export interface BoardCardConversation {
   subject: string;
   status: ThreadSummary["status"];
   mailbox_address: string;
+}
+
+/** A Conversation suggested for a Board Card because it shares a sender with one it links. */
+export interface RelatedConversation extends BoardCardConversation {
+  last_from: string | null;
+  last_message_at: string;
 }
 
 export interface BoardCard {

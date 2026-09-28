@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useDeferredValue, useEffect, useId, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,8 +22,10 @@ import {
   createBoardCard,
   deleteBoardCard,
   fetchBoard,
+  fetchBoardCardSuggestions,
   linkBoardCard,
   moveBoardCard,
+  searchThreads,
   unlinkBoardCard,
   updateBoardCard,
 } from "../api";
@@ -32,7 +34,7 @@ import {
   MAX_BOARD_CARD_TITLE_LENGTH,
 } from "../../shared/board";
 import type { BoardCard, BoardCardConversation } from "../../shared/types";
-import { ArchiveIcon, MailIcon, SearchIcon, XIcon } from "./Icons";
+import { ArchiveIcon, MailIcon, PlusIcon, SearchIcon, XIcon } from "./Icons";
 
 /** Refreshes everything that shows Board Cards or their links. */
 export function useInvalidateBoard() {
@@ -143,6 +145,18 @@ export function BoardCardDialog(props: {
     },
   });
 
+  const link = useMutation({
+    mutationFn: (conversation: BoardCardConversation) => linkBoardCard(card!.id, conversation.id),
+    onSuccess: (updated) => {
+      setLinked(updated.conversations);
+      invalidate();
+    },
+  });
+  const addConversation = (conversation: BoardCardConversation) => {
+    if (target?.kind === "edit") link.mutate(conversation);
+    else setLinked((current) => [...current, conversation]);
+  };
+
   const remove = useMutation({
     mutationFn: () => deleteBoardCard(card!.id),
     onSuccess: async () => {
@@ -164,7 +178,7 @@ export function BoardCardDialog(props: {
     if (title.trim() && !busy) save.mutate();
   };
   const missing = target?.kind === "edit" && board.isSuccess && !card;
-  const error = save.error ?? remove.error ?? unlink.error;
+  const error = save.error ?? remove.error ?? unlink.error ?? link.error;
 
   return (
     <Dialog
@@ -242,10 +256,10 @@ export function BoardCardDialog(props: {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <span className="text-sm font-medium text-foreground">Conversations</span>
+              <span className="text-sm font-medium text-foreground">Related conversations</span>
               {linked.length === 0 ? (
                 <p className="text-xs leading-5 text-muted-foreground">
-                  None yet. Use “Add to board item” on a message to link one.
+                  None yet. Search below to link one.
                 </p>
               ) : (
                 <ul className="divide-y rounded-lg border">
@@ -292,6 +306,12 @@ export function BoardCardDialog(props: {
                   ))}
                 </ul>
               )}
+              <RelatedConversationPicker
+                cardId={card?.id ?? null}
+                linkedIds={new Set(linked.map((conversation) => conversation.id))}
+                disabled={busy || link.isPending}
+                onLink={addConversation}
+              />
             </div>
           </form>
         )}
@@ -467,5 +487,98 @@ export function AddToBoardCardDialog(props: {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Finds Conversations to link to a Board Card: by search, or, for a saved
+ * Card, from new mail by the senders it already tracks.
+ */
+function RelatedConversationPicker(props: {
+  cardId: number | null;
+  linkedIds: Set<number>;
+  disabled: boolean;
+  onLink: (conversation: BoardCardConversation) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const query = useDeferredValue(search.trim());
+  const results = useQuery({
+    queryKey: ["board-link-search", query],
+    queryFn: () => searchThreads(query, { mailboxId: null, labelId: null, unread: false }),
+    enabled: query.length >= 2,
+    staleTime: 30_000,
+  });
+  const suggestions = useQuery({
+    queryKey: ["board", "suggestions", props.cardId],
+    queryFn: () => fetchBoardCardSuggestions(props.cardId!),
+    enabled: props.cardId !== null,
+  });
+
+  const searching = query.length >= 2;
+  const rows = (
+    searching
+      ? (results.data ?? []).map((thread) => ({
+          id: thread.id,
+          subject: thread.subject,
+          status: thread.status,
+          mailbox_address: thread.mailbox_address,
+          last_from: thread.last_from,
+          last_message_at: thread.last_message_at,
+        }))
+      : (suggestions.data ?? [])
+  )
+    .filter((row) => !props.linkedIds.has(row.id))
+    .slice(0, 6);
+
+  return (
+    <div className="space-y-1.5 pt-1">
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.preventDefault();
+          }}
+          placeholder="Search conversations to link"
+          aria-label="Search conversations to link"
+          className="pl-8"
+          disabled={props.disabled}
+        />
+      </div>
+      {!searching && rows.length > 0 && (
+        <p className="px-0.5 pt-1 text-xs text-muted-foreground">Suggested: newer mail from the same senders</p>
+      )}
+      {searching && !results.isLoading && rows.length === 0 && (
+        <p className="px-0.5 py-1 text-xs text-muted-foreground">No other conversations match.</p>
+      )}
+      {rows.length > 0 && (
+        <ul className="space-y-1" aria-label={searching ? "Search results" : "Suggested conversations"}>
+          {rows.map((row) => (
+            <li key={row.id} className="flex items-center gap-2 rounded-lg border border-dashed py-1 pr-1 pl-3">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-foreground">{row.subject || "(no subject)"}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {[row.last_from, row.status === "archived" ? "Archived" : null].filter(Boolean).join(" · ") ||
+                    row.mailbox_address}
+                </span>
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="shrink-0"
+                disabled={props.disabled}
+                onClick={() => props.onLink(row)}
+                aria-label={`Link ${row.subject || "conversation"}`}
+              >
+                <PlusIcon className="h-3.5 w-3.5" />
+                Link
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

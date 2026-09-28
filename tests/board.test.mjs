@@ -163,3 +163,20 @@ test("card titles from subjects drop reply and forward prefixes", () => {
   assert.equal(cardTitleFromSubject("  Order 42 "), "Order 42");
   assert.equal(cardTitleFromSubject(null), "");
 });
+
+test("suggestions are newer conversations from the senders a card already links", async (t) => {
+  const f = fixture(t);
+  f.db.exec(`INSERT INTO threads (id, mailbox_id, subject, last_message_at, status)
+      VALUES (3, 1, 'Refund follow-up', '2026-01-03T00:00:00.000Z', 'open'),
+             (4, 1, 'Unrelated', '2026-01-04T00:00:00.000Z', 'open');
+    INSERT INTO messages (thread_id, message_id, direction, from_address, from_name, created_at) VALUES
+      (1, '<a@x>', 'inbound', 'ada@example.org', 'Ada', '2026-01-01T00:00:00.000Z'),
+      (3, '<b@x>', 'inbound', 'ADA@example.org', 'Ada L', '2026-01-03T00:00:00.000Z'),
+      (4, '<c@x>', 'inbound', 'bob@example.org', 'Bob', '2026-01-04T00:00:00.000Z');`);
+  const card = (await f.call("POST", "/cards", { title: "Refund", thread_ids: [1] })).body;
+  const { body } = await f.call("GET", `/cards/${card.id}/suggestions`);
+  assert.deepEqual(body.map((row) => [row.id, row.last_from]), [[3, "Ada L"]]);
+
+  await f.call("POST", `/cards/${card.id}/conversations`, { thread_id: 3 });
+  assert.deepEqual((await f.call("GET", `/cards/${card.id}/suggestions`)).body, []);
+});

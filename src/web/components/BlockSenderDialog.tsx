@@ -31,19 +31,24 @@ export interface BlockScopeOption {
 export function BlockSenderDialog(props: {
   open: boolean;
   sender: string;
+  /** Addresses to choose from, such as a message's sender and Cc'd people; `sender` is preselected. */
+  senderOptions?: Array<{ address: string; hint: string }>;
   scopes: BlockScopeOption[];
   archives: boolean;
-  onBlock: (kind: BlockKind, scope: string) => Promise<unknown>;
+  /** Whether the chosen sender wrote this conversation, so blocking archives it too. */
+  wroteConversation?: (sender: string, kind: BlockKind) => boolean;
+  onBlock: (kind: BlockKind, scope: string, sender: string) => Promise<unknown>;
   onOpenChange: (open: boolean) => void;
   onBlocked?: () => void;
 }) {
   const queryClient = useQueryClient();
   const [kind, setKind] = useState<BlockKind>("address");
   const [scope, setScope] = useState(props.scopes[0]?.value ?? "");
-  const domain = domainOf(props.sender);
+  const [sender, setSender] = useState(props.sender);
+  const domain = domainOf(sender);
   const sharedDomain = isSharedMailDomain(domain);
   const block = useMutation({
-    mutationFn: () => props.onBlock(kind, scope),
+    mutationFn: () => props.onBlock(kind, scope, sender),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["blocked-senders"] });
       props.onOpenChange(false);
@@ -59,9 +64,11 @@ export function BlockSenderDialog(props: {
     reset();
     setKind("address");
     setScope(firstScope);
+    setSender(props.sender);
   }, [props.open, props.sender, firstScope, reset]);
 
-  const blockedWho = kind === "domain" ? `everyone at ${domain}` : props.sender;
+  const blockedWho = kind === "domain" ? `everyone at ${domain}` : sender;
+  const choices = props.senderOptions ?? [];
   const blockedWhere = props.scopes.find((option) => option.value === scope)?.target ?? "";
 
   return (
@@ -80,6 +87,20 @@ export function BlockSenderDialog(props: {
           </DialogDescription>
         </DialogHeader>
 
+        {choices.length > 1 && (
+          <OptionGroup
+            legend="Sender"
+            name="block-sender-address"
+            value={sender}
+            disabled={block.isPending}
+            onChange={(next) => {
+              setSender(next);
+              if (isSharedMailDomain(domainOf(next))) setKind("address");
+            }}
+            options={choices.map((choice) => ({ value: choice.address, label: choice.address, hint: choice.hint }))}
+          />
+        )}
+
         <OptionGroup
           legend="Block"
           name="block-sender-kind"
@@ -87,7 +108,7 @@ export function BlockSenderDialog(props: {
           disabled={block.isPending}
           onChange={setKind}
           options={[
-            { value: "address", label: props.sender, hint: "Only this address" },
+            { value: "address", label: sender, hint: "Only this address" },
             {
               value: "domain",
               label: `Everyone at ${domain}`,
@@ -111,9 +132,11 @@ export function BlockSenderDialog(props: {
         <p className="rounded-lg bg-muted/60 px-3 py-2.5 text-sm leading-5 text-foreground">
           Mail from <span className="font-medium break-all">{blockedWho}</span> to{" "}
           <span className="font-medium break-all">{blockedWhere}</span> will be rejected.{" "}
-          {props.archives
-            ? "This conversation and their other open conversations there will be archived."
-            : "Existing conversations stay where they are."}
+          {!props.archives
+            ? "Existing conversations stay where they are."
+            : (props.wroteConversation?.(sender, kind) ?? true)
+              ? "This conversation and their other open conversations there will be archived."
+              : "Their open conversations there will be archived. This one stays, since they didn’t write it."}
         </p>
 
         {block.isError && (

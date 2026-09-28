@@ -11,12 +11,14 @@ import type {
   BoardCard,
   BoardCardConversation,
   BoardColumn,
+  RelatedConversation,
 } from "../../shared/types.ts";
 
 type BoardEnv = { Bindings: { DB: D1Database } };
 
 export const boardApi = new Hono<BoardEnv>();
 
+const MAX_SUGGESTIONS = 5;
 const NOW = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
 boardApi.get("/", async (c) => c.json(await loadBoard(c.env.DB)));
@@ -251,6 +253,39 @@ boardApi.post("/cards/:id/conversations", async (c) => {
     c.env.DB.prepare(`UPDATE board_cards SET updated_at = ${NOW} WHERE id = ?`).bind(id),
   ]);
   return c.json(await loadCard(c.env.DB, id));
+});
+
+/**
+ * Recent Conversations from the senders of the Card's linked Conversations
+ * that the Card doesn't link yet, such as a follow-up email that opened a
+ * new Conversation.
+ */
+boardApi.get("/cards/:id/suggestions", async (c) => {
+  const id = parseId(c.req.param("id"));
+  if (id === null) return c.json({ error: "invalid card id" }, 400);
+  const { results } = await c.env.DB.prepare(
+    `SELECT t.id, t.subject, t.status, m.address AS mailbox_address, t.last_message_at,
+       (SELECT COALESCE(li.from_name, li.from_address) FROM messages li
+        WHERE li.thread_id = t.id AND li.direction = 'inbound'
+        ORDER BY li.created_at DESC, li.id DESC LIMIT 1) AS last_from
+     FROM threads t
+     JOIN mailboxes m ON m.id = t.mailbox_id
+     WHERE t.id NOT IN (SELECT thread_id FROM board_card_threads WHERE card_id = ?1)
+       AND t.id IN (
+         SELECT msg.thread_id FROM messages msg
+         WHERE msg.direction = 'inbound'
+           AND msg.from_address COLLATE NOCASE IN (
+             SELECT src.from_address FROM messages src
+             JOIN board_card_threads link ON link.thread_id = src.thread_id
+             WHERE link.card_id = ?1 AND src.direction = 'inbound'
+           )
+       )
+     ORDER BY t.last_message_at DESC, t.id DESC
+     LIMIT ${MAX_SUGGESTIONS}`,
+  )
+    .bind(id)
+    .all<RelatedConversation>();
+  return c.json(results);
 });
 
 boardApi.delete("/cards/:id/conversations/:threadId", async (c) => {

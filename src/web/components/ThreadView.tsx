@@ -9,6 +9,7 @@ import {
   discardDraft,
   fetchMailboxes,
   fetchThread,
+  linkBoardCard,
   markRead,
   retryDraftRun,
   sendReply,
@@ -28,6 +29,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatTime, splitQuotedTail } from "../lib";
@@ -82,13 +84,14 @@ export function ThreadView(props: {
   const [failedAttemptKey, setFailedAttemptKey] = useState<string | null>(null);
   const [usedDraftId, setUsedDraftId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [blockingSender, setBlockingSender] = useState(false);
+  const [blocking, setBlocking] = useState<{ sender: string; options: BlockCandidate[] } | null>(null);
   const [creatingInbox, setCreatingInbox] = useState(false);
   const [blockingAddress, setBlockingAddress] = useState(false);
   const [boardTarget, setBoardTarget] = useState<CardDialogTarget | null>(null);
   const [addingToCard, setAddingToCard] = useState(false);
   const navigate = useNavigate();
   const seenDraftIds = useRef(new Set<number>());
+  const blockArchivesThis = useRef(false);
   const markedRead = useRef<number | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -227,6 +230,14 @@ export function ThreadView(props: {
     onSuccess: invalidateAll,
   });
 
+  const linkSuggested = useMutation({
+    mutationFn: (cardId: number) => linkBoardCard(cardId, props.threadId),
+    onSuccess: () => {
+      invalidateAll();
+      queryClient.invalidateQueries({ queryKey: ["board"] });
+    },
+  });
+
   const startDraft = useMutation({
     mutationFn: () => createDraft(props.threadId),
     onSuccess: invalidateAll,
@@ -283,6 +294,29 @@ export function ThreadView(props: {
     status: thread.status,
     mailbox_address: thread.mailbox_address,
   };
+  const ownAddresses = new Set(
+    [
+      thread.mailbox_address,
+      thread.catch_all_recipient,
+      ...(mailboxes.data ?? []).map((mailbox) => mailbox.address),
+    ]
+      .filter((address): address is string => Boolean(address))
+      .map((address) => address.toLowerCase()),
+  );
+  const openBlockSender = (message: Message) => {
+    const options = blockCandidatesFor(message, ownAddresses);
+    if (options.length > 0) setBlocking({ sender: options[0].address, options });
+  };
+  const wroteConversation = (sender: string, kind: "address" | "domain") =>
+    messages.some((message) => {
+      if (message.direction !== "inbound") return false;
+      const from = message.from_address.toLowerCase();
+      if (kind === "address") return from === sender;
+      const domain = sender.slice(sender.lastIndexOf("@") + 1);
+      const fromDomain = from.slice(from.lastIndexOf("@") + 1);
+      return fromDomain === domain || fromDomain.endsWith(`.${domain}`);
+    });
+
   const createBoardItem = () =>
     setBoardTarget({
       kind: "create",
@@ -431,47 +465,6 @@ export function ThreadView(props: {
             )}
           </div>
         </div>
-        {thread.last_from_address && (
-          <>
-            <Button
-              variant="outline"
-              onClick={() => setBlockingSender(true)}
-              disabled={moveThread.isPending || removeThread.isPending}
-              aria-label="Block sender"
-              className="shrink-0"
-            >
-              <ShieldBanIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Block sender</span>
-            </Button>
-            <BlockSenderDialog
-              open={blockingSender}
-              sender={thread.last_from_address}
-              scopes={[
-                {
-                  value: "inbox",
-                  label: thread.mailbox_address,
-                  hint: "Only this inbox",
-                  target: thread.mailbox_address,
-                },
-                {
-                  value: "all",
-                  label: "All inboxes",
-                  hint: "Every inbox in this workspace",
-                  target: "any of your inboxes",
-                },
-              ]}
-              archives
-              onBlock={(kind, scope) =>
-                blockThreadSender(props.threadId, kind, scope === "all" ? "all" : "inbox")
-              }
-              onOpenChange={setBlockingSender}
-              onBlocked={() => {
-                invalidateAll();
-                props.onMoved();
-              }}
-            />
-          </>
-        )}
         {thread.status === "archived" ? (
           <>
             <Button
@@ -561,6 +554,41 @@ export function ThreadView(props: {
         </div>
       )}
 
+      {detail.data.suggested_board_cards.length > 0 && (
+        <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b bg-muted/40 px-4 py-2 text-xs text-muted-foreground md:px-6">
+          <span className="shrink-0">
+            {detail.data.suggested_board_cards.length === 1
+              ? "Board item from this sender:"
+              : "Board items from this sender:"}
+          </span>
+          {detail.data.suggested_board_cards.map((card) => (
+            <span
+              key={card.id}
+              className="inline-flex h-6 max-w-72 shrink-0 items-center gap-1 rounded-md border bg-background pl-2 text-xs text-foreground touch:h-8"
+            >
+              <button
+                type="button"
+                onClick={() => navigate(`/board/cards/${card.id}`)}
+                className="min-w-0 truncate font-medium outline-none hover:underline focus-visible:underline"
+                title={`${card.title} (${card.column_name})`}
+              >
+                {card.title}
+              </button>
+              <button
+                type="button"
+                disabled={linkSuggested.isPending}
+                onClick={() => linkSuggested.mutate(card.id)}
+                className="flex h-full shrink-0 items-center gap-1 rounded-r-md border-l px-2 text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                aria-label={`Link this conversation to ${card.title}`}
+              >
+                <PlusIcon className="h-3 w-3" />
+                Link
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {detail.data.board_cards.length > 0 && (
         <nav
           aria-label="Board items"
@@ -595,12 +623,49 @@ export function ThreadView(props: {
                 catchAllRecipient={thread.catch_all_recipient}
                 onCreateBoardItem={createBoardItem}
                 onAddToBoardItem={() => setAddingToCard(true)}
+                onBlockSender={
+                  blockCandidatesFor(message, ownAddresses).length > 0
+                    ? () => openBlockSender(message)
+                    : undefined
+                }
               />
             </Fragment>
           ))}
         </div>
       </div>
 
+      {blocking && (
+        <BlockSenderDialog
+          open
+          sender={blocking.sender}
+          senderOptions={blocking.options}
+          scopes={[
+            {
+              value: "inbox",
+              label: thread.mailbox_address,
+              hint: "Only this inbox",
+              target: thread.mailbox_address,
+            },
+            {
+              value: "all",
+              label: "All inboxes",
+              hint: "Every inbox in this workspace",
+              target: "any of your inboxes",
+            },
+          ]}
+          archives
+          wroteConversation={wroteConversation}
+          onBlock={(kind, scope, sender) => {
+            blockArchivesThis.current = wroteConversation(sender, kind);
+            return blockThreadSender(props.threadId, kind, scope === "all" ? "all" : "inbox", sender);
+          }}
+          onOpenChange={(open) => !open && setBlocking(null)}
+          onBlocked={() => {
+            invalidateAll();
+            if (blockArchivesThis.current) props.onMoved();
+          }}
+        />
+      )}
       <BoardCardDialog
         target={boardTarget}
         onOpenChange={(open) => !open && setBoardTarget(null)}
@@ -872,6 +937,24 @@ function CopyRecipientsRow(props: { label: string; htmlFor: string; children: Re
   );
 }
 
+type BlockCandidate = { address: string; hint: string };
+
+/** The external addresses on a Message that could be blocked, sender first. */
+function blockCandidatesFor(message: Message, ownAddresses: Set<string>): BlockCandidate[] {
+  const seen = new Set<string>();
+  const candidates: BlockCandidate[] = [];
+  const add = (address: string, hint: string) => {
+    const normalized = address.trim().toLowerCase();
+    if (!normalized.includes("@") || ownAddresses.has(normalized) || seen.has(normalized)) return;
+    seen.add(normalized);
+    candidates.push({ address: normalized, hint });
+  };
+  if (message.direction === "inbound") add(message.from_address, "Sender");
+  for (const address of parseAddressList(message.to_addresses)) add(address, "To");
+  for (const address of parseAddressList(message.cc_addresses)) add(address, "Cc");
+  return candidates;
+}
+
 function parseAddressList(raw: string | null | undefined): string[] {
   try {
     const values = JSON.parse(raw || "[]") as unknown;
@@ -895,11 +978,13 @@ function MessageCard({
   catchAllRecipient,
   onCreateBoardItem,
   onAddToBoardItem,
+  onBlockSender,
 }: {
   message: Message;
   catchAllRecipient: string | null;
   onCreateBoardItem: () => void;
   onAddToBoardItem: () => void;
+  onBlockSender?: () => void;
 }) {
   const [showQuoted, setShowQuoted] = useState(false);
   const isOutbound = message.direction === "outbound";
@@ -974,6 +1059,15 @@ function MessageCard({
               <BoardIcon />
               Add to board item
             </DropdownMenuItem>
+            {onBlockSender && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onSelect={onBlockSender}>
+                  <ShieldBanIcon />
+                  Block sender…
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

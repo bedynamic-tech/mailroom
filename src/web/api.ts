@@ -3,6 +3,7 @@ import type {
   BoardCard,
   BoardCardInput,
   BoardColumn,
+  RelatedConversation,
   BlockedRecipient,
   BlockedSender,
   BlockRecipientResult,
@@ -411,11 +412,12 @@ export const blockThreadSender = (
   threadId: number,
   kind: "address" | "domain",
   scope: "inbox" | "all",
+  address?: string,
 ) =>
   request<BlockSenderResult>(`/threads/${threadId}/block-sender`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ kind, scope }),
+    body: JSON.stringify({ kind, scope, address }),
   });
 
 export const fetchMailRules = () => request<MailRule[]>("/mail-rules");
@@ -498,3 +500,6 @@ export const linkBoardCard = (id: number, threadId: number) =>
 
 export const unlinkBoardCard = (id: number, threadId: number) =>
   request<BoardCard>(`/board/cards/${id}/conversations/${threadId}`, { method: "DELETE" });
+
+export const fetchBoardCardSuggestions = (id: number) =>
+  request<RelatedConversation[]>(`/board/cards/${id}/suggestions`);

@@ -38,7 +38,10 @@ Routing, D1, R2 and Web Push.
   reorder and delete columns, and drag items between them on desktop or phone
   (press and hold on a touch screen). Create an item from any message's menu in
   a conversation, prefilled from the subject, or add the conversation to an
-  item already on the board. Items link back to their conversations, and
+  item already on the board. Each item's Related conversations section links
+  more conversations by search, and suggests new mail from the senders it
+  already tracks; a conversation from one of those senders offers to link
+  itself to their item. Items link back to their conversations, and
   conversations show the items they are on, both in the list and above the
   messages.
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
@@ -56,7 +59,9 @@ Routing, D1, R2 and Web Push.
   and attachments, then label, mark read, archive, skip drafts or
   notifications, or forward.
 - **Spam blocking.** Block a sender by address or whole domain, on one inbox or
-  all of them. Blocked mail is rejected before it reaches Mailroom.
+  all of them, from any message's menu. When a message has several people on
+  it, such as Cc'd addresses, you choose which one to block. Blocked mail is
+  rejected before it reaches Mailroom.
 
 ### Integrations
 
