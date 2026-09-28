@@ -34,11 +34,28 @@ Routing, D1, R2 and Web Push.
   sign up to. Caught mail is badged and shows the address it was sent to,
   replies go out from that address, and any address can become its own inbox
   or be blocked if spammers find it.
+- **Board.** Track work on a Kanban board from the sidebar. Add, rename,
+  reorder and delete columns, add items with the plus on any column, and drag
+  items between columns on desktop or phone (press and hold on a touch
+  screen). Create an item from any message's menu in a conversation,
+  prefilled from the subject, or add the conversation to an item already on
+  the board. Opening an item shows its name, description, date added, column,
+  timestamped notes you can add over time, and its related conversations. The
+  Edit button changes the name, description and column, links or unlinks
+  conversations, and deletes the item. Linking searches your mail and
+  suggests new mail from the senders the item already tracks; a conversation
+  from one of those senders offers to link itself to their item. Items link
+  back to their conversations, and conversations show the items they are on,
+  both in the list and above the messages.
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.
 
 <img width="2800" height="1800" alt="Catch-all conversations in Mailroom +" src="docs/images/catch-all.png" />
+
+<img width="2800" height="1800" alt="The Board in Mailroom +" src="docs/images/board.png" />
+
+<img width="2800" height="1800" alt="A board item with notes and related conversations" src="docs/images/board-item.png" />
 
 ### Automation
 
@@ -49,7 +66,9 @@ Routing, D1, R2 and Web Push.
   and attachments, then label, mark read, archive, skip drafts or
   notifications, or forward.
 - **Spam blocking.** Block a sender by address or whole domain, on one inbox or
-  all of them. Blocked mail is rejected before it reaches Mailroom.
+  all of them, from any message's menu. When a message has several people on
+  it, such as Cc'd addresses, you choose which one to block. Blocked mail is
+  rejected before it reaches Mailroom.
 
 ### Integrations
 

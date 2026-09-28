@@ -24,8 +24,9 @@ const MAX_BOUND_PARAMETERS = 100;
 
 /**
  * Permanently deletes archived Conversations with their Messages, Attachments,
- * drafts, Draft Runs, Reply and Send Attempts and Label assignments. Only
- * archived Conversations can be deleted; Contacts are left untouched.
+ * drafts, Draft Runs, Reply and Send Attempts, Label assignments and Board
+ * Card links. Only archived Conversations can be deleted; Contacts and Board
+ * Cards are left untouched.
  */
 export async function deleteArchivedConversations(
   env: ConversationDeletionEnv,
@@ -109,6 +110,7 @@ export async function deleteArchivedConversations(
       `DELETE FROM draft_runs WHERE thread_id IN (${deletable})`,
       `DELETE FROM drafts WHERE thread_id IN (${deletable})`,
       `DELETE FROM thread_labels WHERE thread_id IN (${deletable})`,
+      `DELETE FROM board_card_threads WHERE thread_id IN (${deletable})`,
       `DELETE FROM attachments WHERE message_id IN (
          SELECT id FROM messages WHERE thread_id IN (${deletable}))`,
       `DELETE FROM messages WHERE thread_id IN (${deletable})`,

@@ -214,3 +214,25 @@ test("migration keeps existing rules as all-inbox rules", (t) => {
     blocked_count: 3,
   });
 });
+
+test("blockThreadSender can block a chosen address on the conversation, such as a Cc", async (t) => {
+  const f = fixture(t);
+  inbound(f.db, { thread: 1, from: "customer@good.example" });
+  f.db.prepare("UPDATE messages SET cc_addresses = ? WHERE thread_id = 1")
+    .run(JSON.stringify(["Pushy@Vendor.example"]));
+  inbound(f.db, { thread: 2, from: "pushy@vendor.example" });
+
+  const result = await blockThreadSender(f.env, 1, "address", "inbox", "PUSHY@vendor.example");
+  assert.equal(result.blocked.pattern, "pushy@vendor.example");
+  assert.equal(statusOf(f.db, 1), "open", "the conversation stays when the blocked address only was copied");
+  assert.equal(statusOf(f.db, 2), "archived");
+
+  await assert.rejects(
+    blockThreadSender(f.env, 1, "address", "inbox", "stranger@elsewhere.example"),
+    /isn't on this conversation/,
+  );
+  await assert.rejects(
+    blockThreadSender(f.env, 1, "address", "inbox", "help@support.acme.com"),
+    BlockThreadSenderError,
+  );
+});

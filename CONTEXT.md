@@ -41,7 +41,7 @@ A workspace-wide record of a person the Inboxes correspond with, identified by e
 _Avoid_: Customer, address book entry, sender
 
 **Blocked Sender**:
-A rule naming one sender address or one domain (which also covers its subdomains), applying to one Inbox or to all Inboxes. Inbound mail to a covered Inbox whose envelope sender or From address matches is rejected before anything is stored, so it never opens a Conversation, drafts, labels or notifies. "Block sender" on a Conversation, after confirmation, blocks its latest sender's address or domain on that Conversation's Inbox or on all Inboxes, and archives the Conversation along with the sender's other open Conversations in that scope. A rule for all Inboxes replaces the same sender's per-Inbox rules. A rule can never cover one of the workspace's own Inboxes or a public mailbox provider such as gmail.com.
+A rule naming one sender address or one domain (which also covers its subdomains), applying to one Inbox or to all Inboxes. Inbound mail to a covered Inbox whose envelope sender or From address matches is rejected before anything is stored, so it never opens a Conversation, drafts, labels or notifies. "Block sender" in a Message's menu, after confirmation, blocks the address or domain of that Message's sender, or of another address on it such as a Cc'd one, on that Conversation's Inbox or on all Inboxes, and archives the blocked sender's open Conversations in that scope, this one included when they wrote to it. A rule for all Inboxes replaces the same sender's per-Inbox rules. A rule can never cover one of the workspace's own Inboxes or a public mailbox provider such as gmail.com.
 _Avoid_: Spam filter, blacklist, banned sender
 
 **Catch-all**:
@@ -59,6 +59,14 @@ _Avoid_: Filter, automation, playbook
 **Rule Forward**:
 One Mail Rule's forward of one inbound Message, sent from the Inbox that received it with the original's headers and text, as many of its attachments as the send limits allow, and Reply-To set to the original sender. A rule forwards a Message at most once, never to one of the workspace's own Inboxes, and never forwards an email that is itself a Rule Forward, so rules cannot loop. Forwards count against a workspace-wide daily limit; a failed forward is recorded and shown on its rule, not retried.
 _Avoid_: Auto-forward, redirect
+
+**Board**:
+The workspace's one Kanban board, with Columns people add, rename, reorder and delete. It starts with To do, In progress and Done, and always keeps at least one Column. Deleting a Column deletes its Board Items but never their Conversations.
+_Avoid_: Project, pipeline, task list
+
+**Board Item**:
+A card on the Board with a title, an optional description and the time it was added, in one Column, ordered within it by dragging. Notes can be added to it over time, each stamped with when it was written. It can link any number of Conversations, and a Conversation can be on any number of Board Items; each Conversation shows the Board Items it is on. A Board Item suggests newer Conversations from the senders of the Conversations it links, and a Conversation offers the Board Items that track its latest sender. "Create board item" on a Message starts one titled from the Conversation's subject and linked to it. Deleting a Conversation removes its links and keeps the Board Items.
+_Avoid_: Task, ticket, card
 
 **Agent Draft**:
 A proposed reply authored by the agent and held for human review before sending.

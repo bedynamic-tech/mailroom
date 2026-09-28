@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { requireSameOrigin } from "./csrf.ts";
 import { composeApi, copyAddresses } from "./compose.ts";
+import { boardApi } from "./board.ts";
 import { contactsApi } from "./contacts.ts";
 import { blockedSendersApi } from "./blocked-senders.ts";
 import { mailRulesApi } from "./mail-rules.ts";
@@ -67,12 +68,14 @@ import type {
   Mailbox,
   Message,
   PlaybookInput,
+  ThreadBoardCard,
   ThreadLabel,
 } from "../../shared/types";
 
 export const api = new Hono<{ Bindings: Env }>();
 api.use("*", requireSameOrigin);
 api.route("/compose", composeApi);
+api.route("/board", boardApi);
 api.route("/contacts", contactsApi);
 api.route("/blocked-senders", blockedSendersApi);
 api.route("/mail-rules", mailRulesApi);
@@ -790,6 +793,7 @@ api.get("/threads", async (c) => {
     .all();
   const rows = results as unknown as Array<{ id: number; labels: ThreadLabel[] }>;
   await attachLabels(c.env, rows);
+  await attachBoardCardCounts(c.env, rows);
   return c.json(rows);
 });
 
@@ -836,7 +840,7 @@ api.get("/threads/:id", async (c) => {
   if (!thread) return c.json({ error: "thread not found" }, 404);
   await attachLabels(c.env, [thread as { id: number; labels: ThreadLabel[] }]);
 
-  const [messages, drafts, draftRun] = await Promise.all([
+  const [messages, drafts, draftRun, boardCards, suggestedBoardCards] = await Promise.all([
     c.env.DB.prepare("SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at").bind(id).all(),
     c.env.DB.prepare(
       `SELECT d.*, p.name AS playbook_name
@@ -862,6 +866,32 @@ api.get("/threads/:id", async (c) => {
     )
       .bind(id)
       .first<DraftRun>(),
+    c.env.DB.prepare(
+      `SELECT bc.id, bc.title, bc.column_id, col.name AS column_name
+       FROM board_card_threads bct
+       JOIN board_cards bc ON bc.id = bct.card_id
+       JOIN board_columns col ON col.id = bc.column_id
+       WHERE bct.thread_id = ?
+       ORDER BY col.position, bc.position, bc.id`,
+    )
+      .bind(id)
+      .all<ThreadBoardCard>(),
+    // Cards already tracking other mail from this Conversation's latest sender.
+    c.env.DB.prepare(
+      `SELECT bc.id, bc.title, bc.column_id, col.name AS column_name
+       FROM board_cards bc
+       JOIN board_columns col ON col.id = bc.column_id
+       WHERE bc.id NOT IN (SELECT card_id FROM board_card_threads WHERE thread_id = ?1)
+         AND bc.id IN (
+           SELECT link.card_id FROM board_card_threads link
+           JOIN messages msg ON msg.thread_id = link.thread_id AND msg.direction = 'inbound'
+           WHERE msg.from_address = ?2 COLLATE NOCASE
+         )
+       ORDER BY bc.updated_at DESC, bc.id DESC
+       LIMIT 3`,
+    )
+      .bind(Number(id), (thread as { last_from_address?: string | null }).last_from_address ?? "")
+      .all<ThreadBoardCard>(),
   ]);
 
   const messageRows = messages.results as unknown as Message[];
@@ -888,10 +918,12 @@ api.get("/threads/:id", async (c) => {
     attachments: attachmentsByMessage.get(message.id) ?? [],
   }));
   return c.json({
-    thread,
+    thread: { ...thread, board_card_count: boardCards.results.length },
     messages: enrichedMessages,
     drafts: drafts.results,
     draft_run: draftRun ?? null,
+    board_cards: boardCards.results,
+    suggested_board_cards: suggestedBoardCards.results,
   });
 });
 
@@ -1020,9 +1052,15 @@ api.post("/threads/:id/unarchive", async (c) => {
 api.post("/threads/:id/block-sender", async (c) => {
   const threadId = parsePositiveId(c.req.param("id"));
   if (threadId === null) return c.json({ error: "Invalid conversation" }, 400);
-  const body = await c.req.json<{ kind?: unknown; scope?: unknown }>().catch(() => null);
+  const body = await c.req
+    .json<{ kind?: unknown; scope?: unknown; address?: unknown }>()
+    .catch(() => null);
   const kind = body?.kind;
   const scope = body?.scope;
+  const address = body?.address;
+  if (address !== undefined && (typeof address !== "string" || address.length > 320)) {
+    return c.json({ error: "address must be an email address" }, 400);
+  }
   if (kind !== "address" && kind !== "domain") {
     return c.json({ error: "kind must be address or domain" }, 400);
   }
@@ -1030,7 +1068,7 @@ api.post("/threads/:id/block-sender", async (c) => {
     return c.json({ error: "scope must be inbox or all" }, 400);
   }
   try {
-    return c.json(await blockThreadSender(c.env, threadId, kind, scope));
+    return c.json(await blockThreadSender(c.env, threadId, kind, scope, address));
   } catch (error) {
     if (error instanceof BlockThreadSenderError || error instanceof BlockRuleError) {
       return c.json({ error: error.message }, error.status);
@@ -1242,11 +1280,28 @@ api.get("/search", async (c) => {
     .all();
   const rows = results as unknown as Array<{ id: number; labels: ThreadLabel[] }>;
   await attachLabels(c.env, rows);
+  await attachBoardCardCounts(c.env, rows);
   return c.json(rows);
 });
 
 const MAX_LABELS_PER_MAILBOX = 20;
 const THREAD_PAGE_SIZE = 50;
+
+async function attachBoardCardCounts(
+  env: Env,
+  rows: Array<{ id: number; board_card_count?: number }>,
+): Promise<void> {
+  if (rows.length === 0) return;
+  const { results } = await env.DB.prepare(
+    `SELECT thread_id, COUNT(*) AS count FROM board_card_threads
+     WHERE thread_id IN (SELECT value FROM json_each(?))
+     GROUP BY thread_id`,
+  )
+    .bind(JSON.stringify(rows.map((row) => row.id)))
+    .all<{ thread_id: number; count: number }>();
+  const counts = new Map(results.map((row) => [row.thread_id, Number(row.count)]));
+  for (const row of rows) row.board_card_count = counts.get(row.id) ?? 0;
+}
 
 async function attachLabels(
   env: Env,

@@ -21,6 +21,7 @@ import {
 import { AccessSetup } from "./components/AccessSetup";
 import { AgentSettings } from "./components/AgentSettings";
 import { AiSettings } from "./components/AiSettings";
+import { Board } from "./components/Board";
 import { Contacts } from "./components/Contacts";
 import { ContactSettings } from "./components/ContactSettings";
 import { GeneralSettings } from "./components/GeneralSettings";
@@ -33,7 +34,7 @@ import { ThreadList, type ThreadFilter } from "./components/ThreadList";
 import { ThreadView } from "./components/ThreadView";
 import { useUnreadBadge } from "./pwa";
 
-type WorkspaceView = "inbox" | "archive" | "contacts" | "settings";
+type WorkspaceView = "inbox" | "archive" | "contacts" | "board" | "settings";
 type SettingsSection = "general" | "inboxes" | "contacts" | "rules" | "spam" | "ai";
 
 export function App() {
@@ -53,6 +54,8 @@ export function App() {
       <Route path="/contacts" element={<Workspace view="contacts" />} />
       <Route path="/contacts/new" element={<Workspace view="contacts" creatingContact />} />
       <Route path="/contacts/:contactId" element={<Workspace view="contacts" />} />
+      <Route path="/board" element={<Workspace view="board" />} />
+      <Route path="/board/cards/:cardId" element={<Workspace view="board" />} />
       <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
       <Route
         path="/settings/general"
@@ -88,7 +91,12 @@ function Workspace(props: {
   const navigate = useNavigate();
   const openCompose = useCompose();
   const location = useLocation();
-  const params = useParams<{ mailboxId?: string; threadId?: string; contactId?: string }>();
+  const params = useParams<{
+    mailboxId?: string;
+    threadId?: string;
+    contactId?: string;
+    cardId?: string;
+  }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const autoSelectedScope = useRef<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -211,6 +219,7 @@ function Workspace(props: {
     onSelect: selectMailbox,
     onOpenArchive: () => navigate("/archive"),
     onOpenContacts: () => navigate("/contacts"),
+    onOpenBoard: () => navigate("/board"),
     onOpenSettings: openSettings,
   };
 
@@ -282,6 +291,18 @@ function Workspace(props: {
             onCompose={(address) => openCompose(null, { to: address })}
             onOpenConversation={(id, archived) =>
               navigate(`${archived ? "/archive" : "/inbox"}/${id}`)
+            }
+          />
+        </main>
+      ) : props.view === "board" ? (
+        <main className="min-w-0 flex-1 overflow-hidden">
+          <Board
+            cardId={parseId(params.cardId)}
+            onOpenCard={(id) => navigate(`/board/cards/${id}`)}
+            onCloseCard={() => navigate("/board")}
+            onBack={() => navigate("/inbox")}
+            onOpenConversation={(conversation) =>
+              navigate(`${conversation.status === "archived" ? "/archive" : "/inbox"}/${conversation.id}`)
             }
           />
         </main>
