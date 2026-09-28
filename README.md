@@ -65,7 +65,7 @@ Routing, D1, R2 and Web Push.
   General > Appearance**. System follows your device, and the choice is saved
   on each device.
 
-<img width="2800" height="1800" alt="The Board in Mailroom +" src="docs/images/board.png" />
+<img width="2800" height="1800" alt="board" src="https://github.com/user-attachments/assets/175bb19f-b17e-4b3d-9ce5-6933fceb7198" />
 
 ### Automation
 
