@@ -4,6 +4,7 @@ import { SquarePen } from "lucide-react";
 import type { Contact, ContactDetail } from "../../shared/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -329,6 +330,8 @@ function ContactDetails(props: {
   const savedAddresses = detail.data?.addresses;
   const [form, setForm] = useState<ContactForm>(EMPTY_FORM);
   const [addresses, setAddresses] = useState<string[]>([]);
+  // Which row is primary; rows keep their place when another is made primary.
+  const [primary, setPrimary] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes });
@@ -338,10 +341,16 @@ function ContactDetails(props: {
     if (contact) setForm(formOf(contact));
   }, [contact]);
   useEffect(() => {
-    if (savedAddresses) setAddresses(savedAddresses);
+    if (savedAddresses) {
+      setAddresses(savedAddresses);
+      setPrimary(0);
+    }
   }, [savedAddresses]);
 
-  const cleanAddresses = addresses.map((address) => address.trim().toLowerCase()).filter(Boolean);
+  // Primary first, as the API expects.
+  const cleanAddresses = [addresses[primary], ...addresses.filter((_, i) => i !== primary)]
+    .map((address) => address?.trim().toLowerCase())
+    .filter((address): address is string => Boolean(address));
   const addressesChanged =
     savedAddresses !== undefined && cleanAddresses.join("\n") !== savedAddresses.join("\n");
   const save = useMutation({
@@ -481,7 +490,12 @@ function ContactDetails(props: {
           beforeNotes={
             <AddressFields
               addresses={addresses}
-              onChange={(next) => { setAddresses(next); if (save.isSuccess || save.isError) save.reset(); }}
+              primary={primary}
+              onChange={(next, nextPrimary) => {
+                setAddresses(next);
+                setPrimary(nextPrimary);
+                if (save.isSuccess || save.isError) save.reset();
+              }}
             />
           }
         />
@@ -501,6 +515,7 @@ function ContactDetails(props: {
               onClick={() => {
                 setForm(formOf(contact));
                 setAddresses(savedAddresses ?? [contact.address]);
+                setPrimary(0);
                 save.reset();
               }}
             >
@@ -607,13 +622,19 @@ function ContactDetails(props: {
   );
 }
 
-function AddressFields(props: { addresses: string[]; onChange: (addresses: string[]) => void }) {
-  const { addresses } = props;
+function AddressFields(props: {
+  addresses: string[];
+  primary: number;
+  onChange: (addresses: string[], primary: number) => void;
+}) {
+  const { addresses, primary } = props;
   const set = (index: number, value: string) =>
-    props.onChange(addresses.map((address, i) => (i === index ? value : address)));
-  const remove = (index: number) => props.onChange(addresses.filter((_, i) => i !== index));
-  const makePrimary = (index: number) =>
-    props.onChange([addresses[index], ...addresses.filter((_, i) => i !== index)]);
+    props.onChange(addresses.map((address, i) => (i === index ? value : address)), primary);
+  const remove = (index: number) =>
+    props.onChange(
+      addresses.filter((_, i) => i !== index),
+      index === primary ? 0 : index < primary ? primary - 1 : primary,
+    );
   return (
     <fieldset>
       <legend className="text-sm font-medium text-foreground">Email addresses</legend>
@@ -627,27 +648,20 @@ function AddressFields(props: { addresses: string[]; onChange: (addresses: strin
               placeholder="person@example.com"
               autoComplete="off"
               autoFocus={index > 0 && address === "" && index === addresses.length - 1}
-              aria-label={index === 0 ? "Primary email address" : `Email address ${index + 1}`}
+              aria-label={`Email address ${index + 1}`}
               className="min-w-0 flex-1"
             />
-            <span className="flex w-[6.5rem] shrink-0 justify-center">
-              {index === 0 ? (
-                <Badge variant="secondary" className="h-6 rounded-md px-2 text-xs font-normal">
-                  Primary
-                </Badge>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  className="text-muted-foreground"
-                  disabled={!address.trim()}
-                  onClick={() => makePrimary(index)}
-                >
-                  Make primary
-                </Button>
-              )}
-            </span>
+            <label className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
+              <Checkbox
+                checked={index === primary}
+                disabled={index !== primary && !address.trim()}
+                onCheckedChange={(checked) => {
+                  if (checked === true) props.onChange(addresses, index);
+                }}
+                aria-label={`Make ${address.trim() || `address ${index + 1}`} primary`}
+              />
+              Primary
+            </label>
             <Button
               type="button"
               variant="ghost"
@@ -668,7 +682,7 @@ function AddressFields(props: { addresses: string[]; onChange: (addresses: strin
         size="sm"
         className="mt-2 -ml-2 text-muted-foreground"
         disabled={addresses.length >= 20}
-        onClick={() => props.onChange([...addresses, ""])}
+        onClick={() => props.onChange([...addresses, ""], primary)}
       >
         <PlusIcon className="h-3.5 w-3.5" />
         Add email address
