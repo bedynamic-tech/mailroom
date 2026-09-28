@@ -43,7 +43,9 @@ export function startTheme(): void {
   if (typeof window === "undefined") return;
   apply();
   darkQuery().addEventListener("change", () => {
-    if (choice === "system") apply();
+    if (choice !== "system") return;
+    apply();
+    listeners.forEach((listener) => listener());
   });
   // Another tab changed the theme.
   window.addEventListener("storage", (event) => {
@@ -73,4 +75,9 @@ const subscribe = (listener: () => void) => {
 
 export function useTheme(): ThemeChoice {
   return useSyncExternalStore(subscribe, () => choice, () => "system" as const);
+}
+
+/** The theme actually showing: the saved choice, or the device's when set to System. */
+export function useResolvedTheme(): "light" | "dark" {
+  return useSyncExternalStore(subscribe, resolved, () => "light" as const);
 }

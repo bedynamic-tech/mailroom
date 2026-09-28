@@ -233,3 +233,12 @@ export function MoreIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function ContrastIcon(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
