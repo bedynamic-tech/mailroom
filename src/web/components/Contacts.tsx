@@ -638,9 +638,23 @@ function AddressFields(props: {
   return (
     <fieldset>
       <legend className="text-sm font-medium text-foreground">Email addresses</legend>
-      <ul className="mt-1.5 space-y-2">
+      <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+        Check the box next to the primary address. New email to this contact goes there, and mail
+        from any of these addresses shows up under this contact.
+      </p>
+      <ul className="mt-2 space-y-2">
         {addresses.map((address, index) => (
           <li key={index} className="flex items-center gap-2">
+            <Checkbox
+              checked={index === primary}
+              disabled={index !== primary && !address.trim()}
+              onCheckedChange={(checked) => {
+                if (checked === true) props.onChange(addresses, index);
+              }}
+              aria-label={`Make ${address.trim() || `address ${index + 1}`} primary`}
+              title={index === primary ? "Primary address" : "Make primary"}
+              className="shrink-0"
+            />
             <Input
               type="email"
               value={address}
@@ -651,17 +665,6 @@ function AddressFields(props: {
               aria-label={`Email address ${index + 1}`}
               className="min-w-0 flex-1"
             />
-            <label className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
-              <Checkbox
-                checked={index === primary}
-                disabled={index !== primary && !address.trim()}
-                onCheckedChange={(checked) => {
-                  if (checked === true) props.onChange(addresses, index);
-                }}
-                aria-label={`Make ${address.trim() || `address ${index + 1}`} primary`}
-              />
-              Primary
-            </label>
             <Button
               type="button"
               variant="ghost"
@@ -687,10 +690,6 @@ function AddressFields(props: {
         <PlusIcon className="h-3.5 w-3.5" />
         Add email address
       </Button>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-        Mail from any of these addresses shows up under this contact. New email goes to the primary
-        address.
-      </p>
     </fieldset>
   );
 }
