@@ -68,6 +68,7 @@ import { CatchAllBadge } from "./CatchAllBadge";
 import { BlockAddressDialog, CreateInboxFromAddressDialog } from "./CatchAllDialogs";
 import { LinkifiedText } from "./LinkifiedText";
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
+import { readReplyRecipients, writeReplyRecipients } from "../reply-recipients";
 import { RichTextEditor, RichTextPreview, richTextSummary } from "./RichTextEditor";
 import {
   isBlankRichText,
@@ -85,10 +86,12 @@ export function ThreadView(props: {
   const queryClient = useQueryClient();
   const [replyText, setReplyText] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  // Edited recipients are remembered per conversation (see reply-recipients.ts).
+  const [savedRecipients] = useState(() => readReplyRecipients(props.threadId));
   // null until the To field is edited, so it keeps following the latest inbound reply target.
-  const [replyToEdit, setReplyToEdit] = useState<string[] | null>(null);
-  const [replyCc, setReplyCc] = useState<string[]>([]);
-  const [replyBcc, setReplyBcc] = useState<string[]>([]);
+  const [replyToEdit, setReplyToEdit] = useState<string[] | null>(savedRecipients.to);
+  const [replyCc, setReplyCc] = useState<string[]>(savedRecipients.cc);
+  const [replyBcc, setReplyBcc] = useState<string[]>(savedRecipients.bcc);
   // Cc/Bcc rows stay collapsed unless they hold an address or are being filled in.
   const [addingCc, setAddingCc] = useState(false);
   const [addingBcc, setAddingBcc] = useState(false);
@@ -142,9 +145,10 @@ export function ThreadView(props: {
   useEffect(() => {
     setReplyText("");
     setPendingFiles([]);
-    setReplyToEdit(null);
-    setReplyCc([]);
-    setReplyBcc([]);
+    const saved = readReplyRecipients(props.threadId);
+    setReplyToEdit(saved.to);
+    setReplyCc(saved.cc);
+    setReplyBcc(saved.bcc);
     setAddingCc(false);
     setAddingBcc(false);
     setSendNotice(null);
@@ -155,6 +159,10 @@ export function ThreadView(props: {
     seenDraftIds.current.clear();
     attemptIds.current.clear();
   }, [props.threadId]);
+
+  useEffect(() => {
+    writeReplyRecipients(props.threadId, { to: replyToEdit, cc: replyCc, bcc: replyBcc });
+  }, [props.threadId, replyToEdit, replyCc, replyBcc]);
 
   useStickToBottom(
     conversationRef,
@@ -191,12 +199,10 @@ export function ThreadView(props: {
         args.html,
       ),
     onSuccess: (result, args) => {
+      // Recipients stay as sent, so the next reply goes to the same people.
       if (result.status === "sent") {
         setReplyText("");
         setPendingFiles([]);
-        setReplyToEdit(null);
-        setReplyCc([]);
-        setReplyBcc([]);
         setAddingCc(false);
         setAddingBcc(false);
         setUsedDraftId(null);
