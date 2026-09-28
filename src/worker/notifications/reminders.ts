@@ -1,5 +1,5 @@
 import { sendEmail, type SendEmailEnv } from "../email/send.ts";
-import { formatDueTime, type BoardReminderChannels } from "../../shared/board.ts";
+import { formatDueTime } from "../../shared/board.ts";
 import { pushToSubscribedBrowsers, type PushMessage } from "./push.ts";
 
 /** Most reminders sent in one scheduler run; the rest go out a minute later. */
@@ -15,9 +15,12 @@ export interface DueReminder {
 }
 
 interface ReminderSettings {
-  board_reminder_channels: BoardReminderChannels;
-  board_reminder_address: string | null;
-  board_reminder_origin: string | null;
+  browser_notifications_enabled: number;
+  browser_board_reminders: number;
+  email_notifications_enabled: number;
+  email_board_reminders: number;
+  email_notification_address: string | null;
+  email_notification_origin: string | null;
 }
 
 export function buildReminderPush(reminder: DueReminder): PushMessage {
@@ -76,13 +79,14 @@ export async function sendDueReminders(
   if (results.length === 0) return { sent: 0 };
 
   const settings = await env.DB.prepare(
-    `SELECT board_reminder_channels, board_reminder_address, board_reminder_origin
+    `SELECT browser_notifications_enabled, browser_board_reminders,
+            email_notifications_enabled, email_board_reminders,
+            email_notification_address, email_notification_origin
      FROM global_settings WHERE id = 1`,
   ).first<ReminderSettings>();
-  const channels = settings?.board_reminder_channels ?? "browser";
 
   for (const reminder of results) {
-    await deliverReminder(env, reminder, channels, settings);
+    await deliverReminder(env, reminder, settings);
   }
   return { sent: results.length };
 }
@@ -90,15 +94,22 @@ export async function sendDueReminders(
 async function deliverReminder(
   env: Env & SendEmailEnv,
   reminder: DueReminder,
-  channels: BoardReminderChannels,
   settings: ReminderSettings | null,
 ): Promise<void> {
   const jobs: Promise<unknown>[] = [];
-  if (channels === "browser" || channels === "both") {
+  // Each kind of notification carries reminders only while it is on and its
+  // Board reminders box is checked.
+  if (settings?.browser_notifications_enabled && settings.browser_board_reminders) {
     jobs.push(pushToSubscribedBrowsers(env, buildReminderPush(reminder)));
   }
-  if ((channels === "email" || channels === "both") && settings?.board_reminder_address) {
-    jobs.push(emailReminder(env, reminder, settings.board_reminder_address, settings.board_reminder_origin));
+  if (
+    settings?.email_notifications_enabled &&
+    settings.email_board_reminders &&
+    settings.email_notification_address
+  ) {
+    jobs.push(
+      emailReminder(env, reminder, settings.email_notification_address, settings.email_notification_origin),
+    );
   }
   const outcomes = await Promise.allSettled(jobs);
   for (const outcome of outcomes) {

@@ -42,10 +42,10 @@ export interface GeneralSettings {
   auto_create_contacts: boolean;
   /** Signature (sanitized HTML) for every Inbox set to use the default. */
   default_signature_html: string | null;
-  /** How Board Item reminders are delivered. */
-  board_reminder_channels: "browser" | "email" | "both";
-  /** Where reminder emails go. */
-  board_reminder_address: string | null;
+  /** Browser Notifications, while on, also carry Board Reminders. */
+  browser_board_reminders: boolean;
+  /** Email Notifications, while on, also carry Board Reminders. */
+  email_board_reminders: boolean;
 }
 
 export interface EmailNotificationTemplate {

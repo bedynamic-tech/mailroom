@@ -127,8 +127,8 @@ test("saving an unchanged due time keeps a sent reminder from going out again", 
 
 test("due reminders are emailed once, from an Inbox, with a link to the item", async (t) => {
   const f = fixture(t);
-  f.db.exec(`UPDATE global_settings SET board_reminder_channels = 'email',
-    board_reminder_address = 'me@personal.test', board_reminder_origin = 'https://mail.example.com'`);
+  f.db.exec(`UPDATE global_settings SET email_notifications_enabled = 1,
+    email_notification_address = 'me@personal.test', email_notification_origin = 'https://mail.example.com'`);
   const { body: due } = await f.call("POST", "/cards", {
     title: "Send the quote",
     description: "Include shipping",
@@ -158,18 +158,29 @@ test("due reminders are emailed once, from an Inbox, with a link to the item", a
   assert.equal(f.sent.length, 1);
 });
 
-test("browser-only reminders send no email", async (t) => {
+test("reminders are only emailed while email notifications are on and the box is checked", async (t) => {
   const f = fixture(t);
-  f.db.exec("UPDATE global_settings SET board_reminder_address = 'me@personal.test'");
-  await f.call("POST", "/cards", { title: "Ping", due_at: inAnHour(), reminder_minutes: 60 });
+  f.db.exec("UPDATE global_settings SET email_notification_address = 'me@personal.test'");
+  await f.call("POST", "/cards", { title: "Off", due_at: inAnHour(), reminder_minutes: 60 });
   assert.deepEqual(await sendDueReminders(f.env), { sent: 1 });
   assert.equal(f.sent.length, 0);
+
+  f.db.exec("UPDATE global_settings SET email_notifications_enabled = 1, email_board_reminders = 0");
+  await f.call("POST", "/cards", { title: "Unchecked", due_at: inAnHour(), reminder_minutes: 60 });
+  assert.deepEqual(await sendDueReminders(f.env), { sent: 1 });
+  assert.equal(f.sent.length, 0);
+
+  f.db.exec("UPDATE global_settings SET email_board_reminders = 1");
+  await f.call("POST", "/cards", { title: "Checked", due_at: inAnHour(), reminder_minutes: 60 });
+  assert.deepEqual(await sendDueReminders(f.env), { sent: 1 });
+  assert.equal(f.sent.length, 1);
+  assert.equal(f.sent[0].subject, "Reminder: Checked");
 });
 
 test("reminder emails never go to one of the workspace's own Inboxes", async (t) => {
   const f = fixture(t);
-  f.db.exec(`UPDATE global_settings SET board_reminder_channels = 'both',
-    board_reminder_address = 'support@example.com'`);
+  f.db.exec(`UPDATE global_settings SET email_notifications_enabled = 1,
+    email_notification_address = 'support@example.com'`);
   await f.call("POST", "/cards", { title: "Loop", due_at: inAnHour(), reminder_minutes: 60 });
   assert.deepEqual(await sendDueReminders(f.env), { sent: 1 });
   assert.equal(f.sent.length, 0);

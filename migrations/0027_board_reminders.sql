@@ -13,9 +13,8 @@ ALTER TABLE board_cards ADD COLUMN reminder_sent_at TEXT;
 CREATE INDEX idx_board_cards_remind_at ON board_cards(remind_at)
   WHERE remind_at IS NOT NULL AND reminder_sent_at IS NULL;
 
--- How reminders are delivered: to subscribed browsers, by email, or both.
-ALTER TABLE global_settings ADD COLUMN board_reminder_channels TEXT NOT NULL DEFAULT 'browser'
-  CHECK (board_reminder_channels IN ('browser', 'email', 'both'));
-ALTER TABLE global_settings ADD COLUMN board_reminder_address TEXT;
--- Web origin captured when the setting is saved, used to link to the item.
-ALTER TABLE global_settings ADD COLUMN board_reminder_origin TEXT;
+-- Whether Browser and Email Notifications, while on, also carry Board Reminders.
+ALTER TABLE global_settings ADD COLUMN browser_board_reminders INTEGER NOT NULL DEFAULT 1
+  CHECK (browser_board_reminders IN (0, 1));
+ALTER TABLE global_settings ADD COLUMN email_board_reminders INTEGER NOT NULL DEFAULT 1
+  CHECK (email_board_reminders IN (0, 1));

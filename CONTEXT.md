@@ -69,7 +69,7 @@ A card on the Board with a title, an optional description and the time it was ad
 _Avoid_: Task, ticket, card
 
 **Board Reminder**:
-A notice that a Board Item is coming due, sent once at the time chosen on the Item (at its due time or a set time before). It goes to every subscribed browser, by email to one address that is never an Inbox, or both, as the workspace's reminder setting says. A due time already past when saved never reminds; changing the due time or reminder schedules it again. Browsers subscribed for reminders stay subscribed while either reminders or Browser Notifications use them.
+A notice that a Board Item is coming due, sent once at the time chosen on the Item (at its due time or a set time before). It travels through Browser Notifications and Email Notifications: each carries Board Reminders while it is on and its Board reminders box is checked (the default). A due time already past when saved never reminds; changing the due time or reminder schedules it again.
 _Avoid_: Alarm, alert, due notification
 
 **Internal Note**:

@@ -1074,7 +1074,7 @@ function DueFields(props: { value: DueValue; onChange: (value: DueValue) => void
       </div>
       {local && reminder !== "none" && (
         <p className="text-xs text-muted-foreground">
-          Reminders go out by browser, email or both, as set in Settings.
+          Reminders go out through the notifications turned on in Settings.
         </p>
       )}
     </div>

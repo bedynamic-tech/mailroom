@@ -29,9 +29,6 @@ export const BOARD_REMINDER_OPTIONS: ReadonlyArray<{ minutes: number; label: str
   { minutes: 10080, label: "1 week before" },
 ];
 
-export type BoardReminderChannels = "browser" | "email" | "both";
-export const BOARD_REMINDER_CHANNELS: readonly BoardReminderChannels[] = ["browser", "email", "both"];
-
 export function reminderLabel(minutes: number | null): string | null {
   if (minutes === null) return null;
   return BOARD_REMINDER_OPTIONS.find((option) => option.minutes === minutes)?.label ?? `${minutes} minutes before`;

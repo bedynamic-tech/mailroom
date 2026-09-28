@@ -125,17 +125,7 @@ export const enableBrowserNotifications = (subscription: BrowserPushSubscription
     body: JSON.stringify(subscription),
   });
 
-export const subscribeForBoardReminders = (subscription: BrowserPushSubscription) =>
-  request<{ ok: true }>("/settings/board-reminders/subscription", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(subscription),
-  });
-
-export const updateBoardReminders = (input: {
-  channels: GeneralSettings["board_reminder_channels"];
-  address: string | null;
-}) =>
+export const updateBoardReminders = (input: { browser?: boolean; email?: boolean }) =>
   request<{ ok: true }>("/settings/board-reminders", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

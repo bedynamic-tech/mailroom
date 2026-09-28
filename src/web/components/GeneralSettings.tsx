@@ -3,6 +3,7 @@ import { Monitor as MonitorIcon, Moon as MoonIcon, Sun as SunIcon } from "lucide
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
@@ -11,12 +12,11 @@ import {
   fetchGeneralSettings,
   sendTestEmailNotification,
   setEmailNotificationsEnabled,
-  subscribeForBoardReminders,
   updateBoardReminders,
   updateDefaultSignature,
   updateEmailNotifications,
 } from "../api";
-import type { EmailNotificationTemplate, GeneralSettings as GeneralSettingsData } from "../../shared/types";
+import type { EmailNotificationTemplate } from "../../shared/types";
 import {
   BrowserPushError,
   createBrowserPushSubscription,
@@ -76,8 +76,7 @@ export function GeneralSettings(props: {
   const disable = useMutation({
     mutationFn: async () => {
       await disableBrowserNotifications();
-      // Board reminders keep using this browser when they're sent to browsers.
-      if (settings.data?.board_reminder_channels === "email") await unsubscribeCurrentBrowser();
+      await unsubscribeCurrentBrowser();
     },
     onSettled: refreshState,
   });
@@ -148,6 +147,14 @@ export function GeneralSettings(props: {
                     {notificationErrorMessage(error)}
                   </p>
                 )}
+
+                {globalEnabled && (
+                  <BoardRemindersCheckbox
+                    kind="browser"
+                    checked={Boolean(settings.data?.browser_board_reminders)}
+                    disabled={busy}
+                  />
+                )}
               </div>
               <Switch
                 id="browser-notifications"
@@ -164,6 +171,7 @@ export function GeneralSettings(props: {
               </span>
             </div>
             <EmailNotificationSetting
+              boardReminders={Boolean(settings.data?.email_board_reminders)}
               enabled={Boolean(settings.data?.email_notifications_enabled)}
               savedAddress={settings.data?.email_notification_address ?? null}
               template={settings.data?.email_notification_template ?? null}
@@ -171,8 +179,6 @@ export function GeneralSettings(props: {
             />
           </SettingsPanel>
         </SettingsBlock>
-
-        <BoardReminderSetting settings={settings.data ?? null} loading={settings.isLoading} />
 
         <DefaultSignatureSetting
           savedHtml={settings.data?.default_signature_html ?? null}
@@ -266,186 +272,37 @@ function DefaultSignatureSetting(props: {
   );
 }
 
-type ReminderChannels = GeneralSettingsData["board_reminder_channels"];
-
-const REMINDER_CHANNEL_OPTIONS: { value: ReminderChannels; label: string }[] = [
-  { value: "browser", label: "Browser" },
-  { value: "email", label: "Email" },
-  { value: "both", label: "Both" },
-];
-
-/** Where Board Item reminders go: subscribed browsers, an email address, or both. */
-function BoardReminderSetting(props: { settings: GeneralSettingsData | null; loading: boolean }) {
+/** A checkbox under a notification toggle: whether it also carries Board Reminders. */
+function BoardRemindersCheckbox(props: { kind: "browser" | "email"; checked: boolean; disabled: boolean }) {
   const queryClient = useQueryClient();
-  const saved = props.settings;
-  const savedChannels = saved?.board_reminder_channels ?? "browser";
-  const savedAddress = saved?.board_reminder_address ?? null;
-  const [channels, setChannels] = useState<ReminderChannels>(savedChannels);
-  const [address, setAddress] = useState("");
-  useEffect(() => setChannels(savedChannels), [savedChannels]);
-  useEffect(
-    () => setAddress(savedAddress ?? saved?.email_notification_address ?? ""),
-    [savedAddress, saved?.email_notification_address],
-  );
-  const browser = useQuery({
-    queryKey: ["browser-push-state"],
-    queryFn: getBrowserPushState,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-  });
-
-  const refresh = () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["settings", "general"] }),
-      queryClient.invalidateQueries({ queryKey: ["browser-push-state"] }),
-    ]);
+  const id = `${props.kind}-board-reminders`;
   const save = useMutation({
-    mutationFn: async () => {
-      await updateBoardReminders({ channels, address: channels === "browser" ? null : address.trim() });
-      // The server forgets subscribed browsers once nothing uses them.
-      if (channels === "email" && !saved?.browser_notifications_enabled) await unsubscribeCurrentBrowser();
-    },
-    onSuccess: refresh,
+    mutationFn: (checked: boolean) => updateBoardReminders({ [props.kind]: checked }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["settings", "general"] }),
   });
-  const subscribe = useMutation({
-    mutationFn: async () => {
-      if (!saved?.vapid_public_key) throw new Error("Browser notifications are not configured.");
-      await subscribeForBoardReminders(await createBrowserPushSubscription(saved.vapid_public_key));
-    },
-    onSettled: refresh,
-  });
-
-  const usesEmail = channels !== "browser";
-  const usesBrowser = channels !== "email";
-  const trimmed = address.trim();
-  const dirty =
-    channels !== savedChannels || (usesEmail && trimmed.toLowerCase() !== (savedAddress ?? ""));
-  const busy = props.loading || save.isPending;
-  const configured = Boolean(saved?.browser_notifications_configured);
-  const subscribed = Boolean(browser.data?.subscribed);
-  const error = save.error ?? subscribe.error;
-
-  let browserNote: string | null = null;
-  if (usesBrowser && !props.loading && !browser.isLoading) {
-    if (!configured) browserNote = "Push delivery has not been configured on this server.";
-    else if (browser.data && !browser.data.supported) {
-      browserNote = isIosBrowser()
-        ? "On iPhone and iPad, add Mailroom + to your Home Screen to get reminders there."
-        : "This browser does not support push notifications.";
-    } else if (browser.data?.permission === "denied") {
-      browserNote = "Notifications are blocked in this browser's site settings.";
-    } else if (subscribed) browserNote = "This browser will show reminders.";
-    else browserNote = "This browser isn't set up to show reminders yet.";
-  }
-
+  const checked = save.isPending ? Boolean(save.variables) : props.checked;
   return (
-    <SettingsBlock
-      id="board-reminder-settings-heading"
-      title="Board reminders"
-      description="When a board item has a due date and a reminder, it's sent here at the time you picked."
-    >
-      <SettingsPanel>
-        <form
-          className="px-4 py-4 sm:px-5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (dirty && !busy && (!usesEmail || trimmed)) save.mutate();
-          }}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p id="board-reminder-channels-label" className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <BellIcon className="h-4 w-4 text-muted-foreground" />
-              Send reminders by
-            </p>
-            <div
-              role="radiogroup"
-              aria-labelledby="board-reminder-channels-label"
-              className="inline-flex rounded-lg bg-muted p-[3px]"
-            >
-              {REMINDER_CHANNEL_OPTIONS.map((option) => {
-                const selected = channels === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    disabled={busy}
-                    onClick={() => {
-                      setChannels(option.value);
-                      save.reset();
-                    }}
-                    className={cn(
-                      "inline-flex h-7 items-center rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none touch:h-9",
-                      selected
-                        ? "bg-background text-foreground shadow-sm dark:bg-accent"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {usesBrowser && browserNote && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <p className="min-w-0 flex-1 text-sm leading-5 text-muted-foreground">{browserNote}</p>
-              {configured && !subscribed && browser.data?.supported && browser.data.permission !== "denied" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => subscribe.mutate()}
-                  disabled={subscribe.isPending}
-                >
-                  {subscribe.isPending ? "Enabling…" : "Enable on this browser"}
-                </Button>
-              )}
-            </div>
-          )}
-
-          {usesEmail && (
-            <div className="mt-3 max-w-xl space-y-1.5">
-              <label htmlFor="board-reminder-address" className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MailIcon className="h-4 w-4" />
-                Email reminders to
-              </label>
-              <Input
-                id="board-reminder-address"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={address}
-                onChange={(event) => {
-                  setAddress(event.target.value);
-                  save.reset();
-                }}
-                disabled={busy}
-              />
-            </div>
-          )}
-
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <p className="min-w-0 text-xs text-muted-foreground" aria-live="polite">
-              {error ? (
-                <span className="text-destructive">
-                  {error instanceof Error ? notificationErrorMessage(error) : "Couldn’t save reminders."}
-                </span>
-              ) : dirty ? (
-                "Unsaved changes"
-              ) : save.isSuccess ? (
-                "Reminder settings saved"
-              ) : null}
-            </p>
-            <Button type="submit" size="sm" disabled={busy || !dirty || (usesEmail && !trimmed)}>
-              {save.isPending ? "Saving…" : "Save"}
-            </Button>
-          </div>
-        </form>
-      </SettingsPanel>
-    </SettingsBlock>
+    <div className="mt-3">
+      <label htmlFor={id} className="flex w-fit items-center gap-2 text-sm text-foreground">
+        <Checkbox
+          id={id}
+          checked={checked}
+          onCheckedChange={(value) => save.mutate(value === true)}
+          disabled={props.disabled || save.isPending}
+        />
+        Board reminders
+      </label>
+      <p className="mt-1 ml-6 text-xs leading-5 text-muted-foreground">
+        {props.kind === "browser"
+          ? "Also send a browser notification when a board item's reminder is due."
+          : "Also email this address when a board item's reminder is due."}
+      </p>
+      {save.error && (
+        <p className="mt-1 ml-6 text-xs leading-5 text-destructive" role="alert">
+          {save.error.message || "Couldn’t save. Try again."}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -546,6 +403,7 @@ function AppSettings() {
 }
 
 function EmailNotificationSetting(props: {
+  boardReminders: boolean;
   enabled: boolean;
   savedAddress: string | null;
   template: EmailNotificationTemplate | null;
@@ -633,6 +491,10 @@ function EmailNotificationSetting(props: {
             {save.isPending ? "Saving…" : "Save"}
           </Button>
         </div>
+
+        {props.enabled && props.savedAddress && (
+          <BoardRemindersCheckbox kind="email" checked={props.boardReminders} disabled={busy} />
+        )}
 
         {props.savedAddress && (
           <div className="mt-2 flex flex-wrap items-center gap-1 -ml-2.5">
