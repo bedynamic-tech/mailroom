@@ -193,6 +193,24 @@ test("applyMailRules labels, archives, marks read, counts, reports skips and for
   assert.deepEqual((await matchingMailRules(f.env, 2, message())).map((rule) => rule.name), ["Quiet invoices", "Other inbox"]);
 });
 
+test("a board item rule adds one card per conversation, titled from the subject", async (t) => {
+  const f = fixture(t);
+  const doing = f.db.prepare("SELECT id FROM board_columns WHERE name = 'In progress'").get().id;
+  const rule = await createMailRule(f.env, { name: "Track invoices", conditions: all(c("subject", "contains", "invoice")), board_column_id: doing });
+  assert.equal(rule.board_column_id, doing);
+  assert.equal(rule.board_column_name, "In progress");
+  assert.equal((await f.call("POST", "", { name: "x", conditions: all(c("subject", "contains", "x")), board_column_id: 999 })).status, 400);
+
+  await applyMailRules(f.env, { mailboxId: 1, threadId: 10, message: message({ subject: "Re: Your Invoice #42" }) });
+  await applyMailRules(f.env, { mailboxId: 1, threadId: 10, message: message({ subject: "Re: Your Invoice #42" }) });
+  const cards = f.db.prepare("SELECT c.column_id, c.title, t.thread_id FROM board_cards c JOIN board_card_threads t ON t.card_id = c.id").all();
+  assert.deepEqual(cards.map((row) => ({ ...row })), [{ column_id: doing, title: "Your Invoice #42", thread_id: 10 }]);
+
+  f.db.exec(`DELETE FROM board_columns WHERE id = ${doing}`);
+  await applyMailRules(f.env, { mailboxId: 2, threadId: 20, message: message() });
+  assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM board_card_threads WHERE thread_id = 20").get().n, 0);
+});
+
 const original = (overrides = {}) => ({
   from: { address: "billing@vendor.com", name: "Vendor Billing" },
   replyTo: "billing@vendor.com",
