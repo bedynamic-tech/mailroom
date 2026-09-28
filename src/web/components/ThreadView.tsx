@@ -73,7 +73,7 @@ import {
   parseReplyRecipients,
   serializeReplyRecipients,
 } from "../../shared/reply-recipients";
-import { RichTextEditor, RichTextPreview, richTextSummary } from "./RichTextEditor";
+import { RichTextEditor, RichTextPreview } from "./RichTextEditor";
 import {
   isBlankRichText,
   plainTextToHtml,
@@ -444,8 +444,10 @@ export function ThreadView(props: {
 
   const replyMailbox = mailboxes.data?.find((mailbox) => mailbox.id === thread.mailbox_id);
   const replySignature = replyMailbox?.effective_signature_html
-    ? richTextSummary(replyMailbox.effective_signature_html)
-    : "";
+    ? replyMailbox.signature_mode === "custom"
+      ? "Mailbox"
+      : "Default"
+    : null;
 
   const showCc = addingCc || replyCc.length > 0;
   const showBcc = addingBcc || replyBcc.length > 0;
@@ -959,21 +961,20 @@ export function ThreadView(props: {
                 ))}
               </div>
             )}
-            {replySignature && (
-              <p
-                className="truncate px-3.5 pb-2 text-xs text-muted-foreground"
-                title={replySignature}
-              >
-                <span className="text-foreground/70">Signature:</span> {replySignature}
-              </p>
-            )}
-            <div className="flex items-center justify-end px-3 pb-3 sm:justify-between">
-              <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
-                <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
-                <Kbd>Enter</Kbd>
-                <span className="ml-0.5">to send</span>
-              </span>
-              <div className="flex items-center gap-1.5">
+            <div className="flex items-center justify-between gap-2 px-3 pb-3">
+              <div className="flex min-w-0 items-center gap-3 pl-0.5 text-xs text-muted-foreground">
+                {replySignature && (
+                  <span className="min-w-0 truncate" title={`Signature: ${replySignature}`}>
+                    <span className="text-foreground/70">Signature:</span> {replySignature}
+                  </span>
+                )}
+                <span className="hidden shrink-0 items-center gap-1 sm:inline-flex">
+                  <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
+                  <Kbd>Enter</Kbd>
+                  <span className="ml-0.5">to send</span>
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
                 <input
                   ref={fileInputRef}
                   type="file"
