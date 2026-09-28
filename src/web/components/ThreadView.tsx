@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   archiveThread,
@@ -491,9 +491,12 @@ export function ThreadView(props: {
       </header>
 
       <div ref={conversationRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="mr-auto w-full max-w-[800px] space-y-3 px-4 py-5 sm:px-6 md:py-6">
-          {messages.map((message) => (
-            <MessageCard key={message.id} message={message} />
+        <div className="mr-auto w-full max-w-[800px] px-4 py-5 sm:px-6 md:py-6">
+          {messages.map((message, index) => (
+            <Fragment key={message.id}>
+              {index > 0 && <MessageConnector />}
+              <MessageCard message={message} />
+            </Fragment>
           ))}
         </div>
       </div>
@@ -759,6 +762,15 @@ function parseAddressList(raw: string | null | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+// Thin line in the gap between cards, centered under the sender avatar (card padding + half the h-9 avatar).
+function MessageConnector() {
+  return (
+    <div aria-hidden="true" className="h-4 pl-[33.5px] sm:pl-[37.5px]">
+      <div className="h-full w-px bg-border" />
+    </div>
+  );
 }
 
 function MessageCard({ message }: { message: Message }) {
