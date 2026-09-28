@@ -15,10 +15,11 @@ import {
   linkBoardCard,
   markRead,
   retryDraftRun,
+  saveReplyRecipients,
   sendReply,
   unarchiveThread,
 } from "../api";
-import type { Draft, Message, ThreadNote } from "../../shared/types";
+import type { Draft, Message, ThreadDetail, ThreadNote } from "../../shared/types";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits";
 import { replyAllRecipients } from "../../shared/recipients";
 import {
@@ -68,7 +69,10 @@ import { CatchAllBadge } from "./CatchAllBadge";
 import { BlockAddressDialog, CreateInboxFromAddressDialog } from "./CatchAllDialogs";
 import { LinkifiedText } from "./LinkifiedText";
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
-import { readReplyRecipients, writeReplyRecipients } from "../reply-recipients";
+import {
+  parseReplyRecipients,
+  serializeReplyRecipients,
+} from "../../shared/reply-recipients";
 import { RichTextEditor, RichTextPreview, richTextSummary } from "./RichTextEditor";
 import {
   isBlankRichText,
@@ -86,12 +90,13 @@ export function ThreadView(props: {
   const queryClient = useQueryClient();
   const [replyText, setReplyText] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  // Edited recipients are remembered per conversation (see reply-recipients.ts).
-  const [savedRecipients] = useState(() => readReplyRecipients(props.threadId));
   // null until the To field is edited, so it keeps following the latest inbound reply target.
-  const [replyToEdit, setReplyToEdit] = useState<string[] | null>(savedRecipients.to);
-  const [replyCc, setReplyCc] = useState<string[]>(savedRecipients.cc);
-  const [replyBcc, setReplyBcc] = useState<string[]>(savedRecipients.bcc);
+  const [replyToEdit, setReplyToEdit] = useState<string[] | null>(null);
+  const [replyCc, setReplyCc] = useState<string[]>([]);
+  const [replyBcc, setReplyBcc] = useState<string[]>([]);
+  // The recipients last saved on the Conversation; undefined until they are loaded.
+  const savedRecipients = useRef<string | null | undefined>(undefined);
+  const pendingRecipientSaves = useRef(0);
   // Cc/Bcc rows stay collapsed unless they hold an address or are being filled in.
   const [addingCc, setAddingCc] = useState(false);
   const [addingBcc, setAddingBcc] = useState(false);
@@ -145,10 +150,10 @@ export function ThreadView(props: {
   useEffect(() => {
     setReplyText("");
     setPendingFiles([]);
-    const saved = readReplyRecipients(props.threadId);
-    setReplyToEdit(saved.to);
-    setReplyCc(saved.cc);
-    setReplyBcc(saved.bcc);
+    setReplyToEdit(null);
+    setReplyCc([]);
+    setReplyBcc([]);
+    savedRecipients.current = undefined;
     setAddingCc(false);
     setAddingBcc(false);
     setSendNotice(null);
@@ -160,9 +165,44 @@ export function ThreadView(props: {
     attemptIds.current.clear();
   }, [props.threadId]);
 
+  // Edited recipients are saved on the Conversation, so they follow the user
+  // across devices, reloads and sends. Declared before the load below, so the
+  // render that loads them never saves the empty defaults over them.
   useEffect(() => {
-    writeReplyRecipients(props.threadId, { to: replyToEdit, cc: replyCc, bcc: replyBcc });
-  }, [props.threadId, replyToEdit, replyCc, replyBcc]);
+    if (savedRecipients.current === undefined) return;
+    const recipients = { to: replyToEdit, cc: replyCc, bcc: replyBcc };
+    const serialized = serializeReplyRecipients(recipients);
+    if (serialized === savedRecipients.current) return;
+    const previous = savedRecipients.current;
+    savedRecipients.current = serialized;
+    // Keep the cached Conversation current, so reopening it shows these right away.
+    queryClient.setQueryData<ThreadDetail>(["thread", props.threadId], (current) =>
+      current ? { ...current, thread: { ...current.thread, reply_recipients: serialized } } : current,
+    );
+    pendingRecipientSaves.current += 1;
+    saveReplyRecipients(props.threadId, recipients)
+      .catch(() => {
+        // Retry with the next edit.
+        if (savedRecipients.current === serialized) savedRecipients.current = previous;
+      })
+      .finally(() => {
+        pendingRecipientSaves.current -= 1;
+        queryClient.invalidateQueries({ queryKey: ["thread", props.threadId] });
+      });
+  }, [props.threadId, queryClient, replyToEdit, replyCc, replyBcc]);
+
+  // Picks up recipients saved on another device, unless a save from here is still in flight.
+  const storedRecipients = detail.data?.thread.reply_recipients;
+  useEffect(() => {
+    if (storedRecipients === undefined || pendingRecipientSaves.current > 0) return;
+    const saved = parseReplyRecipients(storedRecipients);
+    const serialized = serializeReplyRecipients(saved);
+    if (serialized === savedRecipients.current) return;
+    savedRecipients.current = serialized;
+    setReplyToEdit(saved.to);
+    setReplyCc(saved.cc);
+    setReplyBcc(saved.bcc);
+  }, [storedRecipients]);
 
   useStickToBottom(
     conversationRef,

@@ -1,51 +1,78 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync, readdirSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
+import { Hono } from "hono";
+import { replyRecipientsApi } from "../src/worker/api/reply-recipients.ts";
+import { requireSameOrigin } from "../src/worker/api/csrf.ts";
 import {
   EMPTY_REPLY_RECIPIENTS,
-  readReplyRecipients,
-  writeReplyRecipients,
-} from "../src/web/reply-recipients.ts";
+  parseReplyRecipients,
+  serializeReplyRecipients,
+} from "../src/shared/reply-recipients.ts";
 
-function memoryStorage() {
-  const items = new Map();
-  return {
-    items,
-    getItem: (key) => items.get(key) ?? null,
-    setItem: (key, value) => items.set(key, String(value)),
-    removeItem: (key) => items.delete(key),
+function fixture(t) {
+  const db = new DatabaseSync(":memory:");
+  t.after(() => db.close());
+  for (const file of readdirSync("migrations").filter((file) => file.endsWith(".sql")).sort()) {
+    db.exec(readFileSync(`migrations/${file}`, "utf8"));
+  }
+  db.exec(`INSERT INTO domains (id, name, status) VALUES (1, 'example.com', 'active');
+    INSERT INTO mailboxes (id, address, domain_id) VALUES (1, 'support@example.com', 1);
+    INSERT INTO threads (id, mailbox_id, subject, last_message_at, status)
+      VALUES (1, 1, 'Refund request', '2026-01-01T00:00:00.000Z', 'open');`);
+  function statement(sql, args = []) {
+    return {
+      bind: (...values) => statement(sql, values),
+      async first() { return db.prepare(sql).get(...args) ?? null; },
+      async all() { return { results: db.prepare(sql).all(...args) }; },
+      async run() { const result = db.prepare(sql).run(...args); return { meta: { changes: result.changes, last_row_id: result.lastInsertRowid } }; },
+    };
+  }
+  const env = { DB: { prepare: statement } };
+  const app = new Hono();
+  app.use("/api/*", requireSameOrigin);
+  app.route("/api/threads", replyRecipientsApi);
+  const put = async (path, body) => {
+    const response = await app.request(`https://mailroom.example/api/threads${path}`, {
+      method: "PUT",
+      headers: { Origin: "https://mailroom.example", "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }, env);
+    return { status: response.status, body: await response.json() };
   };
+  const stored = () => db.prepare("SELECT reply_recipients FROM threads WHERE id = 1").get().reply_recipients;
+  return { put, stored };
 }
 
-test("edited reply recipients are remembered per conversation", () => {
-  const storage = memoryStorage();
-  writeReplyRecipients(7, { to: ["a@example.com"], cc: ["b@example.com"], bcc: ["c@example.com"] }, storage);
-  assert.deepEqual(readReplyRecipients(7, storage), {
-    to: ["a@example.com"],
-    cc: ["b@example.com"],
-    bcc: ["c@example.com"],
-  });
-  assert.deepEqual(readReplyRecipients(8, storage), EMPTY_REPLY_RECIPIENTS);
+test("edited reply recipients are saved on the conversation", async (t) => {
+  const f = fixture(t);
+  const recipients = { to: ["a@example.com"], cc: ["b@example.com"], bcc: ["c@example.com"] };
+  assert.equal((await f.put("/1/reply-recipients", recipients)).status, 200);
+  assert.deepEqual(parseReplyRecipients(f.stored()), recipients);
 });
 
-test("an unedited To keeps following the latest inbound sender", () => {
-  const storage = memoryStorage();
-  writeReplyRecipients(7, { to: null, cc: ["b@example.com"], bcc: [] }, storage);
-  assert.equal(readReplyRecipients(7, storage).to, null);
+test("an unedited To is kept as unedited, and no edits clear the saved value", async (t) => {
+  const f = fixture(t);
+  await f.put("/1/reply-recipients", { to: null, cc: ["b@example.com"], bcc: [] });
+  assert.equal(parseReplyRecipients(f.stored()).to, null);
+  await f.put("/1/reply-recipients", EMPTY_REPLY_RECIPIENTS);
+  assert.equal(f.stored(), null);
 });
 
-test("clearing every edit forgets the conversation", () => {
-  const storage = memoryStorage();
-  writeReplyRecipients(7, { to: ["a@example.com"], cc: [], bcc: [] }, storage);
-  writeReplyRecipients(7, EMPTY_REPLY_RECIPIENTS, storage);
-  assert.equal(storage.items.size, 0);
+test("invalid recipients and unknown conversations are refused", async (t) => {
+  const f = fixture(t);
+  assert.equal((await f.put("/1/reply-recipients", { to: ["not an address"], cc: [], bcc: [] })).status, 400);
+  assert.equal((await f.put("/1/reply-recipients", { to: null, cc: "x", bcc: [] })).status, 400);
+  const tooMany = Array.from({ length: 60 }, (_, i) => `p${i}@example.com`);
+  assert.equal((await f.put("/1/reply-recipients", { to: tooMany.slice(0, 30), cc: tooMany.slice(30), bcc: [] })).status, 400);
+  assert.equal(f.stored(), null);
+  assert.equal((await f.put("/99/reply-recipients", EMPTY_REPLY_RECIPIENTS)).status, 404);
 });
 
-test("unreadable or missing storage falls back to defaults", () => {
-  const storage = memoryStorage();
-  storage.setItem("mailroom.replyRecipients.7", "{not json");
-  assert.deepEqual(readReplyRecipients(7, storage), EMPTY_REPLY_RECIPIENTS);
-  storage.setItem("mailroom.replyRecipients.7", JSON.stringify({ to: "x", cc: [1] }));
-  assert.deepEqual(readReplyRecipients(7, storage), EMPTY_REPLY_RECIPIENTS);
-  assert.deepEqual(readReplyRecipients(7, null), EMPTY_REPLY_RECIPIENTS);
-  writeReplyRecipients(7, { to: ["a@example.com"], cc: [], bcc: [] }, null);
+test("unreadable stored recipients fall back to no edits", () => {
+  assert.deepEqual(parseReplyRecipients(null), EMPTY_REPLY_RECIPIENTS);
+  assert.deepEqual(parseReplyRecipients("{not json"), EMPTY_REPLY_RECIPIENTS);
+  assert.deepEqual(parseReplyRecipients(JSON.stringify({ to: "x", cc: [1] })), EMPTY_REPLY_RECIPIENTS);
+  assert.equal(serializeReplyRecipients(EMPTY_REPLY_RECIPIENTS), null);
 });

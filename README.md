@@ -27,8 +27,9 @@ Routing, D1, R2 and Web Push.
   field, filled with the sender of the latest email (or its Reply-To). Remove
   or add To recipients before sending. **Cc**, **Bcc** and **Reply all** sit at
   the right of the To line and open their rows when tapped. Recipients you
-  edit are remembered for that conversation in your browser, through leaving,
-  reloading and sending, so the next reply goes to the same people. The sparkle button
+  edit are saved with that conversation, so they stay after leaving, reloading
+  or sending and on your other devices, and the next reply goes to the same
+  people. The sparkle button
   at the right of the formatting toolbar drafts a reply with AI.
 - **Opens at the latest message.** A conversation opens scrolled to the bottom
   and stays there while emails and images finish loading, until you scroll up.

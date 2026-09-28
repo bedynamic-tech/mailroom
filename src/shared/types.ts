@@ -135,6 +135,8 @@ export interface ThreadSummary {
   last_from_address: string | null;
   /** The address a catch-all Conversation was sent to; null when it reached the Inbox's own address. */
   catch_all_recipient: string | null;
+  /** Recipients edited in the reply box, as JSON (see shared/reply-recipients.ts); null when unedited. */
+  reply_recipients: string | null;
   labels: ThreadLabel[];
   /** How many Board Cards link this Conversation. */
   board_card_count: number;
