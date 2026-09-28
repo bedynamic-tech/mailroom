@@ -40,6 +40,7 @@ import { EmailHtmlBody } from "./EmailHtmlBody";
 import { defaultDarkAppearance, type EmailAppearance } from "../email-html";
 import { inlineAttachmentIds } from "../inline-images";
 import { useResolvedTheme } from "../theme";
+import { useStickToBottom } from "../use-stick-to-bottom";
 import {
   ArchiveIcon,
   ArrowLeftIcon,
@@ -150,13 +151,12 @@ export function ThreadView(props: {
     attemptIds.current.clear();
   }, [props.threadId]);
 
-  useEffect(() => {
-    if (!detail.data) return;
-    requestAnimationFrame(() => {
-      const container = conversationRef.current;
-      if (container) container.scrollTop = container.scrollHeight;
-    });
-  }, [detail.data, props.threadId]);
+  useStickToBottom(
+    conversationRef,
+    props.threadId,
+    Boolean(detail.data),
+    (detail.data?.messages.length ?? 0) + (detail.data?.notes.length ?? 0),
+  );
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["thread", props.threadId] });
