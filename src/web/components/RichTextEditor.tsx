@@ -341,11 +341,28 @@ export function RichTextEditor(props: {
   );
 }
 
-/** Read-only rendering of rich text, e.g. a signature under the compose box. */
-export function RichTextPreview(props: { html: string; className?: string }) {
+/**
+ * Read-only rendering of rich text, e.g. a signature under the compose box.
+ * With `openLinks`, links are clickable and open in a new tab.
+ */
+export function RichTextPreview(props: { html: string; className?: string; openLinks?: boolean }) {
   return (
     <div
-      className={cn(RICH_TEXT_CONTENT_CLASS, "[&_a]:pointer-events-none", props.className)}
+      className={cn(
+        RICH_TEXT_CONTENT_CLASS,
+        !props.openLinks && "[&_a]:pointer-events-none",
+        props.className,
+      )}
+      onClick={
+        props.openLinks
+          ? (event) => {
+              const link = (event.target as HTMLElement).closest("a");
+              if (!link?.href) return;
+              event.preventDefault();
+              window.open(link.href, "_blank", "noopener,noreferrer");
+            }
+          : undefined
+      }
       // The HTML passes the allowlist sanitizer, so it cannot carry scripts
       // or event handlers.
       dangerouslySetInnerHTML={{ __html: sanitizeRichText(props.html) }}

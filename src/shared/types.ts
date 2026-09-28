@@ -178,6 +178,21 @@ export interface ThreadDetail {
   board_cards: ThreadBoardCard[];
   /** Board Cards linking other Conversations from this Conversation's latest sender. */
   suggested_board_cards: ThreadBoardCard[];
+  /** Internal Notes on this Conversation, oldest first. Never sent to anyone. */
+  notes: ThreadNote[];
+}
+
+/** An Internal Note: rich text left on a Conversation for the team only. */
+export interface ThreadNote {
+  id: number;
+  thread_id: number;
+  text_body: string;
+  html_body: string | null;
+  /** The Mail Rule that added the note; null when a person wrote it. */
+  mail_rule_id: number | null;
+  /** That rule's current name, or null once it is deleted. */
+  mail_rule_name: string | null;
+  created_at: string;
 }
 
 /** A Board Card linked to a Conversation, as shown on that Conversation. */
@@ -425,6 +440,8 @@ export interface MailRuleActions {
    * the Conversation, unless the Conversation is already on the Board.
    */
   board_column_id: number | null;
+  /** Add this plain text as an Internal Note on the Conversation; null for none. */
+  note: string | null;
 }
 
 export interface MailRuleInput extends MailRuleActions {

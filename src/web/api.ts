@@ -30,6 +30,7 @@ import type {
   BlockSenderResult,
   ThreadSummary,
   ThreadDetail,
+  ThreadNote,
 } from "../shared/types";
 
 export interface AccessHint {
@@ -513,3 +514,9 @@ export const addBoardCardNote = (id: number, body: string) =>
 
 export const deleteBoardCardNote = (id: number, noteId: number) =>
   request<{ ok: true }>(`/board/cards/${id}/notes/${noteId}`, { method: "DELETE" });
+
+export const addThreadNote = (threadId: number, text: string, html: string) =>
+  request<ThreadNote>(`/threads/${threadId}/notes`, jsonBody("POST", { text, html }));
+
+export const deleteThreadNote = (threadId: number, noteId: number) =>
+  request<{ ok: true }>(`/threads/${threadId}/notes/${noteId}`, { method: "DELETE" });

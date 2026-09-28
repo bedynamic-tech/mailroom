@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ import {
   MAIL_RULE_OPERATOR_LABELS,
   MAIL_RULE_OPERATORS,
   MAX_MAIL_RULE_NAME_LENGTH,
+  MAX_MAIL_RULE_NOTE_LENGTH,
   MAX_MAIL_RULE_TEXT_LENGTH,
   operatorTakesValue,
 } from "../../shared/mail-rules";
@@ -70,6 +72,7 @@ const EMPTY_RULE: MailRuleInput = {
   forward_cc: [],
   forward_bcc: [],
   board_column_id: null,
+  note: null,
 };
 
 function toInput(rule: MailRule): MailRuleInput {
@@ -232,6 +235,7 @@ function describeActions(rule: MailRule): string {
   if (rule.board_column_id !== null) {
     parts.push(`create a board item in “${rule.board_column_name ?? "deleted column"}”`);
   }
+  if (rule.note !== null) parts.push("add a note");
   return parts.length ? parts.join(", ") : "do nothing (its label or board column was deleted)";
 }
 
@@ -463,6 +467,30 @@ function MailRuleDialog(props: {
                       ))}
                     </SelectContent>
                   </Select>
+                </Field>
+              )}
+            </div>
+            <div className="space-y-3 rounded-lg border px-3 py-3">
+              <CheckboxRow
+                id="rule-note"
+                label="Add a note"
+                checked={draft.note !== null}
+                onChange={(checked) => update({ note: checked ? "" : null })}
+              />
+              {draft.note !== null && (
+                <Field
+                  label="Note"
+                  htmlFor="rule-note-text"
+                  hint="Added to the conversation as an internal note each time an email matches. Only your team sees it; it is never sent or forwarded."
+                >
+                  <Textarea
+                    id="rule-note-text"
+                    value={draft.note}
+                    onChange={(event) => update({ note: event.target.value })}
+                    placeholder="e.g. VIP customer. Reply within 2 hours."
+                    maxLength={MAX_MAIL_RULE_NOTE_LENGTH}
+                    className="max-h-48 min-h-20"
+                  />
                 </Field>
               )}
             </div>

@@ -2,10 +2,12 @@ import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import {
+  addThreadNote,
   archiveThread,
   blockThreadSender,
   createDraft,
   deleteThread,
+  deleteThreadNote,
   discardDraft,
   fetchMailboxes,
   fetchThread,
@@ -15,7 +17,7 @@ import {
   sendReply,
   unarchiveThread,
 } from "../api";
-import type { Draft, Message } from "../../shared/types";
+import type { Draft, Message, ThreadNote } from "../../shared/types";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits";
 import { replyAllRecipients } from "../../shared/recipients";
 import {
@@ -39,8 +41,10 @@ import {
   ArchiveIcon,
   ArrowLeftIcon,
   BoardIcon,
+  ChevronUpIcon,
   InboxIcon,
   MoreIcon,
+  NoteIcon,
   PaperclipIcon,
   SendIcon,
   PlusIcon,
@@ -58,7 +62,7 @@ import { CatchAllBadge } from "./CatchAllBadge";
 import { BlockAddressDialog, CreateInboxFromAddressDialog } from "./CatchAllDialogs";
 import { LinkifiedText } from "./LinkifiedText";
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
-import { RichTextEditor, richTextSummary } from "./RichTextEditor";
+import { RichTextEditor, RichTextPreview, richTextSummary } from "./RichTextEditor";
 import {
   isBlankRichText,
   plainTextToHtml,
@@ -136,6 +140,8 @@ export function ThreadView(props: {
     setSendNotice(null);
     setFailedAttemptKey(null);
     setUsedDraftId(null);
+    addNote.reset();
+    removeNote.reset();
     seenDraftIds.current.clear();
     attemptIds.current.clear();
   }, [props.threadId]);
@@ -193,6 +199,23 @@ export function ThreadView(props: {
       invalidateAll();
     },
     onError: (_error, args) => setFailedAttemptKey(args.attemptKey),
+  });
+
+  // Internal Notes stay in the workspace: they are saved apart from the reply
+  // and never sent, so the composer's recipients and attachments stay put.
+  const addNote = useMutation({
+    mutationFn: (args: { text: string; html: string }) =>
+      addThreadNote(props.threadId, args.text, args.html),
+    onSuccess: (_note, args) => {
+      setReplyText((current) => (sanitizeRichText(current) === args.html ? "" : current));
+      setUsedDraftId(null);
+      queryClient.invalidateQueries({ queryKey: ["thread", props.threadId] });
+    },
+  });
+
+  const removeNote = useMutation({
+    mutationFn: (noteId: number) => deleteThreadNote(props.threadId, noteId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["thread", props.threadId] }),
   });
 
   const discard = useMutation({
@@ -287,7 +310,8 @@ export function ThreadView(props: {
     );
   }
 
-  const { thread, messages, drafts } = detail.data;
+  const { thread, messages, drafts, notes } = detail.data;
+  const timeline = conversationTimeline(messages, notes);
   const boardConversation = {
     id: thread.id,
     subject: thread.subject,
@@ -401,6 +425,12 @@ export function ThreadView(props: {
         attemptKey,
       });
     }
+  };
+
+  const submitNote = () => {
+    if (isBlankRichText(replyText) || addNote.isPending || reply.isPending) return;
+    const html = sanitizeRichText(replyText);
+    addNote.mutate({ text: richTextToPlainText(html), html });
   };
 
   const applyDraft = (next: Draft) => {
@@ -615,20 +645,28 @@ export function ThreadView(props: {
 
       <div ref={conversationRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="mr-auto w-full max-w-[800px] px-4 py-5 sm:px-6 md:py-6">
-          {messages.map((message, index) => (
-            <Fragment key={message.id}>
+          {timeline.map((entry, index) => (
+            <Fragment key={`${entry.kind}-${entry.item.id}`}>
               {index > 0 && <MessageConnector />}
-              <MessageCard
-                message={message}
-                catchAllRecipient={thread.catch_all_recipient}
-                onCreateBoardItem={createBoardItem}
-                onAddToBoardItem={() => setAddingToCard(true)}
-                onBlockSender={
-                  blockCandidatesFor(message, ownAddresses).length > 0
-                    ? () => openBlockSender(message)
-                    : undefined
-                }
-              />
+              {entry.kind === "note" ? (
+                <NoteCard
+                  note={entry.item}
+                  deleting={removeNote.isPending && removeNote.variables === entry.item.id}
+                  onDelete={() => removeNote.mutate(entry.item.id)}
+                />
+              ) : (
+                <MessageCard
+                  message={entry.item}
+                  catchAllRecipient={thread.catch_all_recipient}
+                  onCreateBoardItem={createBoardItem}
+                  onAddToBoardItem={() => setAddingToCard(true)}
+                  onBlockSender={
+                    blockCandidatesFor(entry.item, ownAddresses).length > 0
+                      ? () => openBlockSender(entry.item)
+                      : undefined
+                  }
+                />
+              )}
             </Fragment>
           ))}
         </div>
@@ -798,7 +836,7 @@ export function ThreadView(props: {
             <RichTextEditor
               id={`reply-${props.threadId}`}
               value={replyText}
-              disabled={reply.isPending || discard.isPending}
+              disabled={reply.isPending || discard.isPending || addNote.isPending}
               onChange={(html) => {
                 setReplyText(html);
                 if (isBlankRichText(html)) setUsedDraftId(null);
@@ -870,18 +908,68 @@ export function ThreadView(props: {
                 >
                   <PaperclipIcon className="h-4 w-4" />
                 </Button>
-                <Button
-                  onClick={submitReply}
-                  disabled={
-                    (isBlankRichText(replyText) && pendingFiles.length === 0) || reply.isPending || discard.isPending
-                  }
-                >
-                  <SendIcon className="h-3.5 w-3.5" />
-                  {reply.isPending ? "Sending…" : "Send reply"}
-                </Button>
+                <div className="flex items-center">
+                  <Button
+                    onClick={submitReply}
+                    disabled={
+                      (isBlankRichText(replyText) && pendingFiles.length === 0) ||
+                      reply.isPending ||
+                      discard.isPending ||
+                      addNote.isPending
+                    }
+                    className="rounded-r-none"
+                  >
+                    <SendIcon className="h-3.5 w-3.5" />
+                    {reply.isPending ? "Sending…" : addNote.isPending ? "Adding note…" : "Send reply"}
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="icon"
+                        className="w-7 rounded-l-none border-l border-l-primary-foreground/20 touch:w-9"
+                        aria-label="More send options"
+                        title="More send options"
+                        disabled={
+                          isBlankRichText(replyText) ||
+                          reply.isPending ||
+                          discard.isPending ||
+                          addNote.isPending
+                        }
+                      >
+                        <ChevronUpIcon className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="top" align="end" className="min-w-56">
+                      <DropdownMenuItem
+                        disabled={isBlankRichText(replyText)}
+                        onSelect={submitNote}
+                        className="items-start"
+                      >
+                        <NoteIcon className="mt-0.5 text-amber-600 dark:text-amber-400" />
+                        <span className="flex flex-col">
+                          <span>Add internal note</span>
+                          <span className="text-xs text-muted-foreground">
+                            Only your team sees it. Nothing is sent.
+                          </span>
+                        </span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             </div>
           </Card>
+          {addNote.isError && (
+            <p role="alert" className="mt-2 text-xs leading-5 text-destructive">
+              {addNote.error instanceof Error ? addNote.error.message : "Couldn’t add the note."}
+              {" "}Your text is still here. Try again.
+            </p>
+          )}
+          {removeNote.isError && (
+            <p role="alert" className="mt-2 text-xs leading-5 text-destructive">
+              Couldn’t delete the note. Try again.
+            </p>
+          )}
           {discard.isError && (
             <p role="alert" className="mt-2 text-xs leading-5 text-destructive">
               Couldn’t discard the AI draft. Your text is still here. Try again.
@@ -962,6 +1050,18 @@ function parseAddressList(raw: string | null | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+type TimelineEntry = { kind: "message"; item: Message } | { kind: "note"; item: ThreadNote };
+
+/** Messages and Internal Notes in the order they were written. */
+function conversationTimeline(messages: Message[], notes: ThreadNote[]): TimelineEntry[] {
+  const entries: TimelineEntry[] = [
+    ...messages.map((item) => ({ kind: "message" as const, item })),
+    ...notes.map((item) => ({ kind: "note" as const, item })),
+  ];
+  // Stable sort keeps each list's own order for equal timestamps.
+  return entries.sort((a, b) => Date.parse(a.item.created_at) - Date.parse(b.item.created_at));
 }
 
 // Thin line in the gap between cards, centered under the sender avatar (card padding + half the h-9 avatar).
@@ -1115,6 +1215,69 @@ function MessageCard({
               <LinkifiedText text={quoted} />
             </div>
           )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** An Internal Note, tinted yellow so it never reads as an email. */
+function NoteCard(props: { note: ThreadNote; deleting: boolean; onDelete: () => void }) {
+  const { note } = props;
+  return (
+    <Card
+      aria-label="Internal note"
+      className="gap-0 bg-amber-50 p-4 ring-amber-300/70 sm:p-5 dark:bg-amber-400/10 dark:ring-amber-400/30"
+    >
+      <div className="mb-2 flex items-center gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-200/70 text-amber-800 dark:bg-amber-400/20 dark:text-amber-300">
+          <NoteIcon className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="text-sm font-semibold text-amber-900 dark:text-amber-200">Internal note</span>
+          <div className="mt-0.5 truncate text-xs text-amber-800/80 dark:text-amber-300/80">
+            {note.mail_rule_id !== null
+              ? `Added by rule ${note.mail_rule_name ? `“${note.mail_rule_name}”` : "(deleted)"}`
+              : "Only visible to your team"}
+          </div>
+        </div>
+        <time
+          dateTime={note.created_at}
+          className="mt-0.5 shrink-0 self-start text-xs tabular-nums text-amber-800/80 dark:text-amber-300/80"
+          title={new Date(note.created_at).toLocaleString()}
+        >
+          {formatTime(note.created_at)}
+        </time>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="-mt-0.5 -mr-1.5 self-start text-amber-800/80 hover:bg-amber-200/60 dark:text-amber-300/80 dark:hover:bg-amber-400/20"
+              aria-label="Note options"
+              title="More"
+              disabled={props.deleting}
+            >
+              <MoreIcon className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem variant="destructive" onSelect={props.onDelete}>
+              <TrashIcon />
+              Delete note
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {note.html_body ? (
+        <RichTextPreview
+          html={note.html_body}
+          openLinks
+          className="max-w-[72ch] text-foreground touch:text-base"
+        />
+      ) : (
+        <div className="max-w-[72ch] break-words text-sm leading-6 whitespace-pre-wrap text-foreground touch:text-base">
+          <LinkifiedText text={note.text_body} />
         </div>
       )}
     </Card>

@@ -211,6 +211,25 @@ test("a board item rule adds one card per conversation, titled from the subject"
   assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM board_card_threads WHERE thread_id = 20").get().n, 0);
 });
 
+test("a note rule adds its text as an internal note each time an email matches", async (t) => {
+  const f = fixture(t);
+  assert.equal((await f.call("POST", "", { name: "x", conditions: all(c("subject", "contains", "x")), note: "   " })).status, 400);
+  assert.equal((await f.call("POST", "", { name: "x", conditions: all(c("subject", "contains", "x")), note: "n".repeat(2001) })).status, 400);
+  const vip = await createMailRule(f.env, { name: "VIP", conditions: all(c("subject", "contains", "invoice")), note: "  VIP customer.\r\nReply fast.  " });
+  assert.equal(vip.note, "VIP customer.\nReply fast.");
+  await createMailRule(f.env, { name: "Plain", conditions: all(c("subject", "contains", "invoice")), mark_read: true });
+
+  const applied = await applyMailRules(f.env, { mailboxId: 1, threadId: 10, message: message() }, "2026-09-28T10:00:00.000Z");
+  assert.deepEqual(applied.forwards, []);
+  await applyMailRules(f.env, { mailboxId: 1, threadId: 10, message: message() }, "2026-09-28T11:00:00.000Z");
+  const notes = f.db.prepare("SELECT thread_id, text_body, html_body, mail_rule_id, created_at FROM thread_notes ORDER BY id").all();
+  assert.deepEqual(notes.map((row) => ({ ...row })), [
+    { thread_id: 10, text_body: "VIP customer.\nReply fast.", html_body: null, mail_rule_id: vip.id, created_at: "2026-09-28T10:00:00.000Z" },
+    { thread_id: 10, text_body: "VIP customer.\nReply fast.", html_body: null, mail_rule_id: vip.id, created_at: "2026-09-28T11:00:00.000Z" },
+  ]);
+  assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM messages WHERE thread_id = 10").get().n, 2);
+});
+
 const original = (overrides = {}) => ({
   from: { address: "billing@vendor.com", name: "Vendor Billing" },
   replyTo: "billing@vendor.com",

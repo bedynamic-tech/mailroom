@@ -75,6 +75,23 @@ export function ChevronDownIcon(props: IconProps) {
   );
 }
 
+export function ChevronUpIcon(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props}>
+      <path d="m7 14 5-5 5 5" />
+    </svg>
+  );
+}
+
+export function NoteIcon(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props}>
+      <path d="M5 4h14v10l-6 6H5z" />
+      <path d="M13 20v-6h6M9 9h6M9 12.5h3" />
+    </svg>
+  );
+}
+
 export function MailIcon(props: IconProps) {
   return (
     <svg {...baseProps} {...props}>
