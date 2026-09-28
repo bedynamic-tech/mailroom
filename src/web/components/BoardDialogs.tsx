@@ -927,8 +927,8 @@ function BoardCardDetailDialog(props: {
             {editing ? (
               <>
                 {confirmingDelete ? (
-                  <div className="flex flex-wrap items-center gap-2 max-sm:order-last max-sm:justify-center">
-                    <span className="text-sm text-muted-foreground max-sm:w-full max-sm:text-center">
+                  <div className="flex flex-wrap items-center gap-2 max-sm:order-last">
+                    <span className="text-sm text-muted-foreground max-sm:w-full">
                       Delete this item and its notes?
                     </span>
                     <Button
@@ -954,7 +954,7 @@ function BoardCardDetailDialog(props: {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="text-destructive hover:text-destructive max-sm:order-last sm:-ml-2.5"
+                    className="text-destructive hover:text-destructive max-sm:order-last -ml-2.5 max-sm:self-start"
                     onClick={() => setConfirmingDelete(true)}
                     disabled={busy}
                   >
