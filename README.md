@@ -53,6 +53,10 @@ Routing, D1, R2 and Web Push.
 
 <img width="2800" height="1800" alt="Catch-all conversations in Mailroom +" src="docs/images/catch-all.png" />
 
+<img width="2800" height="1800" alt="The Board in Mailroom +" src="docs/images/board.png" />
+
+<img width="2800" height="1800" alt="A board item with notes and related conversations" src="docs/images/board-item.png" />
+
 ### Automation
 
 - **AI reply drafts.** Per-inbox drafting with custom instructions and
