@@ -1,3 +1,4 @@
+import type { ReplyRecipients } from "../shared/reply-recipients";
 import type {
   Board,
   BoardCard,
@@ -548,6 +549,9 @@ export const deleteBoardCardNote = (id: number, noteId: number) =>
 
 export const addThreadNote = (threadId: number, text: string, html: string) =>
   request<ThreadNote>(`/threads/${threadId}/notes`, jsonBody("POST", { text, html }));
+
+export const saveReplyRecipients = (threadId: number, recipients: ReplyRecipients) =>
+  request<{ ok: true }>(`/threads/${threadId}/reply-recipients`, jsonBody("PUT", recipients));
 
 export const deleteThreadNote = (threadId: number, noteId: number) =>
   request<{ ok: true }>(`/threads/${threadId}/notes/${noteId}`, { method: "DELETE" });
