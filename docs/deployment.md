@@ -130,7 +130,7 @@ Do not deploy `wrangler.dev.jsonc` or expose the local dev server publicly.
    **Send to Worker**. Unknown recipient addresses are rejected, so a rule that
    exists before the Inbox bounces mail. To keep mail for every other address
    on the domain, choose a catch-all inbox for the domain under **Settings,
-   General, Catch-all**, then set the domain's Email Routing catch-all address
+   Inboxes, Catch-all**, then set the domain's Email Routing catch-all address
    to **Send to a Worker** with this Worker. Caught mail shows the address it was sent to; from there you can
    create an Inbox for the address or block it.
 5. Send a message from an external mailbox, confirm it appears in the app, then

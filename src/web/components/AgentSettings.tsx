@@ -50,6 +50,7 @@ import {
   TrashIcon,
 } from "./Icons";
 import { RichTextEditor, RichTextPreview } from "./RichTextEditor";
+import { CatchAllSettings } from "./CatchAllSettings";
 import {
   SettingsBlock,
   SettingsHeader,
@@ -392,7 +393,10 @@ export function AgentSettings(props: {
       />
 
       <SettingsPage>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <CatchAllSettings onOpenInbox={props.onSelectMailbox} />
+
+        {/* Everything below applies to the selected inbox only. */}
+        <div className="flex flex-col gap-2 border-t pt-8 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1 sm:max-w-sm">
             <MailboxSelect
               mailboxes={props.mailboxes}

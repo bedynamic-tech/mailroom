@@ -21,7 +21,6 @@ import {
 } from "../push-notifications";
 import { isIosBrowser, useInstallState } from "../pwa";
 import { BellIcon, MailIcon } from "./Icons";
-import { CatchAllSettings } from "./CatchAllSettings";
 import { EmailTemplateEditor } from "./EmailTemplateEditor";
 import { RichTextEditor } from "./RichTextEditor";
 import { normalizeSignature } from "../../shared/signature";
@@ -39,7 +38,6 @@ export function GeneralSettings(props: {
   onOpenRules: () => void;
   onOpenSpam: () => void;
   onOpenAi: () => void;
-  onOpenInbox: (id: number) => void;
 }) {
   const queryClient = useQueryClient();
   const settings = useQuery({
@@ -173,8 +171,6 @@ export function GeneralSettings(props: {
           loading={settings.isLoading}
           onOpenInboxes={props.onOpenInboxes}
         />
-
-        <CatchAllSettings onOpenInbox={props.onOpenInbox} />
 
         <AppSettings />
       </SettingsPage>

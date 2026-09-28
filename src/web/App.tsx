@@ -295,7 +295,6 @@ function Workspace(props: {
               onOpenRules={() => navigate("/settings/rules")}
               onOpenSpam={() => navigate("/settings/spam")}
               onOpenAi={() => navigate("/settings/ai")}
-              onOpenInbox={(id) => navigate(`/settings/inboxes/${id}`)}
             />
           ) : props.settingsSection === "contacts" ? (
             <ContactSettings
