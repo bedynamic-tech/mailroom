@@ -42,6 +42,10 @@ export interface GeneralSettings {
   auto_create_contacts: boolean;
   /** Signature (sanitized HTML) for every Inbox set to use the default. */
   default_signature_html: string | null;
+  /** How Board Item reminders are delivered. */
+  board_reminder_channels: "browser" | "email" | "both";
+  /** Where reminder emails go. */
+  board_reminder_address: string | null;
 }
 
 export interface EmailNotificationTemplate {
@@ -231,6 +235,14 @@ export interface BoardCard {
   created_at: string;
   updated_at: string;
   note_count: number;
+  /** When the Item should be done (UTC ISO), or null. */
+  due_at: string | null;
+  /** IANA time zone the due time was picked in. */
+  due_time_zone: string | null;
+  /** Minutes before due_at to remind (0 = at the due time); null means no reminder. */
+  reminder_minutes: number | null;
+  /** When the reminder went out; null while it is still to come. */
+  reminder_sent_at: string | null;
   conversations: BoardCardConversation[];
 }
 
@@ -256,6 +268,10 @@ export interface BoardCardInput {
   title?: string;
   description?: string | null;
   thread_ids?: number[];
+  /** Send with reminder_minutes and due_time_zone; null clears the due time. */
+  due_at?: string | null;
+  due_time_zone?: string | null;
+  reminder_minutes?: number | null;
 }
 
 export type DraftRunStatus = "queued" | "generating" | "ready" | "failed" | "superseded";

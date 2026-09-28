@@ -65,8 +65,12 @@ The workspace's one Kanban board, with Columns people add, rename, reorder and d
 _Avoid_: Project, pipeline, task list
 
 **Board Item**:
-A card on the Board with a title, an optional description and the time it was added, in one Column, ordered within it by dragging. Notes can be added to it over time, each stamped with when it was written. It can link any number of Conversations, and a Conversation can be on any number of Board Items; each Conversation shows the Board Items it is on. A Board Item suggests newer Conversations from the senders of the Conversations it links, and a Conversation offers the Board Items that track its latest sender. "Create board item" on a Message starts one titled from the Conversation's subject and linked to it. Deleting a Conversation removes its links and keeps the Board Items.
+A card on the Board with a title, an optional description and the time it was added, in one Column, ordered within it by dragging. Notes can be added to it over time, each stamped with when it was written. It can link any number of Conversations, and a Conversation can be on any number of Board Items; each Conversation shows the Board Items it is on. A Board Item suggests newer Conversations from the senders of the Conversations it links, and a Conversation offers the Board Items that track its latest sender. "Create board item" on a Message starts one titled from the Conversation's subject and linked to it. Deleting a Conversation removes its links and keeps the Board Items. A Board Item can have a due time and a Board Reminder.
 _Avoid_: Task, ticket, card
+
+**Board Reminder**:
+A notice that a Board Item is coming due, sent once at the time chosen on the Item (at its due time or a set time before). It goes to every subscribed browser, by email to one address that is never an Inbox, or both, as the workspace's reminder setting says. A due time already past when saved never reminds; changing the due time or reminder schedules it again. Browsers subscribed for reminders stay subscribed while either reminders or Browser Notifications use them.
+_Avoid_: Alarm, alert, due notification
 
 **Internal Note**:
 Rich text a person leaves on a Conversation for the rest of the team, added from the reply box with "Add internal note" or by a Mail Rule's "Add a note" action (plain text, marked with the rule's name), and shown tinted yellow among the Messages in the order it was written. It is never a Message: it is not sent, quoted, forwarded by a Mail Rule, given to Agent Drafts or the MCP Server, or included in Notifications, and it does not change the Conversation's order, snippet or read state. Deleting the Conversation deletes its Internal Notes.

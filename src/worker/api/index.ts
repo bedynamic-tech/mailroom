@@ -8,6 +8,7 @@ import { blockedSendersApi } from "./blocked-senders.ts";
 import { mailRulesApi } from "./mail-rules.ts";
 import { listThreadNotes, threadNotesApi } from "./thread-notes.ts";
 import { universalSearchApi } from "./universal-search.ts";
+import { BOARD_REMINDER_CHANNELS, type BoardReminderChannels } from "../../shared/board.ts";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
 import { MAX_SENDER_NAME_LENGTH, normalizeSenderName } from "../../shared/sender-name.ts";
 import { MAX_RICH_TEXT_HTML_LENGTH, normalizeMessageBody } from "../../shared/rich-text.ts";
@@ -90,7 +91,7 @@ api.get("/settings/general", async (c) => {
       `SELECT browser_notifications_enabled, email_notifications_enabled, email_notification_address,
               email_notification_from_name, email_notification_from_mailbox_id,
               email_notification_subject, email_notification_body, auto_create_contacts,
-              default_signature_html
+              default_signature_html, board_reminder_channels, board_reminder_address
        FROM global_settings WHERE id = 1`,
     ).first<
       StoredNotificationTemplate & {
@@ -100,6 +101,8 @@ api.get("/settings/general", async (c) => {
         email_notification_from_mailbox_id: number | null;
         auto_create_contacts: number;
         default_signature_html: string | null;
+        board_reminder_channels: BoardReminderChannels;
+        board_reminder_address: string | null;
       }
     >(),
     c.env.DB.prepare("SELECT COUNT(*) AS count FROM push_subscriptions")
@@ -124,50 +127,33 @@ api.get("/settings/general", async (c) => {
     },
     auto_create_contacts: Boolean(settings?.auto_create_contacts ?? 1),
     default_signature_html: settings?.default_signature_html ?? null,
+    board_reminder_channels: settings?.board_reminder_channels ?? "browser",
+    board_reminder_address: settings?.board_reminder_address ?? null,
   };
   return c.json(result);
 });
 
 api.post("/settings/browser-notifications", async (c) => {
-  if (!c.env.VAPID_PUBLIC_KEY || !c.env.VAPID_PRIVATE_JWK || !c.env.VAPID_SUBJECT) {
-    return c.json({ error: "Browser notifications are not configured on this server" }, 503);
-  }
+  const saved = await saveSubscription(c.env, c.req.raw);
+  if ("error" in saved) return c.json({ error: saved.error }, saved.status);
+  await c.env.DB.prepare(
+    `UPDATE global_settings
+     SET browser_notifications_enabled = 1,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE id = 1`,
+  ).run();
+  return c.json({ ok: true });
+});
 
-  const subscription = await c.req.json<BrowserPushSubscription>();
-  if (!validatePushSubscription(subscription)) {
-    return c.json({ error: "The browser returned an invalid Push Subscription" }, 400);
-  }
-
-  const userAgent = c.req.header("User-Agent")?.slice(0, 512) ?? null;
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO push_subscriptions
-         (endpoint, expiration_time, p256dh, auth, user_agent)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(endpoint) DO UPDATE SET
-         expiration_time = excluded.expiration_time,
-         p256dh = excluded.p256dh,
-         auth = excluded.auth,
-         user_agent = excluded.user_agent,
-         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
-    ).bind(
-      subscription.endpoint,
-      subscription.expirationTime ?? null,
-      subscription.keys.p256dh,
-      subscription.keys.auth,
-      userAgent,
-    ),
-    c.env.DB.prepare(
-      `UPDATE global_settings
-       SET browser_notifications_enabled = 1,
-           updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-       WHERE id = 1`,
-    ),
-  ]);
+/** Subscribes this browser for Board Item reminders only. */
+api.post("/settings/board-reminders/subscription", async (c) => {
+  const saved = await saveSubscription(c.env, c.req.raw);
+  if ("error" in saved) return c.json({ error: saved.error }, saved.status);
   return c.json({ ok: true });
 });
 
 api.delete("/settings/browser-notifications", async (c) => {
+  // Subscribed browsers stay while Board Item reminders still use them.
   await c.env.DB.batch([
     c.env.DB.prepare(
       `UPDATE global_settings
@@ -175,7 +161,46 @@ api.delete("/settings/browser-notifications", async (c) => {
            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
        WHERE id = 1`,
     ),
-    c.env.DB.prepare("DELETE FROM push_subscriptions"),
+    c.env.DB.prepare(
+      `DELETE FROM push_subscriptions
+       WHERE (SELECT board_reminder_channels FROM global_settings WHERE id = 1) = 'email'`,
+    ),
+  ]);
+  return c.json({ ok: true });
+});
+
+api.put("/settings/board-reminders", async (c) => {
+  const body = await c.req.json<{ channels?: unknown; address?: unknown }>().catch(() => null);
+  const channels = body?.channels;
+  if (typeof channels !== "string" || !BOARD_REMINDER_CHANNELS.includes(channels as BoardReminderChannels)) {
+    return c.json({ error: "Choose browser, email or both" }, 400);
+  }
+  let address: string | null = null;
+  if (channels !== "browser" || (body?.address !== undefined && body.address !== null && body.address !== "")) {
+    address = normalizeNotificationAddress(body?.address);
+    if (!address) return c.json({ error: "Enter a valid email address for reminders" }, 400);
+    const isInbox = await c.env.DB.prepare("SELECT id FROM mailboxes WHERE address = ?")
+      .bind(address)
+      .first();
+    if (isInbox) {
+      return c.json({ error: "Reminders can't be sent to one of this workspace's inboxes" }, 400);
+    }
+  }
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE global_settings
+       SET board_reminder_channels = ?,
+           board_reminder_address = COALESCE(?, board_reminder_address),
+           board_reminder_origin = ?,
+           updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE id = 1`,
+    ).bind(channels, address, new URL(c.req.url).origin),
+    // Nothing uses subscribed browsers once both kinds of notification are off.
+    c.env.DB.prepare(
+      `DELETE FROM push_subscriptions
+       WHERE ? = 'email'
+         AND (SELECT browser_notifications_enabled FROM global_settings WHERE id = 1) = 0`,
+    ).bind(channels),
   ]);
   return c.json({ ok: true });
 });
@@ -1376,4 +1401,38 @@ function parsePositiveId(value: string): number | null {
   if (!/^\d+$/.test(value)) return null;
   const id = Number(value);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+async function saveSubscription(
+  env: Env,
+  request: Request,
+): Promise<{ ok: true } | { error: string; status: 400 | 503 }> {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_JWK || !env.VAPID_SUBJECT) {
+    return { error: "Browser notifications are not configured on this server", status: 503 };
+  }
+  const subscription = await request.json<BrowserPushSubscription>().catch(() => null);
+  if (!validatePushSubscription(subscription)) {
+    return { error: "The browser returned an invalid Push Subscription", status: 400 };
+  }
+  const userAgent = request.headers.get("User-Agent")?.slice(0, 512) ?? null;
+  await env.DB.prepare(
+    `INSERT INTO push_subscriptions
+       (endpoint, expiration_time, p256dh, auth, user_agent)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(endpoint) DO UPDATE SET
+       expiration_time = excluded.expiration_time,
+       p256dh = excluded.p256dh,
+       auth = excluded.auth,
+       user_agent = excluded.user_agent,
+       updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+  )
+    .bind(
+      subscription.endpoint,
+      subscription.expirationTime ?? null,
+      subscription.keys.p256dh,
+      subscription.keys.auth,
+      userAgent,
+    )
+    .run();
+  return { ok: true };
 }

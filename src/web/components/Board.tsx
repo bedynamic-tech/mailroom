@@ -55,7 +55,8 @@ import {
 import { MAX_BOARD_COLUMN_NAME_LENGTH, MAX_BOARD_COLUMNS } from "../../shared/board";
 import type { Board as BoardData, BoardCard, BoardCardConversation, BoardColumn } from "../../shared/types";
 import { BoardCardDialog, type CardDialogTarget } from "./BoardDialogs";
-import { ArrowLeftIcon, BoardIcon, MailIcon, MoreIcon, PencilIcon, PlusIcon, TrashIcon } from "./Icons";
+import { ArrowLeftIcon, BellIcon, BoardIcon, MailIcon, MoreIcon, PencilIcon, PlusIcon, TrashIcon } from "./Icons";
+import { CalendarClock as CalendarClockIcon } from "lucide-react";
 
 type Layout = Map<number, number[]>;
 
@@ -483,6 +484,7 @@ function CardFace({
           {card.description}
         </p>
       )}
+      {card.due_at && <DueChip dueAt={card.due_at} reminder={card.reminder_minutes !== null} />}
       {(first || card.note_count > 0) && (
         <p className="mt-2 flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
           {first && (
@@ -504,6 +506,33 @@ function CardFace({
         </p>
       )}
     </div>
+  );
+}
+
+const dueFormat = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+/** An Item's due time on its card, in red once it has passed. */
+function DueChip(props: { dueAt: string; reminder: boolean }) {
+  const overdue = Date.parse(props.dueAt) <= Date.now();
+  return (
+    <p
+      className={cn(
+        "mt-2 inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs",
+        overdue ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground",
+      )}
+    >
+      <CalendarClockIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span>
+        {overdue ? "Overdue: " : "Due "}
+        <time dateTime={props.dueAt}>{dueFormat.format(new Date(props.dueAt))}</time>
+      </span>
+      {props.reminder && !overdue && (
+        <>
+          <BellIcon className="h-3 w-3 shrink-0" />
+          <span className="sr-only">, reminder set</span>
+        </>
+      )}
+    </p>
   );
 }
 

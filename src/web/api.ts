@@ -125,6 +125,23 @@ export const enableBrowserNotifications = (subscription: BrowserPushSubscription
     body: JSON.stringify(subscription),
   });
 
+export const subscribeForBoardReminders = (subscription: BrowserPushSubscription) =>
+  request<{ ok: true }>("/settings/board-reminders/subscription", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(subscription),
+  });
+
+export const updateBoardReminders = (input: {
+  channels: GeneralSettings["board_reminder_channels"];
+  address: string | null;
+}) =>
+  request<{ ok: true }>("/settings/board-reminders", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
 export const disableBrowserNotifications = () =>
   request<{ ok: true }>("/settings/browser-notifications", { method: "DELETE" });
 
@@ -494,7 +511,10 @@ export const deleteBoardColumn = (id: number) =>
 export const createBoardCard = (input: BoardCardInput) =>
   request<BoardCard>("/board/cards", jsonBody("POST", input));
 
-export const updateBoardCard = (id: number, input: Pick<BoardCardInput, "title" | "description">) =>
+export const updateBoardCard = (
+  id: number,
+  input: Pick<BoardCardInput, "title" | "description" | "due_at" | "due_time_zone" | "reminder_minutes">,
+) =>
   request<BoardCard>(`/board/cards/${id}`, jsonBody("PATCH", input));
 
 export const moveBoardCard = (id: number, columnId: number, index: number) =>

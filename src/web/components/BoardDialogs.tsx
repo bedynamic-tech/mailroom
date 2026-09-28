@@ -35,12 +35,15 @@ import {
   updateBoardCard,
 } from "../api";
 import {
+  BOARD_REMINDER_OPTIONS,
   MAX_BOARD_CARD_DESCRIPTION_LENGTH,
   MAX_BOARD_CARD_TITLE_LENGTH,
   MAX_BOARD_NOTE_LENGTH,
+  reminderLabel,
 } from "../../shared/board";
 import type { BoardCard, BoardCardConversation } from "../../shared/types";
-import { ArchiveIcon, BoardIcon, MailIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, XIcon } from "./Icons";
+import { ArchiveIcon, BellIcon, BoardIcon, MailIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, XIcon } from "./Icons";
+import { CalendarClock as CalendarClockIcon } from "lucide-react";
 
 /** Refreshes everything that shows Board Cards or their links. */
 export function useInvalidateBoard() {
@@ -101,6 +104,7 @@ function BoardCardFormDialog(props: BoardCardDialogProps) {
   const [description, setDescription] = useState("");
   const [columnId, setColumnId] = useState<number | null>(null);
   const [linked, setLinked] = useState<BoardCardConversation[]>([]);
+  const [due, setDue] = useState<DueValue>(EMPTY_DUE);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
@@ -119,11 +123,13 @@ function BoardCardFormDialog(props: BoardCardDialogProps) {
       setDescription(card.description ?? "");
       setColumnId(card.column_id);
       setLinked(card.conversations);
+      setDue(dueValueOf(card));
     } else {
       setTitle(target.title ?? "");
       setDescription("");
       setColumnId(target.columnId ?? board.data.columns[0]?.id ?? null);
       setLinked(target.conversation ? [target.conversation] : []);
+      setDue(EMPTY_DUE);
     }
     setConfirmingDelete(false);
     setLoadedFor(targetKey);
@@ -142,10 +148,11 @@ function BoardCardFormDialog(props: BoardCardDialogProps) {
           title,
           description,
           thread_ids: linked.map((conversation) => conversation.id),
+          ...dueInput(due),
         });
       }
       if (!card) throw new Error("This item no longer exists");
-      const updated = await updateBoardCard(card.id, { title, description });
+      const updated = await updateBoardCard(card.id, { title, description, ...dueInput(due) });
       if (columnId !== card.column_id) {
         const end = board.data?.cards.filter((item) => item.column_id === columnId).length ?? 0;
         await moveBoardCard(card.id, columnId, end);
@@ -258,6 +265,7 @@ function BoardCardFormDialog(props: BoardCardDialogProps) {
                 className="min-h-24"
               />
             </div>
+            <DueFields value={due} onChange={setDue} disabled={busy} />
             <div className="space-y-1.5">
               <span className="text-sm font-medium text-foreground">Column</span>
               <Select
@@ -655,6 +663,7 @@ function BoardCardDetailDialog(props: {
   const [columnId, setColumnId] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [due, setDue] = useState<DueValue>(EMPTY_DUE);
   const [note, setNote] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const titleId = useId();
@@ -666,13 +675,14 @@ function BoardCardDetailDialog(props: {
     setTitle(card.title);
     setDescription(card.description ?? "");
     setColumnId(card.column_id);
+    setDue(dueValueOf(card));
     setConfirmingDelete(false);
     setEditing(true);
   };
 
   const save = useMutation({
     mutationFn: async () => {
-      await updateBoardCard(props.cardId, { title, description });
+      await updateBoardCard(props.cardId, { title, description, ...dueInput(due) });
       if (card && columnId !== null && columnId !== card.column_id) {
         const end = board.data?.cards.filter((item) => item.column_id === columnId).length ?? 0;
         await moveBoardCard(props.cardId, columnId, end);
@@ -784,6 +794,7 @@ function BoardCardDetailDialog(props: {
                     className="min-h-24"
                   />
                 </div>
+                <DueFields value={due} onChange={setDue} disabled={busy} />
                 <div className="space-y-1.5">
                   <span className="text-sm font-medium text-foreground">Column</span>
                   <Select
@@ -840,6 +851,7 @@ function BoardCardDetailDialog(props: {
                       {columns.find((column) => column.id === card.column_id)?.name ?? ""}
                     </span>
                   </DialogDescription>
+                  {card.due_at && <DueSummary card={card} />}
                   {card.description ? (
                     <p className="text-sm leading-6 break-words whitespace-pre-wrap text-foreground">
                       {card.description}
@@ -980,5 +992,112 @@ function BoardCardDetailDialog(props: {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The due time as picked in the form: a local datetime-local value and a reminder. */
+type DueValue = { local: string; reminder: string };
+const EMPTY_DUE: DueValue = { local: "", reminder: "none" };
+
+function dueValueOf(card: BoardCard): DueValue {
+  return {
+    local: card.due_at ? toLocalInput(card.due_at) : "",
+    reminder: card.reminder_minutes === null ? "none" : String(card.reminder_minutes),
+  };
+}
+
+/** A local "YYYY-MM-DDTHH:mm" value for a datetime-local input. */
+function toLocalInput(iso: string): string {
+  const date = new Date(iso);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function dueInput(value: DueValue) {
+  const date = value.local ? new Date(value.local) : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    return { due_at: null, due_time_zone: null, reminder_minutes: null };
+  }
+  return {
+    due_at: date.toISOString(),
+    due_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
+    reminder_minutes: value.reminder === "none" ? null : Number(value.reminder),
+  };
+}
+
+/** Due date, time and reminder fields shared by the new-item and edit forms. */
+function DueFields(props: { value: DueValue; onChange: (value: DueValue) => void; disabled: boolean }) {
+  const dueId = useId();
+  const { local, reminder } = props.value;
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={dueId} className="text-sm font-medium text-foreground">
+        Due
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          id={dueId}
+          type="datetime-local"
+          value={local}
+          onChange={(event) => props.onChange({ ...props.value, local: event.target.value })}
+          disabled={props.disabled}
+          className="w-auto min-w-[13rem] flex-1"
+        />
+        <Select
+          value={reminder}
+          onValueChange={(next) => props.onChange({ ...props.value, reminder: next })}
+          disabled={props.disabled || !local}
+        >
+          <SelectTrigger aria-label="Reminder" className="min-w-[11rem] flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectItem value="none">No reminder</SelectItem>
+            {BOARD_REMINDER_OPTIONS.map((option) => (
+              <SelectItem key={option.minutes} value={String(option.minutes)}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {local && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => props.onChange(EMPTY_DUE)}
+            disabled={props.disabled}
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+      {local && reminder !== "none" && (
+        <p className="text-xs text-muted-foreground">
+          Reminders go out by browser, email or both, as set in Settings.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function DueSummary(props: { card: BoardCard }) {
+  const { due_at, reminder_minutes, reminder_sent_at } = props.card;
+  if (!due_at) return null;
+  const overdue = Date.parse(due_at) <= Date.now();
+  const reminder = reminderLabel(reminder_minutes);
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      <span className={cn("inline-flex items-center gap-1.5", overdue ? "text-destructive" : "text-foreground")}>
+        <CalendarClockIcon className="h-4 w-4" aria-hidden />
+        {overdue ? "Was due" : "Due"} <time dateTime={due_at}>{formatDateTime(due_at)}</time>
+      </span>
+      {reminder && !overdue && (
+        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <BellIcon className="h-3 w-3" />
+          {reminder_sent_at ? "Reminder sent" : `Reminder ${reminder.toLowerCase()}`}
+        </span>
+      )}
+    </p>
   );
 }

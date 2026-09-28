@@ -63,6 +63,12 @@ Routing, D1, R2 and Web Push.
   back to their conversations, and conversations show the items they are on,
   both in the list and above the messages. Rules can also create items
   automatically.
+- **Due dates and reminders.** Give any board item a due date and time, and
+  optionally a reminder (at the due time, or from 5 minutes to 1 week
+  before). Cards show when they are due and turn red once overdue. Choose in
+  **Settings > General > Board reminders** whether reminders arrive as a
+  browser notification, an email to your own address, or both. Reminders are
+  checked every minute and each one is sent once.
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.
@@ -98,7 +104,8 @@ Routing, D1, R2 and Web Push.
 - **MCP server.** Let external AI agents read conversations, compose email and
   send replies through scoped OAuth access.
 - **Notifications.** Opt in to browser push alerts, or a notice email to one
-  address.
+  address. Board item reminders use the same browser notifications or email,
+  set separately.
 - **Private by default.** Everything runs in your own account, with Cloudflare
   Access protecting the web app.
 
