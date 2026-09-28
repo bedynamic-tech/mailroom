@@ -1,7 +1,9 @@
 import type {
   Board,
   BoardCard,
+  BoardCardDetail,
   BoardCardInput,
+  BoardCardNote,
   BoardColumn,
   RelatedConversation,
   BlockedRecipient,
@@ -503,3 +505,11 @@ export const unlinkBoardCard = (id: number, threadId: number) =>
 
 export const fetchBoardCardSuggestions = (id: number) =>
   request<RelatedConversation[]>(`/board/cards/${id}/suggestions`);
+
+export const fetchBoardCard = (id: number) => request<BoardCardDetail>(`/board/cards/${id}`);
+
+export const addBoardCardNote = (id: number, body: string) =>
+  request<BoardCardNote>(`/board/cards/${id}/notes`, jsonBody("POST", { body }));
+
+export const deleteBoardCardNote = (id: number, noteId: number) =>
+  request<{ ok: true }>(`/board/cards/${id}/notes/${noteId}`, { method: "DELETE" });

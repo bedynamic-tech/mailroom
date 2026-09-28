@@ -5,11 +5,14 @@ import {
   MAX_BOARD_CARD_TITLE_LENGTH,
   MAX_BOARD_COLUMN_NAME_LENGTH,
   MAX_BOARD_COLUMNS,
+  MAX_BOARD_NOTE_LENGTH,
 } from "../../shared/board.ts";
 import type {
   Board,
   BoardCard,
   BoardCardConversation,
+  BoardCardDetail,
+  BoardCardNote,
   BoardColumn,
   RelatedConversation,
 } from "../../shared/types.ts";
@@ -91,10 +94,14 @@ boardApi.delete("/columns/:id", async (c) => {
       `DELETE FROM board_card_threads
        WHERE card_id IN (SELECT id FROM board_cards WHERE column_id = ?)`,
     ).bind(id),
+    c.env.DB.prepare(
+      `DELETE FROM board_card_notes
+       WHERE card_id IN (SELECT id FROM board_cards WHERE column_id = ?)`,
+    ).bind(id),
     c.env.DB.prepare("DELETE FROM board_cards WHERE column_id = ?").bind(id),
     c.env.DB.prepare("DELETE FROM board_columns WHERE id = ?").bind(id),
   ]);
-  if (!results[2].meta.changes) return c.json({ error: "Column not found" }, 404);
+  if (!results[3].meta.changes) return c.json({ error: "Column not found" }, 404);
   return c.json({ ok: true });
 });
 
@@ -152,9 +159,46 @@ boardApi.post("/cards", async (c) => {
 boardApi.get("/cards/:id", async (c) => {
   const id = parseId(c.req.param("id"));
   if (id === null) return c.json({ error: "invalid card id" }, 400);
-  const card = await loadCard(c.env.DB, id);
+  const [card, notes] = await Promise.all([
+    loadCard(c.env.DB, id),
+    c.env.DB.prepare(
+      "SELECT id, card_id, body, created_at FROM board_card_notes WHERE card_id = ? ORDER BY created_at, id",
+    )
+      .bind(id)
+      .all<BoardCardNote>(),
+  ]);
   if (!card) return c.json({ error: "Card not found" }, 404);
-  return c.json(card);
+  const detail: BoardCardDetail = { ...card, notes: notes.results };
+  return c.json(detail);
+});
+
+boardApi.post("/cards/:id/notes", async (c) => {
+  const id = parseId(c.req.param("id"));
+  if (id === null) return c.json({ error: "invalid card id" }, 400);
+  const body = await readBody(c.req.raw);
+  const text = typeof body?.body === "string" ? body.body.replace(/\r\n?/g, "\n").trim() : "";
+  if (!text) return c.json({ error: "Write a note" }, 400);
+  if (text.length > MAX_BOARD_NOTE_LENGTH) return c.json({ error: "Note is too long" }, 400);
+  const card = await c.env.DB.prepare("SELECT id FROM board_cards WHERE id = ?").bind(id).first();
+  if (!card) return c.json({ error: "Card not found" }, 404);
+  const note = await c.env.DB.prepare(
+    "INSERT INTO board_card_notes (card_id, body) VALUES (?, ?) RETURNING id, card_id, body, created_at",
+  )
+    .bind(id, text)
+    .first<BoardCardNote>();
+  await c.env.DB.prepare(`UPDATE board_cards SET updated_at = ${NOW} WHERE id = ?`).bind(id).run();
+  return c.json(note, 201);
+});
+
+boardApi.delete("/cards/:id/notes/:noteId", async (c) => {
+  const id = parseId(c.req.param("id"));
+  const noteId = parseId(c.req.param("noteId"));
+  if (id === null || noteId === null) return c.json({ error: "invalid id" }, 400);
+  const result = await c.env.DB.prepare("DELETE FROM board_card_notes WHERE id = ? AND card_id = ?")
+    .bind(noteId, id)
+    .run();
+  if (!result.meta.changes) return c.json({ error: "Note not found" }, 404);
+  return c.json({ ok: true });
 });
 
 boardApi.patch("/cards/:id", async (c) => {
@@ -222,9 +266,10 @@ boardApi.delete("/cards/:id", async (c) => {
   if (id === null) return c.json({ error: "invalid card id" }, 400);
   const results = await c.env.DB.batch([
     c.env.DB.prepare("DELETE FROM board_card_threads WHERE card_id = ?").bind(id),
+    c.env.DB.prepare("DELETE FROM board_card_notes WHERE card_id = ?").bind(id),
     c.env.DB.prepare("DELETE FROM board_cards WHERE id = ?").bind(id),
   ]);
-  if (!results[1].meta.changes) return c.json({ error: "Card not found" }, 404);
+  if (!results[2].meta.changes) return c.json({ error: "Card not found" }, 404);
   return c.json({ ok: true });
 });
 
@@ -306,7 +351,8 @@ async function loadBoard(db: D1Database): Promise<Board> {
     db.prepare("SELECT id, name, position FROM board_columns ORDER BY position, id")
       .all<BoardColumn>(),
     db.prepare(
-      `SELECT id, column_id, title, description, position, created_at, updated_at
+      `SELECT id, column_id, title, description, position, created_at, updated_at,
+         (SELECT COUNT(*) FROM board_card_notes n WHERE n.card_id = board_cards.id) AS note_count
        FROM board_cards ORDER BY position, id`,
     ).all<Omit<BoardCard, "conversations">>(),
     db.prepare(`${LINK_SELECT} ORDER BY bct.created_at, t.id`).all<LinkRow>(),
@@ -320,7 +366,8 @@ async function loadBoard(db: D1Database): Promise<Board> {
 async function loadCard(db: D1Database, id: number): Promise<BoardCard | null> {
   const [card, links] = await Promise.all([
     db.prepare(
-      `SELECT id, column_id, title, description, position, created_at, updated_at
+      `SELECT id, column_id, title, description, position, created_at, updated_at,
+         (SELECT COUNT(*) FROM board_card_notes n WHERE n.card_id = board_cards.id) AS note_count
        FROM board_cards WHERE id = ?`,
     )
       .bind(id)

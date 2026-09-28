@@ -38,7 +38,10 @@ Routing, D1, R2 and Web Push.
   reorder and delete columns, and drag items between them on desktop or phone
   (press and hold on a touch screen). Create an item from any message's menu in
   a conversation, prefilled from the subject, or add the conversation to an
-  item already on the board. Each item's Related conversations section links
+  item already on the board. Opening an item shows its name, description and
+  date added, a column picker, and timestamped notes you can add over time;
+  an Edit button changes the name and description. Each item's Related
+  conversations section links
   more conversations by search, and suggests new mail from the senders it
   already tracks; a conversation from one of those senders offers to link
   itself to their item. Items link back to their conversations, and

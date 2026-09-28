@@ -21,7 +21,11 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   createBoardCard,
   deleteBoardCard,
+  addBoardCardNote,
+  ApiError,
+  deleteBoardCardNote,
   fetchBoard,
+  fetchBoardCard,
   fetchBoardCardSuggestions,
   linkBoardCard,
   moveBoardCard,
@@ -32,9 +36,10 @@ import {
 import {
   MAX_BOARD_CARD_DESCRIPTION_LENGTH,
   MAX_BOARD_CARD_TITLE_LENGTH,
+  MAX_BOARD_NOTE_LENGTH,
 } from "../../shared/board";
 import type { BoardCard, BoardCardConversation } from "../../shared/types";
-import { ArchiveIcon, MailIcon, PlusIcon, SearchIcon, XIcon } from "./Icons";
+import { ArchiveIcon, MailIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, XIcon } from "./Icons";
 
 /** Refreshes everything that shows Board Cards or their links. */
 export function useInvalidateBoard() {
@@ -56,16 +61,32 @@ export type CardDialogTarget =
       conversation?: BoardCardConversation;
     };
 
-/**
- * Creates a Board Card, or edits one: its title, description, column and the
- * Conversations it links.
- */
-export function BoardCardDialog(props: {
+type BoardCardDialogProps = {
   target: CardDialogTarget | null;
   onOpenChange: (open: boolean) => void;
   onOpenConversation?: (conversation: BoardCardConversation) => void;
   onCreated?: (card: BoardCard) => void;
-}) {
+};
+
+/** Opens a Board Card's detail view, or the form for a new Card. */
+export function BoardCardDialog(props: BoardCardDialogProps) {
+  if (props.target?.kind === "edit") {
+    return (
+      <BoardCardDetailDialog
+        cardId={props.target.cardId}
+        onClose={() => props.onOpenChange(false)}
+        onOpenConversation={props.onOpenConversation}
+      />
+    );
+  }
+  return <BoardCardFormDialog {...props} />;
+}
+
+/**
+ * Creates a Board Card: its title, description, column and the Conversations
+ * it links.
+ */
+function BoardCardFormDialog(props: BoardCardDialogProps) {
   const invalidate = useInvalidateBoard();
   const board = useQuery({ queryKey: ["board"], queryFn: fetchBoard, enabled: props.target !== null });
   const titleId = useId();
@@ -257,55 +278,16 @@ export function BoardCardDialog(props: {
             </div>
             <div className="space-y-1.5">
               <span className="text-sm font-medium text-foreground">Related conversations</span>
-              {linked.length === 0 ? (
-                <p className="text-xs leading-5 text-muted-foreground">
-                  None yet. Search below to link one.
-                </p>
-              ) : (
-                <ul className="divide-y rounded-lg border">
-                  {linked.map((conversation) => (
-                    <li key={conversation.id} className="flex items-center gap-1 py-1 pr-1 pl-3">
-                      <button
-                        type="button"
-                        onClick={() => props.onOpenConversation?.(conversation)}
-                        disabled={!props.onOpenConversation}
-                        className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left text-sm outline-none enabled:hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-                      >
-                        {conversation.status === "archived" ? (
-                          <ArchiveIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        ) : (
-                          <MailIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        )}
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-foreground">
-                            {conversation.subject || "(no subject)"}
-                          </span>
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {conversation.mailbox_address}
-                            {conversation.status === "archived" ? " · Archived" : ""}
-                          </span>
-                        </span>
-                      </button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="shrink-0 text-muted-foreground"
-                        aria-label={`Unlink ${conversation.subject || "conversation"}`}
-                        title="Unlink"
-                        disabled={busy || unlink.isPending}
-                        onClick={() =>
-                          target?.kind === "edit"
-                            ? unlink.mutate(conversation.id)
-                            : setLinked((current) => current.filter((item) => item.id !== conversation.id))
-                        }
-                      >
-                        <XIcon className="h-3.5 w-3.5" />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <LinkedConversations
+                conversations={linked}
+                disabled={busy || unlink.isPending}
+                onOpen={props.onOpenConversation}
+                onUnlink={(conversation) =>
+                  target?.kind === "edit"
+                    ? unlink.mutate(conversation.id)
+                    : setLinked((current) => current.filter((item) => item.id !== conversation.id))
+                }
+              />
               <RelatedConversationPicker
                 cardId={card?.id ?? null}
                 linkedIds={new Set(linked.map((conversation) => conversation.id))}
@@ -580,5 +562,377 @@ function RelatedConversationPicker(props: {
         </ul>
       )}
     </div>
+  );
+}
+
+function LinkedConversations(props: {
+  conversations: BoardCardConversation[];
+  disabled: boolean;
+  onOpen?: (conversation: BoardCardConversation) => void;
+  onUnlink: (conversation: BoardCardConversation) => void;
+}) {
+  if (props.conversations.length === 0) {
+    return <p className="text-xs leading-5 text-muted-foreground">None yet. Search below to link one.</p>;
+  }
+  return (
+    <ul className="divide-y rounded-lg border">
+      {props.conversations.map((conversation) => (
+        <li key={conversation.id} className="flex items-center gap-1 py-1 pr-1 pl-3">
+          <button
+            type="button"
+            onClick={() => props.onOpen?.(conversation)}
+            disabled={!props.onOpen}
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left text-sm outline-none enabled:hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            {conversation.status === "archived" ? (
+              <ArchiveIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <MailIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            )}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-foreground">{conversation.subject || "(no subject)"}</span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {conversation.mailbox_address}
+                {conversation.status === "archived" ? " · Archived" : ""}
+              </span>
+            </span>
+          </button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0 text-muted-foreground"
+            aria-label={`Unlink ${conversation.subject || "conversation"}`}
+            title="Unlink"
+            disabled={props.disabled}
+            onClick={() => props.onUnlink(conversation)}
+          >
+            <XIcon className="h-3.5 w-3.5" />
+          </Button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+const formatDateTime = (value: string) => dateTime.format(new Date(value));
+
+/**
+ * A Board Card opened from the board or a Conversation: its name, description
+ * and date added, a column picker, timestamped notes and related Conversations.
+ */
+function BoardCardDetailDialog(props: {
+  cardId: number;
+  onClose: () => void;
+  onOpenConversation?: (conversation: BoardCardConversation) => void;
+}) {
+  const queryClient = useQueryClient();
+  const invalidateBoard = useInvalidateBoard();
+  const board = useQuery({ queryKey: ["board"], queryFn: fetchBoard });
+  const detail = useQuery({
+    queryKey: ["board", "card", props.cardId],
+    queryFn: () => fetchBoardCard(props.cardId),
+    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
+  });
+  const card = detail.data;
+  const columns = board.data?.columns ?? [];
+  const invalidate = () =>
+    Promise.all([
+      invalidateBoard(),
+      queryClient.invalidateQueries({ queryKey: ["board", "card", props.cardId] }),
+    ]);
+
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [note, setNote] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const titleId = useId();
+  const descriptionId = useId();
+  const noteId = useId();
+
+  const startEditing = () => {
+    if (!card) return;
+    setTitle(card.title);
+    setDescription(card.description ?? "");
+    setEditing(true);
+  };
+
+  const save = useMutation({
+    mutationFn: () => updateBoardCard(props.cardId, { title, description }),
+    onSuccess: async () => {
+      await invalidate();
+      setEditing(false);
+    },
+  });
+  const move = useMutation({
+    mutationFn: (columnId: number) => {
+      const end = board.data?.cards.filter((item) => item.column_id === columnId).length ?? 0;
+      return moveBoardCard(props.cardId, columnId, end);
+    },
+    onSuccess: invalidate,
+  });
+  const addNote = useMutation({
+    mutationFn: () => addBoardCardNote(props.cardId, note),
+    onSuccess: async () => {
+      setNote("");
+      await invalidate();
+    },
+  });
+  const removeNote = useMutation({
+    mutationFn: (id: number) => deleteBoardCardNote(props.cardId, id),
+    onSuccess: invalidate,
+  });
+  const link = useMutation({
+    mutationFn: (conversation: BoardCardConversation) => linkBoardCard(props.cardId, conversation.id),
+    onSuccess: invalidate,
+  });
+  const unlink = useMutation({
+    mutationFn: (conversation: BoardCardConversation) => unlinkBoardCard(props.cardId, conversation.id),
+    onSuccess: invalidate,
+  });
+  const remove = useMutation({
+    mutationFn: () => deleteBoardCard(props.cardId),
+    onSuccess: async () => {
+      queryClient.removeQueries({ queryKey: ["board", "card", props.cardId] });
+      await invalidateBoard();
+      props.onClose();
+    },
+  });
+
+  const busy = save.isPending || remove.isPending;
+  const error = [save, move, addNote, removeNote, link, unlink, remove].find((m) => m.isError)?.error;
+  const submitNote = (event?: FormEvent) => {
+    event?.preventDefault();
+    if (note.trim() && !addNote.isPending) addNote.mutate();
+  };
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) props.onClose();
+      }}
+    >
+      <DialogContent
+        fullScreenOnMobile
+        showCloseButton={!busy}
+        className="max-h-[min(90dvh,860px)] gap-5 overflow-y-auto sm:max-w-xl"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        {detail.isLoading ? (
+          <DialogHeader>
+            <DialogTitle>Board item</DialogTitle>
+            <DialogDescription>Loading…</DialogDescription>
+          </DialogHeader>
+        ) : !card ? (
+          <DialogHeader>
+            <DialogTitle>Board item</DialogTitle>
+            <DialogDescription>This item was deleted.</DialogDescription>
+          </DialogHeader>
+        ) : (
+          <>
+            {editing ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (title.trim() && !busy) save.mutate();
+                }}
+                className="space-y-3 pr-8"
+              >
+                <DialogTitle className="sr-only">Edit board item</DialogTitle>
+                <DialogDescription className="sr-only">Change the item’s name and description.</DialogDescription>
+                <div className="space-y-1.5">
+                  <label htmlFor={titleId} className="text-sm font-medium text-foreground">
+                    Name
+                  </label>
+                  <Input
+                    id={titleId}
+                    autoFocus
+                    value={title}
+                    maxLength={MAX_BOARD_CARD_TITLE_LENGTH}
+                    onChange={(event) => setTitle(event.target.value)}
+                    disabled={busy}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor={descriptionId} className="text-sm font-medium text-foreground">
+                    Description
+                  </label>
+                  <Textarea
+                    id={descriptionId}
+                    value={description}
+                    maxLength={MAX_BOARD_CARD_DESCRIPTION_LENGTH}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="Add details (optional)"
+                    disabled={busy}
+                    className="min-h-24"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" size="sm" disabled={busy || !title.trim()}>
+                    {save.isPending ? "Saving…" : "Save"}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={busy}>
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-2 pr-8">
+                <div className="flex items-start gap-2">
+                  <DialogTitle className="min-w-0 flex-1 text-lg leading-7 font-semibold break-words">
+                    {card.title}
+                  </DialogTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={startEditing}
+                    title="Edit name and description"
+                  >
+                    <PencilIcon className="h-3.5 w-3.5" />
+                    Edit
+                  </Button>
+                </div>
+                <DialogDescription className="text-xs">
+                  Added <time dateTime={card.created_at}>{formatDateTime(card.created_at)}</time>
+                </DialogDescription>
+                {card.description ? (
+                  <p className="text-sm leading-6 break-words whitespace-pre-wrap text-foreground">{card.description}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No description.</p>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-foreground">Column</span>
+              <Select
+                value={String(card.column_id)}
+                onValueChange={(value) => move.mutate(Number(value))}
+                disabled={move.isPending || columns.length === 0}
+              >
+                <SelectTrigger aria-label="Column" className="min-w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {columns.map((column) => (
+                    <SelectItem key={column.id} value={String(column.id)}>
+                      {column.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <section aria-labelledby={noteId} className="space-y-2 border-t pt-4">
+              <h3 id={noteId} className="text-sm font-medium text-foreground">
+                Notes
+              </h3>
+              <form onSubmit={submitNote} className="space-y-2">
+                <Textarea
+                  value={note}
+                  maxLength={MAX_BOARD_NOTE_LENGTH}
+                  onChange={(event) => setNote(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) submitNote();
+                  }}
+                  placeholder="Add a note"
+                  aria-label="New note"
+                  disabled={addNote.isPending}
+                  className="min-h-16"
+                />
+                <Button type="submit" size="sm" disabled={!note.trim() || addNote.isPending}>
+                  {addNote.isPending ? "Adding…" : "Add note"}
+                </Button>
+              </form>
+              {card.notes.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No notes yet.</p>
+              ) : (
+                <ol className="space-y-2">
+                  {[...card.notes].reverse().map((entry) => (
+                    <li key={entry.id} className="group rounded-lg bg-muted/50 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <time dateTime={entry.created_at} className="flex-1 text-xs text-muted-foreground">
+                          {formatDateTime(entry.created_at)}
+                        </time>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          className="text-muted-foreground"
+                          aria-label={`Delete note from ${formatDateTime(entry.created_at)}`}
+                          title="Delete note"
+                          disabled={removeNote.isPending}
+                          onClick={() => removeNote.mutate(entry.id)}
+                        >
+                          <TrashIcon className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <p className="mt-0.5 text-sm leading-6 break-words whitespace-pre-wrap text-foreground">
+                        {entry.body}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+
+            <section className="space-y-1.5 border-t pt-4">
+              <h3 className="text-sm font-medium text-foreground">Related conversations</h3>
+              <LinkedConversations
+                conversations={card.conversations}
+                disabled={unlink.isPending}
+                onOpen={props.onOpenConversation}
+                onUnlink={(conversation) => unlink.mutate(conversation)}
+              />
+              <RelatedConversationPicker
+                cardId={card.id}
+                linkedIds={new Set(card.conversations.map((conversation) => conversation.id))}
+                disabled={link.isPending}
+                onLink={(conversation) => link.mutate(conversation)}
+              />
+            </section>
+          </>
+        )}
+
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error instanceof Error ? error.message : "Something went wrong"}
+          </p>
+        )}
+
+        {card && (
+          <DialogFooter className="border-t pt-4 max-sm:mt-auto sm:justify-between">
+            {confirmingDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Delete this item?</span>
+                <Button variant="destructive" size="sm" onClick={() => remove.mutate()} disabled={busy}>
+                  {remove.isPending ? "Deleting…" : "Delete"}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={busy}>
+                  Keep
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={busy}
+              >
+                <TrashIcon className="h-4 w-4" />
+                Delete item
+              </Button>
+            )}
+            <Button variant="outline" onClick={props.onClose} disabled={busy}>
+              Close
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

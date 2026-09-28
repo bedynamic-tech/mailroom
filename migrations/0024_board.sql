@@ -30,6 +30,16 @@ CREATE TABLE board_card_threads (
 
 CREATE INDEX idx_board_card_threads_thread ON board_card_threads(thread_id);
 
+-- Notes people add to a Card over time, shown oldest to newest.
+CREATE TABLE board_card_notes (
+  id INTEGER PRIMARY KEY,
+  card_id INTEGER NOT NULL REFERENCES board_cards(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX idx_board_card_notes_card ON board_card_notes(card_id, created_at, id);
+
 INSERT INTO board_columns (name, position) VALUES
   ('To do', 0),
   ('In progress', 1),

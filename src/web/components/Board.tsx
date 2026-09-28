@@ -500,14 +500,24 @@ function CardFace({
           {card.description}
         </p>
       )}
-      {first && (
-        <p className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-          <MailIcon className="h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0 truncate">
-            {card.conversations.length === 1
-              ? first.subject || "(no subject)"
-              : `${card.conversations.length} conversations`}
-          </span>
+      {(first || card.note_count > 0) && (
+        <p className="mt-2 flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
+          {first && (
+            <span className="flex min-w-0 items-center gap-1.5">
+              <MailIcon className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 truncate">
+                {card.conversations.length === 1
+                  ? first.subject || "(no subject)"
+                  : `${card.conversations.length} conversations`}
+              </span>
+            </span>
+          )}
+          {card.note_count > 0 && (
+            <span className="flex shrink-0 items-center gap-1.5">
+              <PencilIcon className="h-3.5 w-3.5" />
+              {card.note_count === 1 ? "1 note" : `${card.note_count} notes`}
+            </span>
+          )}
         </p>
       )}
     </div>

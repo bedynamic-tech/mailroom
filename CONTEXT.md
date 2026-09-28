@@ -65,7 +65,7 @@ The workspace's one Kanban board, with Columns people add, rename, reorder and d
 _Avoid_: Project, pipeline, task list
 
 **Board Item**:
-A card on the Board with a title and an optional description, in one Column, ordered within it by dragging. It can link any number of Conversations, and a Conversation can be on any number of Board Items; each Conversation shows the Board Items it is on. A Board Item suggests newer Conversations from the senders of the Conversations it links, and a Conversation offers the Board Items that track its latest sender. "Create board item" on a Message starts one titled from the Conversation's subject and linked to it. Deleting a Conversation removes its links and keeps the Board Items.
+A card on the Board with a title, an optional description and the time it was added, in one Column, ordered within it by dragging. Notes can be added to it over time, each stamped with when it was written. It can link any number of Conversations, and a Conversation can be on any number of Board Items; each Conversation shows the Board Items it is on. A Board Item suggests newer Conversations from the senders of the Conversations it links, and a Conversation offers the Board Items that track its latest sender. "Create board item" on a Message starts one titled from the Conversation's subject and linked to it. Deleting a Conversation removes its links and keeps the Board Items.
 _Avoid_: Task, ticket, card
 
 **Agent Draft**:

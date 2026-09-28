@@ -215,7 +215,20 @@ export interface BoardCard {
   position: number;
   created_at: string;
   updated_at: string;
+  note_count: number;
   conversations: BoardCardConversation[];
+}
+
+export interface BoardCardNote {
+  id: number;
+  card_id: number;
+  body: string;
+  created_at: string;
+}
+
+/** A Board Card with its Notes, as shown when it is opened. */
+export interface BoardCardDetail extends BoardCard {
+  notes: BoardCardNote[];
 }
 
 export interface Board {

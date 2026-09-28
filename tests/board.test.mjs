@@ -180,3 +180,25 @@ test("suggestions are newer conversations from the senders a card already links"
   await f.call("POST", `/cards/${card.id}/conversations`, { thread_id: 3 });
   assert.deepEqual((await f.call("GET", `/cards/${card.id}/suggestions`)).body, []);
 });
+
+test("notes are added with a time, listed oldest first and deleted with their card", async (t) => {
+  const f = fixture(t);
+  const card = (await f.call("POST", "/cards", { title: "Refund" })).body;
+  assert.equal(card.note_count, 0);
+  assert.equal((await f.call("POST", `/cards/${card.id}/notes`, { body: "  " })).status, 400);
+  const first = await f.call("POST", `/cards/${card.id}/notes`, { body: " Called the bank\r\nNo answer " });
+  assert.equal(first.status, 201);
+  assert.equal(first.body.body, "Called the bank\nNo answer");
+  assert.match(first.body.created_at, /^\d{4}-\d\d-\d\dT/);
+  await f.call("POST", `/cards/${card.id}/notes`, { body: "Refund sent" });
+
+  const detail = (await f.call("GET", `/cards/${card.id}`)).body;
+  assert.deepEqual(detail.notes.map((note) => note.body), ["Called the bank\nNo answer", "Refund sent"]);
+  assert.equal(detail.note_count, 2);
+  assert.equal((await f.call("GET", "")).body.cards[0].note_count, 2);
+
+  assert.equal((await f.call("DELETE", `/cards/${card.id}/notes/${first.body.id}`)).status, 200);
+  assert.equal((await f.call("DELETE", `/cards/${card.id}/notes/${first.body.id}`)).status, 404);
+  await f.call("DELETE", `/cards/${card.id}`);
+  assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM board_card_notes").get().n, 0);
+});
