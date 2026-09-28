@@ -1061,11 +1061,12 @@ function CopyRecipientsRow(props: {
 }) {
   return (
     <div className={cn("flex items-start gap-2 pl-3.5", props.actions ? "pr-2" : "pr-3.5")}>
-      <label htmlFor={props.htmlFor} className="w-8 shrink-0 py-2.5 text-muted-foreground">
+      {/* Label and actions share the height of the field's first line, so all three center on it. */}
+      <label htmlFor={props.htmlFor} className="flex h-10 w-8 shrink-0 items-center text-muted-foreground md:h-[38px]">
         {props.label}
       </label>
       {props.children}
-      {props.actions && <span className="flex shrink-0 items-center py-1.5">{props.actions}</span>}
+      {props.actions && <span className="flex h-10 shrink-0 items-center md:h-[38px]">{props.actions}</span>}
     </div>
   );
 }
