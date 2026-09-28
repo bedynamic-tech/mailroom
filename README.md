@@ -24,6 +24,13 @@ Routing, D1, R2 and Web Push.
 
 - **Unified inbox.** Manage multiple addresses and domains in one workspace.
 - **Compose and reply.** Send new mail or reply to conversations, with attachments.
+- **Internal notes.** Leave notes for your team on any conversation. Write in
+  the reply box, then choose **Add internal note** from the arrow next to
+  **Send reply**. Notes appear in yellow between the messages, in the order
+  they were written, and can be deleted from their menu. They are stored
+  apart from email, so they are never sent, quoted in replies, forwarded by
+  rules, read by AI drafts or the MCP server, or included in notifications.
+  Attachments and Cc or Bcc recipients stay with the reply.
 - **Search and triage.** Search message content, filter conversations, mark read
   or archive in bulk, and restore or permanently delete archived conversations.
 - **Contacts.** Keep names, companies, phone numbers and notes, see each

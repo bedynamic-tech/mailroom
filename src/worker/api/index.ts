@@ -6,6 +6,7 @@ import { boardApi } from "./board.ts";
 import { contactsApi } from "./contacts.ts";
 import { blockedSendersApi } from "./blocked-senders.ts";
 import { mailRulesApi } from "./mail-rules.ts";
+import { listThreadNotes, threadNotesApi } from "./thread-notes.ts";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
 import { MAX_SENDER_NAME_LENGTH, normalizeSenderName } from "../../shared/sender-name.ts";
 import { MAX_RICH_TEXT_HTML_LENGTH, normalizeMessageBody } from "../../shared/rich-text.ts";
@@ -79,6 +80,7 @@ api.route("/board", boardApi);
 api.route("/contacts", contactsApi);
 api.route("/blocked-senders", blockedSendersApi);
 api.route("/mail-rules", mailRulesApi);
+api.route("/threads", threadNotesApi);
 
 api.get("/settings/general", async (c) => {
   const [settings, subscriptions] = await Promise.all([
@@ -840,7 +842,7 @@ api.get("/threads/:id", async (c) => {
   if (!thread) return c.json({ error: "thread not found" }, 404);
   await attachLabels(c.env, [thread as { id: number; labels: ThreadLabel[] }]);
 
-  const [messages, drafts, draftRun, boardCards, suggestedBoardCards] = await Promise.all([
+  const [messages, drafts, draftRun, boardCards, suggestedBoardCards, notes] = await Promise.all([
     c.env.DB.prepare("SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at").bind(id).all(),
     c.env.DB.prepare(
       `SELECT d.*, p.name AS playbook_name
@@ -892,6 +894,7 @@ api.get("/threads/:id", async (c) => {
     )
       .bind(Number(id), (thread as { last_from_address?: string | null }).last_from_address ?? "")
       .all<ThreadBoardCard>(),
+    listThreadNotes(c.env.DB, Number(id)),
   ]);
 
   const messageRows = messages.results as unknown as Message[];
@@ -924,6 +927,7 @@ api.get("/threads/:id", async (c) => {
     draft_run: draftRun ?? null,
     board_cards: boardCards.results,
     suggested_board_cards: suggestedBoardCards.results,
+    notes,
   });
 });
 

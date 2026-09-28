@@ -68,6 +68,10 @@ _Avoid_: Project, pipeline, task list
 A card on the Board with a title, an optional description and the time it was added, in one Column, ordered within it by dragging. Notes can be added to it over time, each stamped with when it was written. It can link any number of Conversations, and a Conversation can be on any number of Board Items; each Conversation shows the Board Items it is on. A Board Item suggests newer Conversations from the senders of the Conversations it links, and a Conversation offers the Board Items that track its latest sender. "Create board item" on a Message starts one titled from the Conversation's subject and linked to it. Deleting a Conversation removes its links and keeps the Board Items.
 _Avoid_: Task, ticket, card
 
+**Internal Note**:
+Rich text a person leaves on a Conversation for the rest of the team, added from the reply box with "Add internal note" and shown tinted yellow among the Messages in the order it was written. It is never a Message: it is not sent, quoted, forwarded by a Mail Rule, given to Agent Drafts or the MCP Server, or included in Notifications, and it does not change the Conversation's order, snippet or read state. Deleting the Conversation deletes its Internal Notes.
+_Avoid_: Comment, private message, annotation
+
 **Agent Draft**:
 A proposed reply authored by the agent and held for human review before sending.
 _Avoid_: Auto-reply, suggestion
