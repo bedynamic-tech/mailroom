@@ -50,7 +50,6 @@ import {
   TrashIcon,
 } from "./Icons";
 import { RichTextEditor, RichTextPreview } from "./RichTextEditor";
-import { CatchAllSettings } from "./CatchAllSettings";
 import {
   SettingsBlock,
   SettingsHeader,
@@ -550,13 +549,6 @@ export function AgentSettings(props: {
                 </form>
               </SettingsPanel>
             </SettingsBlock>
-
-            <CatchAllSettings
-              mailbox={mailbox}
-              mailboxes={props.mailboxes}
-              domains={domains.data ?? []}
-              onOpenInbox={props.onSelectMailbox}
-            />
 
             <SettingsBlock id="agent-drafting-heading" title="AI drafting">
               <SettingsPanel>

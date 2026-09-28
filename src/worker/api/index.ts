@@ -26,7 +26,7 @@ import {
   createInboxFromCatchAll,
   listBlockedRecipients,
   listCatchAllAddresses,
-  setCatchAll,
+  setDomainCatchAll,
   unblockRecipient,
 } from "../inbox/catch-all";
 import { createInbox, InboxCreationError, type StoredMailbox } from "../inbox/create";
@@ -411,13 +411,16 @@ async function newMailboxResponse(env: Env, mailbox: StoredMailbox): Promise<Mai
   };
 }
 
-api.put("/mailboxes/:id/catch-all", async (c) => {
+api.put("/domains/:id/catch-all", async (c) => {
   const id = parsePositiveId(c.req.param("id"));
-  if (id === null) return c.json({ error: "Invalid inbox" }, 400);
-  const body = await c.req.json<{ enabled?: unknown }>().catch(() => null);
-  if (typeof body?.enabled !== "boolean") return c.json({ error: "enabled must be true or false" }, 400);
+  if (id === null) return c.json({ error: "Invalid domain" }, 400);
+  const body = await c.req.json<{ mailbox_id?: unknown }>().catch(() => null);
+  const mailboxId = body?.mailbox_id ?? null;
+  if (mailboxId !== null && (typeof mailboxId !== "number" || !Number.isSafeInteger(mailboxId))) {
+    return c.json({ error: "Choose an inbox, or turn the catch-all off" }, 400);
+  }
   try {
-    await setCatchAll(c.env, id, body.enabled);
+    await setDomainCatchAll(c.env, id, mailboxId);
     return c.json({ ok: true });
   } catch (error) {
     if (error instanceof CatchAllError) return c.json({ error: error.message }, error.status);
