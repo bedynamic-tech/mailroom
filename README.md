@@ -23,6 +23,8 @@ Routing, D1, R2 and Web Push.
 
 - **Unified inbox.** Manage multiple addresses and domains in one workspace.
 - **Compose and reply.** Send new mail or reply to conversations, with attachments.
+- **Opens at the latest message.** A conversation opens scrolled to the bottom
+  and stays there while emails and images finish loading, until you scroll up.
 - **Internal notes.** Leave notes for your team on any conversation. Write in
   the reply box, then choose **Add internal note** from the arrow next to
   **Send reply**. Notes appear in yellow between the messages, in the order
