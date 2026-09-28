@@ -33,7 +33,10 @@ Routing, D1, R2 and Web Push.
   at the right of the formatting toolbar drafts a reply with AI. Beside
   **Send reply**, the reply box shows which signature will be added:
   **Signature: Default** for the workspace default, or **Signature: Mailbox**
-  when the Inbox has its own.
+  when the Inbox has its own. On phones, scrolling back through a
+  conversation folds the reply box into a round **Reply** button, keeping
+  anything already written. Tap it, or scroll back down to the latest
+  message, to open the reply box again.
 - **Opens at the latest message.** A conversation opens scrolled to the bottom
   and stays there while emails and images finish loading, until you scroll up.
 - **Internal notes.** Leave notes for your team on any conversation. Write in
