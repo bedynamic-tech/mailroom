@@ -221,10 +221,10 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                   </select>
                 </div>
                 <div className="flex min-h-12 items-start gap-2 border-b sm:gap-3">
-                  <label htmlFor="compose-to" className="shrink-0 py-3.5 text-sm text-muted-foreground max-sm:sr-only">To</label>
-                  <RecipientInput ref={toField} inputRef={toRef} id="compose-to" label="To" values={to} onChange={setTo} capacity={Math.min(1 - to.length, remaining)} taken={takenBy(cc, bcc)} placeholder={phone ? "To" : "recipient@example.com"} className="py-1.5" />
+                  <label htmlFor="compose-to" className="shrink-0 py-[13px] text-sm text-muted-foreground max-sm:sr-only">To</label>
+                  <RecipientInput ref={toField} inputRef={toRef} id="compose-to" label="To" values={to} onChange={setTo} capacity={Math.min(1 - to.length, remaining)} taken={takenBy(cc, bcc)} placeholder={phone ? "To" : "recipient@example.com"} className="py-[3px] sm:py-[5px]" />
                   {(!showCc || !showBcc) && (
-                    <span className="flex shrink-0 items-center py-2.5">
+                    <span className="flex h-[47px] shrink-0 items-center">
                       {!showCc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Cc recipients" onClick={() => { setAddingCc(true); requestAnimationFrame(() => ccRef.current?.focus()); }}>Cc</Button>}
                       {!showBcc && <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="Add Bcc recipients" onClick={() => { setAddingBcc(true); requestAnimationFrame(() => bccRef.current?.focus()); }}>Bcc</Button>}
                     </span>
@@ -232,14 +232,14 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                 </div>
                 {showCc && (
                   <div className="flex min-h-12 items-start gap-2 border-b sm:gap-3">
-                    <label htmlFor="compose-cc" className="shrink-0 py-3.5 text-sm text-muted-foreground max-sm:sr-only">Cc</label>
-                    <RecipientInput ref={ccField} inputRef={ccRef} id="compose-cc" label="Cc" values={cc} onChange={setCc} capacity={copyCapacity} taken={takenBy(to, bcc)} placeholder={phone ? "Cc" : "Add Cc recipients"} onDismiss={() => setAddingCc(false)} className="py-1.5" />
+                    <label htmlFor="compose-cc" className="shrink-0 py-[13px] text-sm text-muted-foreground max-sm:sr-only">Cc</label>
+                    <RecipientInput ref={ccField} inputRef={ccRef} id="compose-cc" label="Cc" values={cc} onChange={setCc} capacity={copyCapacity} taken={takenBy(to, bcc)} placeholder={phone ? "Cc" : "Add Cc recipients"} onDismiss={() => setAddingCc(false)} className="py-[3px] sm:py-[5px]" />
                   </div>
                 )}
                 {showBcc && (
                   <div className="flex min-h-12 items-start gap-2 border-b sm:gap-3">
-                    <label htmlFor="compose-bcc" className="shrink-0 py-3.5 text-sm text-muted-foreground max-sm:sr-only">Bcc</label>
-                    <RecipientInput ref={bccField} inputRef={bccRef} id="compose-bcc" label="Bcc" values={bcc} onChange={setBcc} capacity={copyCapacity} taken={takenBy(to, cc)} placeholder={phone ? "Bcc" : "Add Bcc recipients"} onDismiss={() => setAddingBcc(false)} className="py-1.5" />
+                    <label htmlFor="compose-bcc" className="shrink-0 py-[13px] text-sm text-muted-foreground max-sm:sr-only">Bcc</label>
+                    <RecipientInput ref={bccField} inputRef={bccRef} id="compose-bcc" label="Bcc" values={bcc} onChange={setBcc} capacity={copyCapacity} taken={takenBy(to, cc)} placeholder={phone ? "Bcc" : "Add Bcc recipients"} onDismiss={() => setAddingBcc(false)} className="py-[3px] sm:py-[5px]" />
                   </div>
                 )}
                 {copyCapacity <= 0 && (
