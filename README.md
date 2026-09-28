@@ -46,7 +46,8 @@ Routing, D1, R2 and Web Push.
   suggests new mail from the senders the item already tracks; a conversation
   from one of those senders offers to link itself to their item. Items link
   back to their conversations, and conversations show the items they are on,
-  both in the list and above the messages.
+  both in the list and above the messages. Rules can also create items
+  automatically.
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.
@@ -64,7 +65,9 @@ Routing, D1, R2 and Web Push.
 - **Automatic labels.** Organize incoming mail with natural-language rules.
 - **Rules.** Build IF / AND / OR conditions on sender, recipients, subject, body
   and attachments, then label, mark read, archive, skip drafts or
-  notifications, or forward.
+  notifications, forward, or create a board item. A board item goes in the
+  column the rule picks, takes its name from the subject and links the
+  conversation; a conversation already on the board gets no second item.
 - **Spam blocking.** Block a sender by address or whole domain, on one inbox or
   all of them, from any message's menu. When a message has several people on
   it, such as Cc'd addresses, you choose which one to block. Blocked mail is

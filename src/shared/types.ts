@@ -420,6 +420,11 @@ export interface MailRuleActions {
   forward_to: string[];
   forward_cc: string[];
   forward_bcc: string[];
+  /**
+   * Create a Board Card in this Column, titled from the subject and linked to
+   * the Conversation, unless the Conversation is already on the Board.
+   */
+  board_column_id: number | null;
 }
 
 export interface MailRuleInput extends MailRuleActions {
@@ -434,6 +439,7 @@ export interface MailRule extends MailRuleInput {
   id: number;
   mailbox_address: string | null;
   label_name: string | null;
+  board_column_name: string | null;
   /** How many inbound emails this rule has matched. */
   match_count: number;
   last_matched_at: string | null;

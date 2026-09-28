@@ -41,7 +41,7 @@ import type {
   MailRuleMatch,
   MailRuleOperator,
 } from "../../shared/types";
-import { deleteMailRule, fetchLabels, fetchMailboxes, fetchMailRules, saveMailRule } from "../api";
+import { deleteMailRule, fetchBoard, fetchLabels, fetchMailboxes, fetchMailRules, saveMailRule } from "../api";
 import { formatTime } from "../lib";
 import { PencilIcon, PlusIcon, TrashIcon, XIcon } from "./Icons";
 import {
@@ -69,6 +69,7 @@ const EMPTY_RULE: MailRuleInput = {
   forward_to: [],
   forward_cc: [],
   forward_bcc: [],
+  board_column_id: null,
 };
 
 function toInput(rule: MailRule): MailRuleInput {
@@ -228,7 +229,10 @@ function describeActions(rule: MailRule): string {
     ].filter(Boolean);
     parts.push(`forward to ${rule.forward_to.join(", ")}${extra.length ? ` (${extra.join("; ")})` : ""}`);
   }
-  return parts.length ? parts.join(", ") : "do nothing (its label was deleted)";
+  if (rule.board_column_id !== null) {
+    parts.push(`create a board item in “${rule.board_column_name ?? "deleted column"}”`);
+  }
+  return parts.length ? parts.join(", ") : "do nothing (its label or board column was deleted)";
 }
 
 function MailRuleDialog(props: {
@@ -245,6 +249,8 @@ function MailRuleDialog(props: {
     queryFn: () => fetchLabels(draft.mailbox_id),
     enabled: draft.mailbox_id !== null,
   });
+  const board = useQuery({ queryKey: ["board"], queryFn: fetchBoard, enabled: props.rule !== null });
+  const columns = [...(board.data?.columns ?? [])].sort((a, b) => a.position - b.position || a.id - b.id);
   const save = useMutation({
     mutationFn: () =>
       saveMailRule({
@@ -427,6 +433,37 @@ function MailRuleDialog(props: {
                     received the email, with replies going to the original sender.
                   </p>
                 </div>
+              )}
+            </div>
+            <div className="space-y-3 rounded-lg border px-3 py-3">
+              <CheckboxRow
+                id="rule-board"
+                label="Create a board item"
+                checked={draft.board_column_id !== null}
+                onChange={(checked) => update({ board_column_id: checked ? (columns[0]?.id ?? null) : null })}
+              />
+              {draft.board_column_id !== null && (
+                <Field
+                  label="Column"
+                  htmlFor="rule-board-column"
+                  hint="The item is titled from the email’s subject and linked to its conversation. Replies to a conversation already on the board don’t add another item."
+                >
+                  <Select
+                    value={String(draft.board_column_id)}
+                    onValueChange={(value) => update({ board_column_id: Number(value) })}
+                  >
+                    <SelectTrigger id="rule-board-column" className="w-full sm:w-72">
+                      <SelectValue placeholder="Choose a column" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {columns.map((column) => (
+                        <SelectItem key={column.id} value={String(column.id)}>
+                          {column.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
               )}
             </div>
           </section>
