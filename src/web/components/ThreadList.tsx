@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SquarePen } from "lucide-react";
 import type { Label, Mailbox, ThreadSummary } from "../../shared/types";
 import { Badge } from "@/components/ui/badge";
+import { CatchAllBadge } from "./CatchAllBadge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -582,12 +583,15 @@ function ThreadRow(props: {
         />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
-            <span
-              className={`min-w-0 flex-1 truncate text-sm ${
-                unread ? "font-semibold text-foreground" : "font-medium text-foreground/75"
-              }`}
-            >
-              {sender}
+            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+              <span
+                className={`min-w-0 truncate text-sm ${
+                  unread ? "font-semibold text-foreground" : "font-medium text-foreground/75"
+                }`}
+              >
+                {sender}
+              </span>
+              {thread.catch_all_recipient && <CatchAllBadge address={thread.catch_all_recipient} />}
             </span>
             <time
               dateTime={thread.last_message_at}

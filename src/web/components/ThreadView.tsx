@@ -41,6 +41,7 @@ import {
 } from "./Icons";
 import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
 import { BlockSenderDialog } from "./BlockSenderDialog";
+import { CatchAllBadge } from "./CatchAllBadge";
 import { BlockAddressDialog, CreateInboxFromAddressDialog } from "./CatchAllDialogs";
 import { LinkifiedText } from "./LinkifiedText";
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
@@ -539,7 +540,7 @@ export function ThreadView(props: {
           {messages.map((message, index) => (
             <Fragment key={message.id}>
               {index > 0 && <MessageConnector />}
-              <MessageCard message={message} />
+              <MessageCard message={message} catchAllRecipient={thread.catch_all_recipient} />
             </Fragment>
           ))}
         </div>
@@ -820,7 +821,13 @@ function MessageConnector() {
   );
 }
 
-function MessageCard({ message }: { message: Message }) {
+function MessageCard({
+  message,
+  catchAllRecipient,
+}: {
+  message: Message;
+  catchAllRecipient: string | null;
+}) {
   const [showQuoted, setShowQuoted] = useState(false);
   const isOutbound = message.direction === "outbound";
   const displayName = isOutbound
@@ -845,6 +852,7 @@ function MessageCard({ message }: { message: Message }) {
             <span className="truncate text-sm font-semibold text-foreground">{displayName}</span>
             {message.sent_by === "agent" && <AuthorBadge tone="agent">Agent</AuthorBadge>}
             {isOutbound && message.sent_by === "human" && <AuthorBadge tone="human">You</AuthorBadge>}
+            {!isOutbound && catchAllRecipient && <CatchAllBadge address={catchAllRecipient} />}
           </div>
           <div className="mt-0.5 truncate text-xs text-muted-foreground">
             {isOutbound ? `to ${to.join(", ")}` : message.from_address}
