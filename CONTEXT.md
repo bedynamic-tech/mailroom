@@ -37,7 +37,7 @@ A per-Inbox named tag with a natural-language match condition. When a new inboun
 _Avoid_: Tag, category, folder
 
 **Contact**:
-A workspace-wide record of a person the Inboxes correspond with, identified by email address and carrying a name, company, phone and notes. With "Automatically create new contacts" on, an external sender whose name can be parsed from the From header becomes a Contact on their first inbound Message; Contacts can also be added and edited by hand. Deleting a Contact leaves its Conversations untouched. Recipient fields suggest matching Contacts.
+A workspace-wide record of a person the Inboxes correspond with, identified by one or more email addresses (one of them primary, used when composing to the Contact; Messages from any of them belong to the Contact) and carrying a name, company, phone and notes. With "Automatically create new contacts" on, an external sender whose name can be parsed from the From header becomes a Contact on their first inbound Message; Contacts can also be added and edited by hand. Deleting a Contact leaves its Conversations untouched. Recipient fields suggest matching Contacts.
 _Avoid_: Customer, address book entry, sender
 
 **Blocked Sender**:

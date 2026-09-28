@@ -47,8 +47,10 @@ Routing, D1, R2 and Web Push.
   Results are grouped by type, every word must match, and choosing one opens
   it: the conversation, the board item, the rule's editor or the contact.
 - **Contacts.** Keep names, companies, phone numbers and notes, see each
-  contact's conversations, and autocomplete them in To, Cc and Bcc. Import from
-  CSV or vCard.
+  contact's conversations, and autocomplete them in To, Cc and Bcc. Give a
+  contact several email addresses and edit them at any time: mail from any of
+  them shows up under that contact, and new email goes to the one marked
+  primary. Import from CSV or vCard.
 - **Catch-all.** Make one inbox per domain receive mail for any address that
   has no inbox of its own, such as a different address for each service you
   sign up to. Caught mail is badged and shows the address it was sent to,

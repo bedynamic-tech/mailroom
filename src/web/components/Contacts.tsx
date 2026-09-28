@@ -4,6 +4,7 @@ import { SquarePen } from "lucide-react";
 import type { Contact, ContactDetail } from "../../shared/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -326,7 +327,11 @@ function ContactDetails(props: {
     queryFn: () => fetchContact(props.contactId),
   });
   const contact = detail.data?.contact;
+  const savedAddresses = detail.data?.addresses;
   const [form, setForm] = useState<ContactForm>(EMPTY_FORM);
+  const [addresses, setAddresses] = useState<string[]>([]);
+  // Which row is primary; rows keep their place when another is made primary.
+  const [primary, setPrimary] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes });
@@ -335,16 +340,35 @@ function ContactDetails(props: {
   useEffect(() => {
     if (contact) setForm(formOf(contact));
   }, [contact]);
+  useEffect(() => {
+    if (savedAddresses) {
+      setAddresses(savedAddresses);
+      setPrimary(0);
+    }
+  }, [savedAddresses]);
 
+  // Primary first, as the API expects.
+  const cleanAddresses = [addresses[primary], ...addresses.filter((_, i) => i !== primary)]
+    .map((address) => address?.trim().toLowerCase())
+    .filter((address): address is string => Boolean(address));
+  const addressesChanged =
+    savedAddresses !== undefined && cleanAddresses.join("\n") !== savedAddresses.join("\n");
   const save = useMutation({
-    mutationFn: () => updateContact(props.contactId, form),
-    onSuccess: (updated) => {
+    mutationFn: () =>
+      updateContact(props.contactId, {
+        ...form,
+        ...(addressesChanged ? { addresses: cleanAddresses } : {}),
+      }),
+    onSuccess: async (updated) => {
       queryClient.setQueryData<ContactDetail>(
         ["contacts", "detail", props.contactId],
         (current) => (current ? { ...current, contact: updated } : current),
       );
       queryClient.invalidateQueries({ queryKey: ["contacts", "list"] });
       queryClient.invalidateQueries({ queryKey: ["contacts", "suggest"] });
+      if (addressesChanged) {
+        await queryClient.invalidateQueries({ queryKey: ["contacts", "detail", props.contactId] });
+      }
     },
   });
   const remove = useMutation({
@@ -375,7 +399,8 @@ function ContactDetails(props: {
     );
   }
 
-  const dirty = JSON.stringify(form) !== JSON.stringify(formOf(contact));
+  const dirty = addressesChanged || JSON.stringify(form) !== JSON.stringify(formOf(contact));
+  const otherAddressCount = (savedAddresses?.length ?? 1) - 1;
   const title = contact.name ?? contact.address;
   const candidates = blockCandidates(contact.address);
   const blockRules = (blockedSenders.data ?? []).filter((rule) =>
@@ -429,7 +454,12 @@ function ContactDetails(props: {
         <EmailAvatar email={contact.address} label={title} className="h-11 w-11 text-base" />
         <div className="min-w-0">
           <p className="truncate text-base font-semibold text-foreground">{title}</p>
-          <p className="truncate text-sm text-muted-foreground">{contact.address}</p>
+          <p className="truncate text-sm text-muted-foreground">
+            {contact.address}
+            {otherAddressCount > 0 && (
+              <span> and {otherAddressCount} more</span>
+            )}
+          </p>
           {blockRules.length > 0 && (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ShieldBanIcon className="h-3.5 w-3.5 shrink-0" />
@@ -454,7 +484,21 @@ function ContactDetails(props: {
           save.mutate();
         }}
       >
-        <ContactFields form={form} onChange={(next) => { setForm(next); if (save.isSuccess) save.reset(); }} />
+        <ContactFields
+          form={form}
+          onChange={(next) => { setForm(next); if (save.isSuccess) save.reset(); }}
+          beforeNotes={
+            <AddressFields
+              addresses={addresses}
+              primary={primary}
+              onChange={(next, nextPrimary) => {
+                setAddresses(next);
+                setPrimary(nextPrimary);
+                if (save.isSuccess || save.isError) save.reset();
+              }}
+            />
+          }
+        />
         {save.isError && (
           <p role="alert" className="text-sm text-destructive">
             {save.error instanceof Error ? save.error.message : "Couldn’t save this contact"}
@@ -465,7 +509,16 @@ function ContactDetails(props: {
             {save.isPending ? "Saving…" : "Save changes"}
           </Button>
           {dirty && (
-            <Button type="button" variant="ghost" onClick={() => setForm(formOf(contact))}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setForm(formOf(contact));
+                setAddresses(savedAddresses ?? [contact.address]);
+                setPrimary(0);
+                save.reset();
+              }}
+            >
               Discard
             </Button>
           )}
@@ -486,7 +539,7 @@ function ContactDetails(props: {
         </h2>
         {detail.data.conversations.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            No email from this address yet.
+            No email from {otherAddressCount > 0 ? "these addresses" : "this address"} yet.
           </p>
         ) : (
           <ul className="mt-3 overflow-hidden rounded-xl border bg-background">
@@ -569,7 +622,84 @@ function ContactDetails(props: {
   );
 }
 
-function ContactFields(props: { form: ContactForm; onChange: (form: ContactForm) => void }) {
+function AddressFields(props: {
+  addresses: string[];
+  primary: number;
+  onChange: (addresses: string[], primary: number) => void;
+}) {
+  const { addresses, primary } = props;
+  const set = (index: number, value: string) =>
+    props.onChange(addresses.map((address, i) => (i === index ? value : address)), primary);
+  const remove = (index: number) =>
+    props.onChange(
+      addresses.filter((_, i) => i !== index),
+      index === primary ? 0 : index < primary ? primary - 1 : primary,
+    );
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium text-foreground">Email addresses</legend>
+      <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+        Check the box next to the primary address. New email to this contact goes there, and mail
+        from any of these addresses shows up under this contact.
+      </p>
+      <ul className="mt-2 space-y-2">
+        {addresses.map((address, index) => (
+          <li key={index} className="flex items-center gap-2">
+            <Checkbox
+              checked={index === primary}
+              disabled={index !== primary && !address.trim()}
+              onCheckedChange={(checked) => {
+                if (checked === true) props.onChange(addresses, index);
+              }}
+              aria-label={`Make ${address.trim() || `address ${index + 1}`} primary`}
+              title={index === primary ? "Primary address" : "Make primary"}
+              className="shrink-0"
+            />
+            <Input
+              type="email"
+              value={address}
+              onChange={(event) => set(index, event.target.value)}
+              placeholder="person@example.com"
+              autoComplete="off"
+              autoFocus={index > 0 && address === "" && index === addresses.length - 1}
+              aria-label={`Email address ${index + 1}`}
+              className="min-w-0 flex-1"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="shrink-0 text-muted-foreground"
+              disabled={addresses.length === 1}
+              onClick={() => remove(index)}
+              aria-label={`Remove ${address.trim() || "this address"}`}
+            >
+              <XIcon className="h-3.5 w-3.5" />
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="mt-2 -ml-2 text-muted-foreground"
+        disabled={addresses.length >= 20}
+        onClick={() => props.onChange([...addresses, ""], primary)}
+      >
+        <PlusIcon className="h-3.5 w-3.5" />
+        Add email address
+      </Button>
+    </fieldset>
+  );
+}
+
+function ContactFields(props: {
+  form: ContactForm;
+  onChange: (form: ContactForm) => void;
+  /** Shown below Company and Phone, above Notes. */
+  beforeNotes?: ReactNode;
+}) {
   const set = (field: keyof ContactForm) => (value: string) =>
     props.onChange({ ...props.form, [field]: value });
   return (
@@ -594,6 +724,7 @@ function ContactFields(props: { form: ContactForm; onChange: (form: ContactForm)
           />
         </Field>
       </div>
+      {props.beforeNotes}
       <Field label="Notes">
         <Textarea
           value={props.form.notes}

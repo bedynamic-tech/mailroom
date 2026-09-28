@@ -30,7 +30,8 @@ function fixture(t) {
       VALUES (1, 'Invoices to accounting',
               '{"match":"all","items":[{"field":"subject","operator":"contains","value":"invoice"}]}',
               NULL, '["books@accounting.test"]');
-    INSERT INTO contacts (address, name, company) VALUES ('dana@finance.test', 'Dana Finance', 'Acme Books');`);
+    INSERT INTO contacts (address, name, company) VALUES ('dana@finance.test', 'Dana Finance', 'Acme Books');
+    INSERT INTO contact_addresses (address, contact_id) SELECT 'dana@personal.test', id FROM contacts;`);
   function statement(sql, args = []) {
     return {
       bind: (...values) => statement(sql, values),
@@ -86,6 +87,7 @@ test("internal notes, board items and their notes, rules and contacts are found"
   assert.deepEqual((await search("accounting")).rules.map((rule) => [rule.id, rule.excerpt]), [[1, ""]]);
   assert.deepEqual((await search("books@")).rules.map((rule) => rule.excerpt), ["Forwards to books@accounting.test"]);
   assert.deepEqual((await search("acme")).contacts.map((contact) => contact.address), ["dana@finance.test"]);
+  assert.deepEqual((await search("personal.test")).contacts.map((contact) => contact.address), ["dana@finance.test"]);
 });
 
 test("search syntax and LIKE wildcards are taken literally", async (t) => {

@@ -245,3 +245,77 @@ test("contacts import creates new contacts, fills or overwrites existing ones an
     contacts: Array.from({ length: 501 }, (_, i) => ({ address: `p${i}@example.org` })),
   })).status, 400);
 });
+
+test("migration keeps each existing contact's address as its primary address", (t) => {
+  const db = new DatabaseSync(":memory:");
+  t.after(() => db.close());
+  migrate(db, { before: "0028" });
+  db.exec(`INSERT INTO contacts (address, name) VALUES ('ada@example.org', 'Ada'), ('Bob@Example.org', NULL);`);
+  db.exec(readFileSync("migrations/0028_contact_addresses.sql", "utf8"));
+  assert.deepEqual(
+    db.prepare(`SELECT c.address AS primary_address, a.address FROM contact_addresses a
+      JOIN contacts c ON c.id = a.contact_id ORDER BY a.address`).all().map((row) => ({ ...row })),
+    [
+      { primary_address: "ada@example.org", address: "ada@example.org" },
+      { primary_address: "Bob@Example.org", address: "bob@example.org" },
+    ],
+  );
+});
+
+test("contacts can have several addresses, and mail from any of them is the contact's", async (t) => {
+  const f = fixture(t);
+  inbound(f.db, { thread: 1, from: "ada@work.example", at: "2026-03-01T00:00:00.000Z" });
+  inbound(f.db, { thread: 2, from: "Ada@Home.example", at: "2026-03-05T00:00:00.000Z" });
+  const ada = (await f.call("POST", "", { address: "ada@work.example", name: "Ada" })).body;
+  const bob = (await f.call("POST", "", { address: "bob@example.org", name: "Bob" })).body;
+
+  let detail = await f.call("GET", `/${ada.id}`);
+  assert.deepEqual(detail.body.addresses, ["ada@work.example"]);
+  assert.equal(detail.body.conversation_count, 1);
+
+  // Add a second address and make it primary.
+  const updated = await f.call("PATCH", `/${ada.id}`, {
+    addresses: [" ADA@home.example ", "ada@work.example", "", "ada@home.example"],
+  });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.address, "ada@home.example");
+  assert.equal(updated.body.last_seen_at, "2026-03-05T00:00:00.000Z");
+  detail = await f.call("GET", `/${ada.id}`);
+  assert.deepEqual(detail.body.addresses, ["ada@home.example", "ada@work.example"]);
+  assert.equal(detail.body.conversation_count, 2);
+
+  // Either address finds the contact; new mail from either updates it, never a new contact.
+  assert.deepEqual((await f.call("GET", "?q=work.example")).body.map((c) => c.id), [ada.id]);
+  await recordSender(f.env, { address: "ada@work.example", name: "Ada W", seenAt: "2026-04-01T00:00:00.000Z" });
+  assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM contacts").get().n, 2);
+  assert.equal(f.db.prepare("SELECT last_seen_at FROM contacts WHERE id = ?").get(ada.id).last_seen_at,
+    "2026-04-01T00:00:00.000Z");
+
+  // Creating or importing a secondary address matches the existing contact.
+  const duplicate = await f.call("POST", "", { address: "ada@work.example" });
+  assert.equal(duplicate.status, 409);
+  assert.equal(duplicate.body.id, ada.id);
+  const imported = await f.call("POST", "/import", {
+    contacts: [{ address: "ada@work.example", company: "Engines" }],
+  });
+  assert.deepEqual({ created: imported.body.created, updated: imported.body.updated }, { created: 0, updated: 1 });
+  assert.equal(f.db.prepare("SELECT company FROM contacts WHERE id = ?").get(ada.id).company, "Engines");
+
+  // Addresses can't be shared with another contact or an inbox, and one is always required.
+  const taken = await f.call("PATCH", `/${bob.id}`, { addresses: ["bob@example.org", "ada@work.example"] });
+  assert.equal(taken.status, 409);
+  assert.equal(taken.body.id, ada.id);
+  assert.equal((await f.call("PATCH", `/${bob.id}`, { addresses: ["ADA@home.example"] })).status, 409);
+  assert.equal((await f.call("PATCH", `/${bob.id}`, { addresses: ["support@example.com"] })).status, 400);
+  assert.equal((await f.call("PATCH", `/${bob.id}`, { addresses: ["", " "] })).status, 400);
+  assert.equal((await f.call("PATCH", `/${bob.id}`, { addresses: ["nope"] })).status, 400);
+
+  // Editing an address replaces it; removed addresses are free to use again.
+  const renamed = await f.call("PATCH", `/${bob.id}`, { addresses: ["robert@example.org"], name: "Robert" });
+  assert.equal(renamed.body.address, "robert@example.org");
+  assert.equal(renamed.body.name, "Robert");
+  assert.equal((await f.call("POST", "", { address: "bob@example.org" })).status, 201);
+
+  assert.equal((await f.call("DELETE", `/${ada.id}`)).status, 200);
+  assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM contact_addresses WHERE contact_id = ?").get(ada.id).n, 0);
+});
