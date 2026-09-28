@@ -1163,6 +1163,7 @@ async function removeArchivedConversations(c: Context<{ Bindings: Env }>, ids: n
 }
 
 const replyCopies = z.object({
+  to: z.array(z.email().max(254)).min(1).max(MAX_RECIPIENTS_PER_MESSAGE).optional(),
   cc: z.array(z.email().max(254)).max(MAX_RECIPIENTS_PER_MESSAGE),
   bcc: z.array(z.email().max(254)).max(MAX_RECIPIENTS_PER_MESSAGE),
 });
@@ -1175,6 +1176,7 @@ api.post("/threads/:id/reply", async (c) => {
   let html: string | undefined;
   let draftId: number | undefined;
   let attemptId = "";
+  let to: unknown[] | undefined;
   let cc: unknown[] = [];
   let bcc: unknown[] = [];
   const attachments: OutboundAttachmentInput[] = [];
@@ -1187,6 +1189,8 @@ api.post("/threads/:id/reply", async (c) => {
     text = typeof formText === "string" ? formText : "";
     html = typeof formHtml === "string" && formHtml ? formHtml : undefined;
     attemptId = typeof formAttempt === "string" ? formAttempt : "";
+    // A form that chose its To recipients says so even when it removed them all.
+    to = form.has("to_set") ? copyAddresses(form, "to") : undefined;
     cc = copyAddresses(form, "cc");
     bcc = copyAddresses(form, "bcc");
     if (formDraft !== null && formDraft !== "") {
@@ -1209,6 +1213,7 @@ api.post("/threads/:id/reply", async (c) => {
       html?: string;
       draft_id?: number;
       attempt_id?: string;
+      to?: unknown[];
       cc?: unknown[];
       bcc?: unknown[];
     }>();
@@ -1216,6 +1221,7 @@ api.post("/threads/:id/reply", async (c) => {
     html = typeof body.html === "string" && body.html ? body.html : undefined;
     draftId = body.draft_id;
     attemptId = body.attempt_id ?? "";
+    to = Array.isArray(body.to) ? body.to : undefined;
     cc = Array.isArray(body.cc) ? body.cc : [];
     bcc = Array.isArray(body.bcc) ? body.bcc : [];
   }
@@ -1232,9 +1238,13 @@ api.post("/threads/:id/reply", async (c) => {
   if (draftId !== undefined && (!Number.isInteger(draftId) || draftId <= 0)) {
     return c.json({ error: "invalid draft_id" }, 400);
   }
-  const copies = replyCopies.safeParse({ cc, bcc });
+  const copies = replyCopies.safeParse({ to, cc, bcc });
   if (!copies.success) {
-    const field = copies.error.issues[0]?.path[0] === "bcc" ? "Bcc" : "Cc";
+    const path = copies.error.issues[0]?.path[0];
+    if (path === "to" && Array.isArray(to) && to.length === 0) {
+      return c.json({ error: "Add at least one To recipient" }, 400);
+    }
+    const field = path === "bcc" ? "Bcc" : path === "to" ? "To" : "Cc";
     return c.json(
       { error: `Enter valid ${field} email addresses, up to ${MAX_RECIPIENTS_PER_MESSAGE} recipients` },
       400,
@@ -1247,6 +1257,7 @@ api.post("/threads/:id/reply", async (c) => {
       threadId,
       text,
       html,
+      to: copies.data.to,
       cc: copies.data.cc,
       bcc: copies.data.bcc,
       attachments,

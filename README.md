@@ -23,6 +23,11 @@ Routing, D1, R2 and Web Push.
 
 - **Unified inbox.** Manage multiple addresses and domains in one workspace.
 - **Compose and reply.** Send new mail or reply to conversations, with attachments.
+- **Choose who a reply goes to.** The reply box opens with an editable **To**
+  field, filled with the sender of the latest email (or its Reply-To). Remove
+  or add To recipients before sending. **Cc**, **Bcc** and **Reply all** sit at
+  the right of the To line and open their rows when tapped. The sparkle button
+  at the right of the formatting toolbar drafts a reply with AI.
 - **Opens at the latest message.** A conversation opens scrolled to the bottom
   and stays there while emails and images finish loading, until you scroll up.
 - **Internal notes.** Leave notes for your team on any conversation. Write in

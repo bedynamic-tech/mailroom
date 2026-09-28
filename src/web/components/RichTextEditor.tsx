@@ -63,6 +63,10 @@ export function RichTextEditor(props: {
   contentClassName?: string;
   /** Called on Cmd/Ctrl+Enter. */
   onSubmitShortcut?: () => void;
+  /** Extra controls shown at the right end of the formatting toolbar. */
+  toolbarEnd?: ReactNode;
+  /** Shown between the toolbar and the editable area. */
+  belowToolbar?: ReactNode;
 }) {
   const variant = props.variant ?? "boxed";
   const editorRef = useRef<HTMLDivElement>(null);
@@ -221,7 +225,9 @@ export function RichTextEditor(props: {
         >
           <RemoveFormatting />
         </ToolbarButton>
+        {props.toolbarEnd && <span className="ml-auto flex shrink-0 items-center pl-1">{props.toolbarEnd}</span>}
       </div>
+      {props.belowToolbar}
 
       {linkEditor && (
         // Not a <form>: the editor usually sits inside one, and forms can't nest.

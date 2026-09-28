@@ -395,6 +395,43 @@ test("a Reply Attempt sends Cc and Bcc copies and keeps them bound to the attemp
   assert.equal(fixture.sends(), 1);
 });
 
+test("a Reply Attempt sends to the To chosen in the composer and keeps it bound to the attempt", async () => {
+  const fixture = makeEnv();
+  const intent = {
+    attemptId: "attempt-to",
+    threadId: 1,
+    text: "Sending this to the right person",
+    to: ["Owner@Example.COM", "owner@example.com", "billing@example.com"],
+    cc: ["owner@example.com", "team@example.com"],
+  };
+
+  const first = await sendReplyAttempt(fixture.env, intent);
+  assert.equal(first.status, "sent");
+  const [sent] = fixture.sent();
+  assert.deepEqual(sent.to, ["Owner@example.com", "billing@example.com"]);
+  assert.deepEqual(sent.cc, ["team@example.com"]);
+  assert.equal(
+    fixture.env.DB.attempts.get("attempt-to").to_addresses,
+    JSON.stringify(["Owner@example.com", "billing@example.com"]),
+  );
+
+  assert.deepEqual(await sendReplyAttempt(fixture.env, intent), first);
+  await assert.rejects(
+    sendReplyAttempt(fixture.env, { ...intent, to: ["customer@example.com"] }),
+    (error) => error instanceof ReplyIntentError && error.status === 409,
+  );
+  assert.equal(fixture.sends(), 1);
+});
+
+test("a Reply Attempt with an empty To is rejected before anything is sent", async () => {
+  const fixture = makeEnv();
+  await assert.rejects(
+    sendReplyAttempt(fixture.env, { attemptId: "attempt-empty-to", threadId: 1, text: "Hi", to: [] }),
+    (error) => error instanceof ReplyIntentError && error.status === 400,
+  );
+  assert.equal(fixture.sends(), 0);
+});
+
 test("a Reply Attempt without copies omits Cc and Bcc from the provider request", async () => {
   const fixture = makeEnv();
   await sendReplyAttempt(fixture.env, { attemptId: "attempt-no-cc", threadId: 1, text: "Hi" });
