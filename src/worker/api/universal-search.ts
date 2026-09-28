@@ -361,7 +361,14 @@ function ruleExcerpt(
 
 async function searchContacts(db: D1Database, terms: string[]): Promise<SearchContactResult[]> {
   const where = everyTermIn(
-    ["address", "COALESCE(name, '')", "COALESCE(company, '')", "COALESCE(phone, '')", "COALESCE(notes, '')"],
+    [
+      "address",
+      "COALESCE(name, '')",
+      "COALESCE(company, '')",
+      "COALESCE(phone, '')",
+      "COALESCE(notes, '')",
+      "id IN (SELECT contact_id FROM contact_addresses WHERE address LIKE {})",
+    ],
     terms,
   );
   const { results } = await db

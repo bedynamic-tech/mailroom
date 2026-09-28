@@ -343,6 +343,8 @@ export interface ContactConversation {
 
 export interface ContactDetail {
   contact: Contact;
+  /** Every email address of the Contact, primary first. */
+  addresses: string[];
   conversation_count: number;
   conversations: ContactConversation[];
 }

@@ -326,7 +326,9 @@ function ContactDetails(props: {
     queryFn: () => fetchContact(props.contactId),
   });
   const contact = detail.data?.contact;
+  const savedAddresses = detail.data?.addresses;
   const [form, setForm] = useState<ContactForm>(EMPTY_FORM);
+  const [addresses, setAddresses] = useState<string[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes });
@@ -335,16 +337,29 @@ function ContactDetails(props: {
   useEffect(() => {
     if (contact) setForm(formOf(contact));
   }, [contact]);
+  useEffect(() => {
+    if (savedAddresses) setAddresses(savedAddresses);
+  }, [savedAddresses]);
 
+  const cleanAddresses = addresses.map((address) => address.trim().toLowerCase()).filter(Boolean);
+  const addressesChanged =
+    savedAddresses !== undefined && cleanAddresses.join("\n") !== savedAddresses.join("\n");
   const save = useMutation({
-    mutationFn: () => updateContact(props.contactId, form),
-    onSuccess: (updated) => {
+    mutationFn: () =>
+      updateContact(props.contactId, {
+        ...form,
+        ...(addressesChanged ? { addresses: cleanAddresses } : {}),
+      }),
+    onSuccess: async (updated) => {
       queryClient.setQueryData<ContactDetail>(
         ["contacts", "detail", props.contactId],
         (current) => (current ? { ...current, contact: updated } : current),
       );
       queryClient.invalidateQueries({ queryKey: ["contacts", "list"] });
       queryClient.invalidateQueries({ queryKey: ["contacts", "suggest"] });
+      if (addressesChanged) {
+        await queryClient.invalidateQueries({ queryKey: ["contacts", "detail", props.contactId] });
+      }
     },
   });
   const remove = useMutation({
@@ -375,7 +390,8 @@ function ContactDetails(props: {
     );
   }
 
-  const dirty = JSON.stringify(form) !== JSON.stringify(formOf(contact));
+  const dirty = addressesChanged || JSON.stringify(form) !== JSON.stringify(formOf(contact));
+  const otherAddressCount = (savedAddresses?.length ?? 1) - 1;
   const title = contact.name ?? contact.address;
   const candidates = blockCandidates(contact.address);
   const blockRules = (blockedSenders.data ?? []).filter((rule) =>
@@ -429,7 +445,12 @@ function ContactDetails(props: {
         <EmailAvatar email={contact.address} label={title} className="h-11 w-11 text-base" />
         <div className="min-w-0">
           <p className="truncate text-base font-semibold text-foreground">{title}</p>
-          <p className="truncate text-sm text-muted-foreground">{contact.address}</p>
+          <p className="truncate text-sm text-muted-foreground">
+            {contact.address}
+            {otherAddressCount > 0 && (
+              <span> and {otherAddressCount} more</span>
+            )}
+          </p>
           {blockRules.length > 0 && (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ShieldBanIcon className="h-3.5 w-3.5 shrink-0" />
@@ -454,6 +475,10 @@ function ContactDetails(props: {
           save.mutate();
         }}
       >
+        <AddressFields
+          addresses={addresses}
+          onChange={(next) => { setAddresses(next); if (save.isSuccess || save.isError) save.reset(); }}
+        />
         <ContactFields form={form} onChange={(next) => { setForm(next); if (save.isSuccess) save.reset(); }} />
         {save.isError && (
           <p role="alert" className="text-sm text-destructive">
@@ -465,7 +490,15 @@ function ContactDetails(props: {
             {save.isPending ? "Saving…" : "Save changes"}
           </Button>
           {dirty && (
-            <Button type="button" variant="ghost" onClick={() => setForm(formOf(contact))}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setForm(formOf(contact));
+                setAddresses(savedAddresses ?? [contact.address]);
+                save.reset();
+              }}
+            >
               Discard
             </Button>
           )}
@@ -486,7 +519,7 @@ function ContactDetails(props: {
         </h2>
         {detail.data.conversations.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            No email from this address yet.
+            No email from {otherAddressCount > 0 ? "these addresses" : "this address"} yet.
           </p>
         ) : (
           <ul className="mt-3 overflow-hidden rounded-xl border bg-background">
@@ -566,6 +599,80 @@ function ContactDetails(props: {
         )}
       </section>
     </DetailShell>
+  );
+}
+
+function AddressFields(props: { addresses: string[]; onChange: (addresses: string[]) => void }) {
+  const { addresses } = props;
+  const set = (index: number, value: string) =>
+    props.onChange(addresses.map((address, i) => (i === index ? value : address)));
+  const remove = (index: number) => props.onChange(addresses.filter((_, i) => i !== index));
+  const makePrimary = (index: number) =>
+    props.onChange([addresses[index], ...addresses.filter((_, i) => i !== index)]);
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium text-foreground">Email addresses</legend>
+      <ul className="mt-1.5 space-y-2">
+        {addresses.map((address, index) => (
+          <li key={index} className="flex items-center gap-2">
+            <Input
+              type="email"
+              value={address}
+              onChange={(event) => set(index, event.target.value)}
+              placeholder="person@example.com"
+              autoComplete="off"
+              autoFocus={index > 0 && address === "" && index === addresses.length - 1}
+              aria-label={index === 0 ? "Primary email address" : `Email address ${index + 1}`}
+              className="min-w-0 flex-1"
+            />
+            <span className="flex w-[6.5rem] shrink-0 justify-center">
+              {index === 0 ? (
+                <Badge variant="secondary" className="h-6 rounded-md px-2 text-xs font-normal">
+                  Primary
+                </Badge>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  className="text-muted-foreground"
+                  disabled={!address.trim()}
+                  onClick={() => makePrimary(index)}
+                >
+                  Make primary
+                </Button>
+              )}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="shrink-0 text-muted-foreground"
+              disabled={addresses.length === 1}
+              onClick={() => remove(index)}
+              aria-label={`Remove ${address.trim() || "this address"}`}
+            >
+              <XIcon className="h-3.5 w-3.5" />
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="mt-2 -ml-2 text-muted-foreground"
+        disabled={addresses.length >= 20}
+        onClick={() => props.onChange([...addresses, ""])}
+      >
+        <PlusIcon className="h-3.5 w-3.5" />
+        Add email address
+      </Button>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        Mail from any of these addresses shows up under this contact. New email goes to the primary
+        address.
+      </p>
+    </fieldset>
   );
 }
 

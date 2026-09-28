@@ -406,7 +406,11 @@ export const createContact = (input: ContactInput) =>
     body: JSON.stringify(input),
   });
 
-export const updateContact = (id: number, input: Omit<ContactInput, "address">) =>
+/** Saves a contact's details; `addresses` replaces all of its email addresses, primary first. */
+export const updateContact = (
+  id: number,
+  input: Omit<ContactInput, "address"> & { addresses?: string[] },
+) =>
   request<Contact>(`/contacts/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
