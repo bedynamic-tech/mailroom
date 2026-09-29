@@ -122,8 +122,9 @@ Do not deploy `wrangler.dev.jsonc` or expose the local dev server publicly.
    completing the DNS verification shown by Cloudflare. The `EMAIL` Worker
    binding alone does not verify a domain or grant sending access.
 3. In Mailroom **Settings**, add an Inbox such as `support@example.com`. For a
-   new domain, the dialog asks you to confirm Email Routing is enabled and Email
-   Sending is active before it saves the Inbox. Leave **Draft replies to new
+   new domain, the dialog asks you to confirm Email Routing is enabled, Email
+   Sending is active and bounce tracking is subscribed (see
+   [Track bounces](#track-bounces)) before it saves the Inbox. Leave **Draft replies to new
    messages** off until delivery looks right. Turning it on writes a draft for
    your approval; nothing is sent automatically.
 4. Then point that address (or a catch-all rule) at your deployed Worker using

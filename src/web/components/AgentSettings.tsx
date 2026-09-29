@@ -83,6 +83,8 @@ const CLOUDFLARE_EMAIL_ROUTING_URL =
   "https://dash.cloudflare.com/?to=%2F%3Aaccount%2Femail-service%2Frouting";
 const CLOUDFLARE_EMAIL_SENDING_URL =
   "https://dash.cloudflare.com/?to=%2F%3Aaccount%2Femail-service%2Fsending";
+const CLOUDFLARE_QUEUES_URL =
+  "https://dash.cloudflare.com/?to=%2F%3Aaccount%2Fworkers%2Fqueues";
 
 const EMPTY_PLAYBOOK: PlaybookEditorState = {
   name: "",
@@ -125,6 +127,7 @@ export function AgentSettings(props: {
   const [inboxSetup, setInboxSetup] = useState<InboxSetupState | null>(null);
   const [routingConfirmed, setRoutingConfirmed] = useState(false);
   const [sendingConfirmed, setSendingConfirmed] = useState(false);
+  const [bouncesConfirmed, setBouncesConfirmed] = useState(false);
   const [deleteInboxOpen, setDeleteInboxOpen] = useState(false);
   const [deleteInboxConfirmation, setDeleteInboxConfirmation] = useState("");
 
@@ -353,6 +356,7 @@ export function AgentSettings(props: {
     setInboxSetup(null);
     setRoutingConfirmed(false);
     setSendingConfirmed(false);
+    setBouncesConfirmed(false);
     setMailboxEditorOpen(true);
   };
 
@@ -373,10 +377,12 @@ export function AgentSettings(props: {
     }
     setRoutingConfirmed(false);
     setSendingConfirmed(false);
+    setBouncesConfirmed(false);
     setInboxSetup(parsed);
   };
 
-  const setupStepsRemaining = Number(!routingConfirmed) + Number(!sendingConfirmed);
+  const setupStepsRemaining =
+    Number(!routingConfirmed) + Number(!sendingConfirmed) + Number(!bouncesConfirmed);
 
   const activePlaybookCount = playbooks.data?.filter((item) => item.enabled).length ?? 0;
 
@@ -787,6 +793,7 @@ export function AgentSettings(props: {
             setInboxSetup(null);
             setRoutingConfirmed(false);
             setSendingConfirmed(false);
+            setBouncesConfirmed(false);
           }
         }}
       >
@@ -854,6 +861,7 @@ export function AgentSettings(props: {
                       setInboxSetup(null);
                       setRoutingConfirmed(false);
                       setSendingConfirmed(false);
+                      setBouncesConfirmed(false);
                     }}
                   >
                     Edit
@@ -926,6 +934,40 @@ export function AgentSettings(props: {
                       </Button>
                     </div>
                   </div>
+                  <div className="flex items-start gap-3 py-4">
+                    <Checkbox
+                      id="confirm-bounce-events"
+                      checked={bouncesConfirmed}
+                      onCheckedChange={(checked) => setBouncesConfirmed(checked === true)}
+                      aria-labelledby="bounce-events-title"
+                      className="mt-1"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <label
+                        id="bounce-events-title"
+                        htmlFor="confirm-bounce-events"
+                        className="cursor-pointer text-sm font-medium"
+                      >
+                        Track bounces
+                      </label>
+                      <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                        In Queues, open the draft queue (mailroom-drafts unless you renamed it),
+                        then Subscriptions, Subscribe to events. Choose Email Sending and{" "}
+                        {inboxSetup.domainName}, and select the Bounced, Rejected and Failed events.
+                        Without it, emails that bounce still show as sent.
+                      </p>
+                      <Button asChild type="button" variant="outline" size="sm" className="mt-3">
+                        <a
+                          href={CLOUDFLARE_QUEUES_URL}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open Queues
+                          <ExternalLinkIcon />
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
                 </fieldset>
 
                 {configureAndAddMailbox.isError && (
@@ -941,7 +983,7 @@ export function AgentSettings(props: {
             <DialogFooter className="flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {inboxSetup && (
                 <p className="mr-auto text-xs text-muted-foreground" aria-live="polite">
-                  {2 - setupStepsRemaining} of 2 complete
+                  {3 - setupStepsRemaining} of 3 complete
                 </p>
               )}
               <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">

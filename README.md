@@ -45,6 +45,7 @@ Routing, D1, R2 and Web Push.
   Cloudflare keeps bounce notices for itself, so Mailroom learns about bounces
   from Cloudflare's Email Sending events; subscribe each sending domain once
   as described in [docs/deployment.md](docs/deployment.md#track-bounces).
+  Adding an Inbox on a new domain lists this step in its setup checklist.
   Bounce notices that do reach an Inbox are read too.
 - **Bounced address warnings.** When you add an address that has bounced
   before to To, Cc or Bcc, it turns red with a warning under the field, since
