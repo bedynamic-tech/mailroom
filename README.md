@@ -1,5 +1,3 @@
-<div align="center">
-
 # Mailroom +
 
 **A self-hosted shared inbox for humans and AI agents, running entirely on Cloudflare.**
@@ -10,8 +8,7 @@
 ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)
 ![MCP](https://img.shields.io/badge/MCP-ready-6E56CF)
 
-</div>
-<img width="2800" height="1800" alt="All inboxes in Mailroom +" src="docs/images/screenshot.png" />
+<img width="2800" height="1800" alt="inbox-no-board" src="https://github.com/user-attachments/assets/50f69feb-3920-43e5-aff9-9c4854678f52" />
 
 Mailroom + is a fork of the original Mailroom with a large set of features added
 for everyday use. It runs in your own Cloudflare account on Workers, Email
