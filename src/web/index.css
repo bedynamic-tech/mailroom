@@ -80,6 +80,12 @@
     :root {
       --app-inset-top: calc(env(safe-area-inset-top, 0px) + 12px);
     }
+    /* The installed app also copies a fixed backdrop blur into that band,
+       so dialog overlays stay a plain tint there. */
+    [data-slot="dialog-overlay"] {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
   }
 }
 

@@ -76,7 +76,10 @@ function DialogContent({
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button
               variant="ghost"
-              className="absolute top-2 right-2"
+              className={cn(
+                "absolute top-2 right-2",
+                fullScreenOnMobile && "max-sm:top-[max(0.5rem,var(--app-inset-top))]"
+              )}
               size="icon-sm"
             >
               <XIcon
