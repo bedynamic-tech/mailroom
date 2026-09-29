@@ -196,7 +196,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
           }}
           onPointerDownOutside={(event) => event.preventDefault()}
         >
-          <header className="flex shrink-0 items-center justify-between border-b py-3 pr-2 pl-4 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5 sm:py-4">
+          <header className="flex shrink-0 items-center justify-between border-b py-3 pr-2 pl-4 pt-[max(0.75rem,var(--app-inset-top))] sm:px-5 sm:py-4">
             <DialogTitle>New message</DialogTitle>
             <DialogDescription className="sr-only">Write a new email. Closing keeps your draft until you leave or reload this page.</DialogDescription>
             <Button type="button" variant="ghost" size="icon" onClick={close} disabled={sending} aria-label="Close and keep draft" title="Close and keep draft">
