@@ -133,6 +133,8 @@ export interface ThreadSummary {
   last_message_at: string;
   last_from: string | null;
   last_from_address: string | null;
+  /** 1 when last_from is the person the Inbox wrote to, because nobody has written back yet. */
+  last_from_is_recipient: number;
   /** The address a catch-all Conversation was sent to; null when it reached the Inbox's own address. */
   catch_all_recipient: string | null;
   /** Recipients edited in the reply box, as JSON (see shared/reply-recipients.ts); null when unedited. */

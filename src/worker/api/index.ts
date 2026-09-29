@@ -804,14 +804,7 @@ api.get("/threads", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT t.*, m.address AS mailbox_address, m.color AS mailbox_color,
        m.agent_mode AS mailbox_agent_mode,
-       COALESCE(
-         latest_inbound.from_name,
-         latest_inbound.from_address,
-         CASE WHEN latest_message.direction = 'outbound'
-           THEN 'To: ' || COALESCE(json_extract(latest_message.to_addresses, '$[0]'), '')
-         END
-       ) AS last_from,
-       latest_inbound.from_address AS last_from_address,
+       ${THREAD_CORRESPONDENT_COLUMNS},
        (SELECT COUNT(*) FROM drafts d
         WHERE d.thread_id = t.id AND d.status = 'pending'
           AND d.source_inbound_message_id = latest_inbound.id) AS pending_draft_count,
@@ -850,14 +843,7 @@ api.get("/threads/:id", async (c) => {
   const thread = await c.env.DB.prepare(
     `SELECT t.*, m.address AS mailbox_address, m.color AS mailbox_color,
        m.agent_mode AS mailbox_agent_mode,
-       COALESCE(
-         latest_inbound.from_name,
-         latest_inbound.from_address,
-         CASE WHEN latest_message.direction = 'outbound'
-           THEN 'To: ' || COALESCE(json_extract(latest_message.to_addresses, '$[0]'), '')
-         END
-       ) AS last_from,
-       latest_inbound.from_address AS last_from_address,
+       ${THREAD_CORRESPONDENT_COLUMNS},
        (SELECT COUNT(*) FROM drafts d
         WHERE d.thread_id = t.id AND d.status = 'pending'
           AND d.source_inbound_message_id = latest_inbound.id) AS pending_draft_count,
@@ -1308,14 +1294,7 @@ api.get("/search", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT DISTINCT t.*, m.address AS mailbox_address, m.color AS mailbox_color,
        m.agent_mode AS mailbox_agent_mode,
-       COALESCE(
-         latest_inbound.from_name,
-         latest_inbound.from_address,
-         CASE WHEN latest_message.direction = 'outbound'
-           THEN 'To: ' || COALESCE(json_extract(latest_message.to_addresses, '$[0]'), '')
-         END
-       ) AS last_from,
-       latest_inbound.from_address AS last_from_address,
+       ${THREAD_CORRESPONDENT_COLUMNS},
        (SELECT COUNT(*) FROM drafts d
         WHERE d.thread_id = t.id AND d.status = 'pending'
           AND d.source_inbound_message_id = latest_inbound.id) AS pending_draft_count,
@@ -1359,6 +1338,30 @@ api.get("/search", async (c) => {
 
 const MAX_LABELS_PER_MAILBOX = 20;
 const THREAD_PAGE_SIZE = 50;
+
+// The first To address of a Conversation's latest message, when that message
+// was sent from the Inbox. Used for Conversations with no inbound mail yet.
+const LATEST_RECIPIENT_SQL = `CASE WHEN latest_message.direction = 'outbound'
+  THEN json_extract(latest_message.to_addresses, '$[0]') END`;
+
+// Who a Conversation is with, for the list: the latest sender, or, when the
+// Inbox started it and nobody has written back, the person it was sent to,
+// named by their Contact, else by the name on their own mail, else the address.
+// Expects `latest_message` and `latest_inbound` joins.
+const THREAD_CORRESPONDENT_COLUMNS = `COALESCE(
+         latest_inbound.from_name,
+         latest_inbound.from_address,
+         (SELECT c.name FROM contact_addresses ca JOIN contacts c ON c.id = ca.contact_id
+          WHERE ca.address = ${LATEST_RECIPIENT_SQL} AND trim(COALESCE(c.name, '')) <> ''),
+         (SELECT trim(nm.from_name) FROM messages nm
+          WHERE nm.direction = 'inbound' AND nm.from_address = ${LATEST_RECIPIENT_SQL} COLLATE NOCASE
+            AND trim(COALESCE(nm.from_name, '')) <> ''
+          ORDER BY nm.created_at DESC, nm.id DESC LIMIT 1),
+         ${LATEST_RECIPIENT_SQL}
+       ) AS last_from,
+       COALESCE(latest_inbound.from_address, ${LATEST_RECIPIENT_SQL}) AS last_from_address,
+       CASE WHEN latest_inbound.id IS NULL AND ${LATEST_RECIPIENT_SQL} IS NOT NULL
+         THEN 1 ELSE 0 END AS last_from_is_recipient`;
 
 async function attachLabels(
   env: Env,
