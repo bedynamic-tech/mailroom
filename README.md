@@ -89,7 +89,8 @@ Routing, D1, R2 and Web Push.
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.
-  In dark mode, simple emails are shown in dark colors, and emails that ship
+  In dark mode, simple emails are shown in dark colors on the app's own
+  background, and emails that ship
   their own dark styles use them. Designed emails with their own backgrounds
   (newsletters, receipts) keep their original colors. Any text that would
   still be hard to read on its dark background is given a readable color. Any email can be

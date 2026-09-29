@@ -3,6 +3,7 @@ import {
   contrastRatio,
   DARK_EMAIL_BACKGROUND,
   DARK_EMAIL_TEXT,
+  neutralDarkBackground,
   parseColor,
   relativeLuminance,
 } from "./email-colors";
@@ -11,6 +12,22 @@ import {
 const MIN_CONTRAST = 3;
 const MAX_ELEMENTS = 5_000;
 const DARK_TEXT = "#172033";
+
+/**
+ * Gives dark tinted surfaces the theme's gray, so an email whose own dark
+ * styles use navy or another dark tint sits on the app's background.
+ */
+export function neutralizeDarkSurfaces(document: Document): void {
+  const view = document.defaultView;
+  if (!view || !document.body) return;
+  const elements = [document.documentElement, document.body, ...document.body.querySelectorAll("*")].slice(0, MAX_ELEMENTS);
+  for (const element of elements) {
+    const style = view.getComputedStyle(element);
+    if (style.backgroundImage && style.backgroundImage !== "none") continue;
+    const neutral = neutralDarkBackground(style.backgroundColor);
+    if (neutral) (element as HTMLElement).style?.setProperty("background-color", neutral, "important");
+  }
+}
 
 /**
  * A last pass over an email shown in dark colors, after its styles have

@@ -131,15 +131,22 @@ export function adaptBackgroundColor(value: string): string {
   const l = Math.min(hsl.l, CARD_LIGHTNESS + (1 - hsl.l) * 0.9);
   if (l === hsl.l) return value;
   if (hsl.l >= 0.99 && color.a === 1) return DARK_EMAIL_BACKGROUND;
-  const neutral = hsl.s < 0.12;
-  return formatColor({
-    ...hslToRgb({
-      h: neutral ? CARD_HUE : hsl.h,
-      s: neutral ? CARD_SATURATION : hsl.s * 0.6,
-      l,
-    }),
-    a: color.a,
-  });
+  // Darkened surfaces take the theme's own gray rather than a dark version
+  // of their tint, so a pale blue box does not turn navy.
+  return formatColor({ ...hslToRgb({ h: CARD_HUE, s: CARD_SATURATION, l }), a: color.a });
+}
+
+/**
+ * The theme's gray at the same lightness, for a dark tinted surface (an
+ * email's own dark styles, like a navy #111827); null for any other color.
+ */
+export function neutralDarkBackground(value: string): string | null {
+  const color = parseColor(value);
+  if (!color || color.a < 0.5) return null;
+  const hsl = rgbToHsl(color);
+  if (hsl.l >= 0.25 || hsl.s <= CARD_SATURATION + 0.04) return null;
+  if (hsl.l <= CARD_LIGHTNESS + 0.04) return DARK_EMAIL_BACKGROUND;
+  return formatColor({ ...hslToRgb({ h: CARD_HUE, s: CARD_SATURATION, l: hsl.l }), a: color.a });
 }
 
 /**
