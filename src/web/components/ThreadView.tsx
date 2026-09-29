@@ -427,13 +427,18 @@ export function ThreadView(props: {
       : detail.data.draft_run?.error ?? null;
 
   // To starts as the latest inbound Message's reply target (see sendReplyAttempt) and can be edited.
+  // A Conversation started from Mailroom has no inbound Message yet, so it follows up with the
+  // latest sent Message's To.
   const latestInbound = messages.filter((message) => message.direction === "inbound").at(-1);
+  const latestOutbound = messages.filter((message) => message.direction === "outbound").at(-1);
   const inboundReplyTarget = latestInbound
     ? (() => {
         const replyTo = parseAddressList(latestInbound.reply_to_addresses);
         return replyTo.length ? replyTo : [latestInbound.from_address];
       })()
-    : [];
+    : latestOutbound
+      ? parseAddressList(latestOutbound.to_addresses)
+      : [];
   const replyTargets = replyToEdit ?? inboundReplyTarget;
   const copyCapacity =
     MAX_RECIPIENTS_PER_MESSAGE - replyTargets.length - replyCc.length - replyBcc.length;

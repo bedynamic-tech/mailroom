@@ -116,7 +116,7 @@ export async function sendReplyAttempt(
         thread.default_signature_html,
       );
 
-  const lastInbound = await env.DB.prepare(
+  let lastInbound = await env.DB.prepare(
     `SELECT id, message_id, from_address, reply_to_addresses, references_ids
      FROM messages
      WHERE thread_id = ? AND direction = 'inbound'
@@ -141,19 +141,37 @@ export async function sendReplyAttempt(
       from_address: string;
       reply_to_addresses: string;
       references_ids: string;
+      to_addresses?: string;
     }>();
-  if (!lastInbound) {
-    if (!existing && intent.inboundMessageId !== undefined) {
-      throw new ReplyIntentError(
-        "Conversation advanced after it was read; read it again before replying",
-        409,
-      );
-    }
-    throw new ReplyIntentError("No inbound message to reply to", 400);
+  if (!lastInbound && !existing && intent.inboundMessageId !== undefined) {
+    throw new ReplyIntentError(
+      "Conversation advanced after it was read; read it again before replying",
+      409,
+    );
   }
+  // A Conversation started from Mailroom has no inbound Message until someone answers,
+  // so a follow-up threads on the latest sent Message and goes to its To recipients.
+  const followsUpSent = !lastInbound;
+  if (!lastInbound) {
+    lastInbound = await env.DB.prepare(
+      `SELECT id, message_id, from_address, reply_to_addresses, references_ids, to_addresses
+       FROM messages
+       WHERE thread_id = ? AND direction = 'outbound' AND (? = 0 OR id = ?)
+       ORDER BY created_at DESC, id DESC LIMIT 1`,
+    )
+      .bind(
+        intent.threadId,
+        existing?.inbound_message_id ?? 0,
+        existing?.inbound_message_id ?? 0,
+      )
+      .first();
+  }
+  if (!lastInbound) throw new ReplyIntentError("No message to reply to", 400);
 
-  const replyTarget = parseAddresses(lastInbound.reply_to_addresses);
-  if (replyTarget.length === 0) replyTarget.push(lastInbound.from_address);
+  const replyTarget = followsUpSent
+    ? parseAddresses(lastInbound.to_addresses ?? "[]")
+    : parseAddresses(lastInbound.reply_to_addresses);
+  if (replyTarget.length === 0 && !followsUpSent) replyTarget.push(lastInbound.from_address);
   // Retries keep the stored To; a new attempt uses the composer's To when it chose one.
   const recipients = existing
     ? parseAddresses(existing.to_addresses)
