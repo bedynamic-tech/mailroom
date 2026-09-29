@@ -723,7 +723,7 @@ export function ThreadView(props: {
       )}
 
       <div ref={conversationRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="mr-auto w-full max-w-[800px] px-4 py-5 sm:px-6 md:py-6">
+        <div className="mr-auto w-full max-w-[1100px] px-4 py-5 sm:px-6 md:py-6">
           {timeline.map((entry, index) => (
             <Fragment key={`${entry.kind}-${entry.item.id}`}>
               {index > 0 && <MessageConnector />}
@@ -811,7 +811,7 @@ export function ThreadView(props: {
       <footer
         className={cn("shrink-0 bg-canvas pt-1 pb-3 sm:pb-5", replyCollapsed.collapsed && "hidden")}
       >
-        <div ref={replyFormRef} className="mr-auto w-full max-w-[800px] px-4 sm:px-6">
+        <div ref={replyFormRef} className="mr-auto w-full max-w-[1100px] px-4 sm:px-6">
           <Card className="gap-0 py-0 shadow-[0_1px_2px_oklch(0.2_0.012_265/0.04),0_4px_16px_-6px_oklch(0.2_0.012_265/0.08)] transition-shadow focus-within:ring-foreground/25">
             <div className="border-b border-border/70 text-xs">
                 <CopyRecipientsRow
@@ -1643,7 +1643,7 @@ function ThreadViewSkeleton({ onBack }: { onBack: () => void }) {
           <div className="h-2.5 w-32 animate-pulse rounded bg-muted/70" />
         </div>
       </div>
-      <div className="mr-auto w-full max-w-[800px] space-y-3 px-4 py-5 sm:px-6 md:py-6">
+      <div className="mr-auto w-full max-w-[1100px] space-y-3 px-4 py-5 sm:px-6 md:py-6">
         {[0, 1].map((item) => (
           <Card key={item} className="animate-pulse p-5">
             <div className="flex items-center gap-3">
