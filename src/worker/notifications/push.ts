@@ -97,7 +97,6 @@ export async function notifyNewEmail(
     tag: payload.tag,
     // The installed app shows this total as its OS badge.
     data: unread === null ? { url: payload.data.url } : { url: payload.data.url, unread },
-    topic: `conversation-${input.threadId}`,
   });
   console.log("Browser notification sent", {
     threadId: input.threadId,
@@ -113,8 +112,6 @@ export interface PushMessage {
   body: string;
   tag: string;
   data: { url: string; unread?: number; kind?: string };
-  /** Replaces an undelivered push with the same topic. */
-  topic: string;
 }
 
 export interface PushFailure {
@@ -171,9 +168,9 @@ export async function pushToSubscribedBrowsers(env: Env, message: PushMessage): 
             data: message.data,
           }),
           ttl: 60 * 60,
-          // Urgency is left at the protocol default (normal); Apple's service
-          // has rejected an explicit "normal" in the past.
-          topic: message.topic,
+          // No Topic or Urgency header: Apple's service rejects topics
+          // (BadWebPushTopic) and has rejected an explicit "normal" urgency.
+          // The notification tag already replaces an older one on the device.
         });
         const response = await fetch(request.endpoint, {
           method: "POST",

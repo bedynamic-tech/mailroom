@@ -229,7 +229,6 @@ api.post("/settings/browser-notifications/test", async (c) => {
     body: "Browser notifications from Mailroom + are working.",
     tag: "mailroom-test",
     data: { url: "/inbox" },
-    topic: "mailroom-test",
   });
   return c.json(result);
 });

@@ -19,8 +19,6 @@ export interface WebPushRequestOptions {
   payload: string;
   /** Seconds the push service may hold an undelivered message. */
   ttl: number;
-  /** Replaces an undelivered message with the same topic. */
-  topic?: string;
   urgency?: "very-low" | "low" | "normal" | "high";
 }
 
@@ -76,7 +74,6 @@ export async function buildWebPushRequest(
     "Content-Type": "application/octet-stream",
     TTL: String(Math.max(0, Math.floor(options.ttl))),
   };
-  if (options.topic) headers.Topic = options.topic;
   if (options.urgency) headers.Urgency = options.urgency;
   return { endpoint: endpoint.href, headers, body };
 }

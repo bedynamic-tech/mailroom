@@ -93,12 +93,11 @@ test("builds an aes128gcm VAPID request a browser can decrypt", async () => {
     subject: "mailto:admin@example.com",
     payload,
     ttl: 3600,
-    topic: "conversation-1",
   });
 
   assert.equal(request.headers["Content-Encoding"], "aes128gcm");
   assert.equal(request.headers.TTL, "3600");
-  assert.equal(request.headers.Topic, "conversation-1");
+  assert.equal(request.headers.Topic, undefined);
   assert.equal(request.headers.Urgency, undefined);
   assert.equal(request.headers.Encryption, undefined);
   assert.equal(request.headers["Crypto-Key"], undefined);
