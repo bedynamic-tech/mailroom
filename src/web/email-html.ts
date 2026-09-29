@@ -63,7 +63,7 @@ const LIGHT_STYLE = `
 // The email's own dark styles apply; it only needs a dark canvas and text
 // default for the parts it leaves unstyled.
 const NATIVE_DARK_STYLE = `
-  :root { color-scheme: light dark; }
+  :root { color-scheme: dark; }
 `;
 
 const ADAPTED_DARK_STYLE = `

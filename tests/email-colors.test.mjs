@@ -4,6 +4,7 @@ import {
   adaptBackgroundColor,
   adaptCssColors,
   adaptTextColor,
+  contrastRatio,
   cssBackgrounds,
   DARK_EMAIL_BACKGROUND,
   isBrightColor,
@@ -70,4 +71,11 @@ test("keeps dark text on backgrounds that stay bright", () => {
     adaptCssColors("color:#1f1f1f;background-color:#ffff00", { keepText: true }),
     "color:#1f1f1f;background-color:#ffff00",
   );
+});
+
+test("measures contrast between text and background", () => {
+  assert.equal(Math.round(contrastRatio("#000", "#fff")), 21);
+  assert.equal(contrastRatio("#123456", "#123456"), 1);
+  assert.ok(contrastRatio("rgb(0, 0, 0)", "#111827") < 3);
+  assert.equal(contrastRatio("var(--x)", "#fff"), null);
 });

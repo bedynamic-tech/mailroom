@@ -162,11 +162,30 @@ export function isPaperBackground(value: string): boolean {
 export function isBrightColor(value: string): boolean {
   const color = parseColor(value);
   if (!color || color.a < 0.5) return false;
-  const [r, g, b] = [color.r, color.g, color.b].map((channel) => {
+  return luminance(color) > 0.35;
+}
+
+/** WCAG contrast ratio between two opaque colors, or null if either is unreadable. */
+export function contrastRatio(first: string, second: string): number | null {
+  const a = parseColor(first);
+  const b = parseColor(second);
+  if (!a || !b) return null;
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+/** WCAG relative luminance, from 0 (black) to 1 (white). */
+export function relativeLuminance(value: string): number | null {
+  const color = parseColor(value);
+  return color ? luminance(color) : null;
+}
+
+function luminance({ r, g, b }: Rgba): number {
+  const [red, green, blue] = [r, g, b].map((channel) => {
     const c = channel / 255;
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.35;
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }
 
 const COLOR_TOKEN =
