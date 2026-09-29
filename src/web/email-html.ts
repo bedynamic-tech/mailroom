@@ -39,6 +39,7 @@ const BLOCKED_ELEMENTS = [
 ].join(",");
 
 const BASE_STYLE = `
+  html, body { height: auto !important; min-height: 0 !important; }
   body {
     box-sizing: border-box;
     margin: 0;
