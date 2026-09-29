@@ -1,6 +1,10 @@
+<div align="center">
+
 # Mailroom +
 
-**A self-hosted shared inbox for humans and AI agents, running entirely on Cloudflare.**
+### The shared inbox you own.
+
+Email, helpdesk and AI agents in one workspace, running entirely in your own Cloudflare account.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bedynamic-tech/mailroom)
 
@@ -8,174 +12,68 @@
 ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)
 ![MCP](https://img.shields.io/badge/MCP-ready-6E56CF)
 
-<img width="2800" height="1800" alt="inbox-no-board" src="https://github.com/user-attachments/assets/50f69feb-3920-43e5-aff9-9c4854678f52" />
+[Features](docs/features.md) · [Deploy](#get-started) · [Docs](docs/deployment.md)
 
-Mailroom + is a fork of the original Mailroom with a large set of features added
-for everyday use. It runs in your own Cloudflare account on Workers, Email
-Routing, D1, R2 and Web Push.
+<br />
 
-## Features
+<img width="2800" height="1800" alt="The Mailroom + inbox" src="https://github.com/user-attachments/assets/50f69feb-3920-43e5-aff9-9c4854678f52" />
 
-### Mail
+</div>
 
-- **Unified inbox.** Manage multiple addresses and domains in one workspace.
-- **Who each conversation is with.** The conversation list shows the name of
-  the latest sender. In a conversation you started that nobody has answered
-  yet, it shows **To** and the recipient's name, taken from their Contact, else
-  from the name on mail they sent you before, else their address.
-- **Compose and reply.** Send new mail or reply to conversations, with attachments.
-- **Choose who a reply goes to.** The reply box opens with an editable **To**
-  field, filled with the sender of the latest email (or its Reply-To). In a
-  conversation you started, it is filled with the address you sent to, so you
-  can follow up before anyone answers. Remove or add To recipients before
-  sending. **Cc**, **Bcc** and **Reply all** sit at
-  the right of the To line and open their rows when tapped. Recipients you
-  edit are saved with that conversation, so they stay after leaving, reloading
-  or sending and on your other devices, and the next reply goes to the same
-  people. The sparkle button
-  at the right of the formatting toolbar drafts a reply with AI. Beside
-  **Send reply**, the reply box shows which signature will be added:
-  **Signature: Default** for the workspace default, or **Signature: Mailbox**
-  when the Inbox has its own. On phones, scrolling back through a
-  conversation folds the reply box into a round **Reply** button, keeping
-  anything already written. Tap it, or scroll back down to the latest
-  message, to open the reply box again.
-- **Reply greeting.** Turn on **Add a greeting to replies** in
-  **Settings > General** and each reply box starts with a greeting such as
-  `Jane,` followed by a blank line, with the cursor on the line below, as if
-  you had typed it and pressed Enter twice. The greeting is editable there;
-  `{first_name}` stands for the first name of the first To recipient, taken
-  from their contact or, failing that, the name on their latest email in the
-  conversation (the default is `{first_name},`, and `Hi {first_name},` also
-  works). When no name is known the reply starts empty. The greeting follows
-  the To field until you edit the text, never replaces text you have written,
-  and gives way to an AI draft. A reply holding only the greeting cannot be
-  sent. It is off by default.
-- **Send status and bounces.** Every email sent from Mailroom shows a small
-  check at the bottom right of its card once the email provider has accepted
-  it. When any recipient bounces, the check turns into a red exclamation
-  point. Hover over it, or tap it on a phone, to see which
-  address bounced and the receiving server's message. Bounces are tracked per
-  recipient, so a Cc that bounces is shown even when the To was delivered.
-  Cloudflare keeps bounce notices for itself, so Mailroom learns about bounces
-  from Cloudflare's Email Sending events; subscribe each sending domain once
-  as described in [docs/deployment.md](docs/deployment.md#track-bounces).
-  Adding an Inbox on a new domain lists this step in its setup checklist.
-  Bounce notices that do reach an Inbox are read too.
-- **Bounced address warnings.** When you add an address that has bounced
-  before to To, Cc or Bcc, it turns red with a warning under the field, since
-  sending to it again can hurt your sender reputation. Hover over it to see why
-  it bounced. You can still send if you know the address works now.
-- **Opens at the latest message.** A conversation opens scrolled to the bottom
-  and stays there while emails and images finish loading, until you scroll up.
-- **Internal notes.** Leave notes for your team on any conversation. Write in
-  the reply box, then choose **Add internal note** from the arrow next to
-  **Send reply**. Notes appear in yellow between the messages, in the order
-  they were written, and can be deleted from their menu. Rules can add notes
-  automatically. They are stored
-  apart from email, so they are never sent, quoted in replies, forwarded by
-  rules, read by AI drafts or the MCP server, or included in notifications.
-  Attachments and Cc or Bcc recipients stay with the reply.
-- **Search and triage.** Search message content, filter conversations, mark read
-  or archive in bulk, and restore or permanently delete archived conversations.
-- **Universal search.** The search box in the top right (or Ctrl K / Cmd K,
-  and the search icon on phones) finds conversations by subject, message text,
-  sender or recipient, along with internal notes, rules (name, note,
-  condition values and forward addresses) and contacts. Results are grouped
-  by type, every word must match, and choosing one opens it: the
-  conversation, the rule's editor or the contact.
-- **Contacts.** Keep names, companies, phone numbers and notes, see each
-  contact's conversations, and autocomplete them in To, Cc and Bcc. Give a
-  contact several email addresses and edit them at any time: mail from any of
-  them shows up under that contact, and new email goes to the one marked
-  primary. A contact's name is used for its senders in the conversation list
-  and on each message, in place of the name on the email. Import from CSV or
-  vCard.
-- **Catch-all.** Make one inbox per domain receive mail for any address that
-  has no inbox of its own, such as a different address for each service you
-  sign up to. Caught mail is badged and shows the address it was sent to,
-  replies go out from that address, and any address can become its own inbox
-  or be blocked if spammers find it.
-- **Light and dark mode.** Choose Light, Dark or System in **Settings >
-  General > Appearance**. System follows your device, and the choice is saved
-  on each device.
-  In dark mode, simple emails are shown in dark colors on the app's own
-  background, and emails that ship
-  their own dark styles use them. Designed emails with their own backgrounds
-  (newsletters, receipts) keep their original colors. Any text that would
-  still be hard to read on its dark background is given a readable color. Any email can be
-  switched from its **...** menu with **Show original colors** or **Show in
-  dark colors**.
-  Images an email shows in its body, such as signature logos, are not listed
-  again as attachments.
+<br />
 
-### Automation
+## Why Mailroom +
 
-- **AI reply drafts.** Per-inbox drafting with custom instructions and
-  playbooks. You review and approve before anything is sent.
-- **Automatic labels.** Organize incoming mail with natural-language rules.
-- **Rules.** Build IF / AND / OR conditions on sender, recipients, subject, body
-  and attachments, then label, mark read, archive, skip drafts or
-  notifications, forward, or add a note. **Add a note** opens a text box, and
-  each matching email adds that text to its conversation as an internal note
-  marked with the rule's name.
-  **Permanently delete it** discards matching emails as they arrive: nothing
-  is stored, notified, drafted or forwarded, the sender gets no bounce, and
-  the email can't be recovered. A deleting rule takes no other action, and it
-  wins over any other rule that matches the same email.
-- **Spam blocking.** Block a sender by address or whole domain, on one inbox or
-  all of them, from any message's menu. When a message has several people on
-  it, such as Cc'd addresses, you choose which one to block. Blocked mail is
-  rejected before it reaches Mailroom.
+<table>
+<tr>
+<td width="33%" valign="top">
 
-### Integrations
+**Every address, one inbox**
 
-- **MCP server.** Let external AI agents read conversations, compose email and
-  send replies through scoped OAuth access.
-- **Notifications.** In **Settings > Notifications**, turn on browser push
-  notifications, email notifications to one address, or both. Under each,
-  checkboxes choose what it sends: **New email** (a new conversation) and
-  **Replies** (a new message in an existing conversation), both checked
-  by default. Browser push works in Chrome, Edge, Firefox and Safari. On
-  iPhone and iPad, add Mailroom + to the Home Screen and turn notifications
-  on from the app opened there. **Send test** under Browser notifications
-  pushes a test notification and says whether it was sent.
-- **Private by default.** Everything runs in your own account, with Cloudflare
-  Access protecting the web app.
+Bring all your domains and addresses into a single workspace your team shares, with catch-all, contacts and search built in.
 
-## Deploy
+</td>
+<td width="33%" valign="top">
 
-Click **Deploy to Cloudflare** above. Storage, queues and database migrations
-are provisioned for you, and the app's setup screen walks you through turning
-on Cloudflare Access and connecting your email domain.
+**AI that waits for you**
 
-You will need:
+Draft replies with AI, sort mail with plain-language rules, and let agents work over MCP. Nothing is sent until you approve it.
 
-- A domain on Cloudflare
-- R2 enabled
-- The Workers Paid plan (for outbound email)
+</td>
+<td width="33%" valign="top">
 
-Prefer to set things up by hand, or deploying from an existing fork? See the
-[manual deployment guide](docs/deployment.md).
+**Yours, end to end**
 
-## MCP server
+No SaaS vendor and no per-seat pricing. Your mail lives in your own Cloudflare account, behind Cloudflare Access.
 
-The MCP server ships in the same Worker at `https://<your-hostname>/mcp`, and
-its URL is shown in **Settings > AI**. It is its own OAuth 2.1 authorization
-server with `inbox.read` and `inbox.send` scopes.
+</td>
+</tr>
+</table>
 
-| Tool | Scope |
-| --- | --- |
-| `list_inboxes` | `inbox.read` |
-| `search_conversations` | `inbox.read` |
-| `get_conversation` | `inbox.read` |
-| `reply_to_conversation` | `inbox.send` |
-| `send_email` | `inbox.send` |
+## Highlights
 
-Send tools only use inboxes already registered in Mailroom, require an
-idempotency key, and are capped by `MCP_DAILY_SEND_LIMIT`. Set
-`MCP_SEND_ENABLED=false` to turn them off for every client. Setup details are in
-[connect an AI agent over MCP](docs/deployment.md#optional-connect-an-ai-agent-over-mcp).
+- **Shared inbox.** Conversations, internal notes, contacts and universal search in one place.
+- **Delivery you can see.** Every sent email shows when it was accepted, and bounces are flagged per recipient.
+- **Rules and automation.** Label, forward, archive, add notes or block spam automatically.
+- **AI drafts.** Per-inbox instructions and playbooks, always reviewed before sending.
+- **MCP server.** Give external AI agents scoped OAuth access to read and send.
+- **Notifications.** Browser push and email alerts, on desktop and phone.
+
+See the [full feature list](docs/features.md) for the details.
+
+## Get started
+
+1. **Deploy.** Click **Deploy to Cloudflare** above. Storage, queues and the database are set up for you.
+2. **Secure.** The setup screen walks you through turning on Cloudflare Access.
+3. **Connect.** Point your email domain at Mailroom + and start working.
+
+You will need a domain on Cloudflare, R2 enabled, and the Workers Paid plan (for outbound email).
+Prefer to set things up by hand? Follow the [manual deployment guide](docs/deployment.md).
+
+## Built on
+
+Cloudflare Workers, Email Routing, D1, R2, Workers AI and Web Push.
+Mailroom + is a fork of the original Mailroom.
 
 ## License
 
