@@ -70,6 +70,7 @@ import type {
   LabelInput,
   Mailbox,
   Message,
+  MessageBounce,
   PlaybookInput,
   ThreadBoardCard,
   ThreadLabel,
@@ -957,6 +958,22 @@ api.get("/threads/:id", async (c) => {
       .all<Attachment>();
     attachments = result.results;
   }
+  const bouncesByMessage = new Map<number, MessageBounce[]>();
+  const outboundIds = messageRows.filter((message) => message.direction === "outbound").map((message) => message.id);
+  if (outboundIds.length > 0) {
+    const placeholders = outboundIds.map(() => "?").join(", ");
+    const { results: bounces } = await c.env.DB.prepare(
+      `SELECT message_id, recipient, status, diagnostic, created_at
+       FROM message_bounces WHERE message_id IN (${placeholders}) ORDER BY id`,
+    )
+      .bind(...outboundIds)
+      .all<MessageBounce>();
+    for (const bounce of bounces) {
+      const list = bouncesByMessage.get(bounce.message_id) ?? [];
+      list.push(bounce);
+      bouncesByMessage.set(bounce.message_id, list);
+    }
+  }
   const attachmentsByMessage = new Map<number, Attachment[]>();
   for (const attachment of attachments) {
     const list = attachmentsByMessage.get(attachment.message_id) ?? [];
@@ -966,6 +983,7 @@ api.get("/threads/:id", async (c) => {
   const enrichedMessages = messageRows.map((message) => ({
     ...message,
     attachments: attachmentsByMessage.get(message.id) ?? [],
+    bounces: bouncesByMessage.get(message.id) ?? [],
   }));
   return c.json({
     thread: { ...thread, board_card_count: boardCards.results.length },
