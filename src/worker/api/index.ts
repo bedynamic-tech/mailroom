@@ -7,6 +7,8 @@ import { blockedSendersApi } from "./blocked-senders.ts";
 import { mailRulesApi } from "./mail-rules.ts";
 import { listThreadNotes, threadNotesApi } from "./thread-notes.ts";
 import { replyRecipientsApi } from "./reply-recipients.ts";
+import { contactNamesFor, replyGreetingApi } from "./reply-greeting.ts";
+import { parseReplyRecipients } from "../../shared/reply-recipients.ts";
 import { universalSearchApi } from "./universal-search.ts";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
 import { MAX_SENDER_NAME_LENGTH, normalizeSenderName } from "../../shared/sender-name.ts";
@@ -83,6 +85,7 @@ api.route("/blocked-senders", blockedSendersApi);
 api.route("/mail-rules", mailRulesApi);
 api.route("/threads", threadNotesApi);
 api.route("/threads", replyRecipientsApi);
+api.route("/settings/reply-greeting", replyGreetingApi);
 api.route("/search/all", universalSearchApi);
 
 api.get("/settings/general", async (c) => {
@@ -91,7 +94,8 @@ api.get("/settings/general", async (c) => {
       `SELECT browser_notifications_enabled, email_notifications_enabled, email_notification_address,
               email_notification_from_name, email_notification_from_mailbox_id,
               email_notification_subject, email_notification_body, auto_create_contacts,
-              default_signature_html, browser_new_email, email_new_email, browser_replies, email_replies
+              default_signature_html, browser_new_email, email_new_email, browser_replies, email_replies,
+              reply_greeting_enabled, reply_greeting_template
        FROM global_settings WHERE id = 1`,
     ).first<
       StoredNotificationTemplate & {
@@ -105,6 +109,8 @@ api.get("/settings/general", async (c) => {
         email_new_email: number;
         browser_replies: number;
         email_replies: number;
+        reply_greeting_enabled: number;
+        reply_greeting_template: string | null;
       }
     >(),
     c.env.DB.prepare("SELECT COUNT(*) AS count FROM push_subscriptions")
@@ -133,6 +139,8 @@ api.get("/settings/general", async (c) => {
     email_new_email: Boolean(settings?.email_new_email ?? 1),
     browser_replies: Boolean(settings?.browser_replies ?? 1),
     email_replies: Boolean(settings?.email_replies ?? 1),
+    reply_greeting_enabled: Boolean(settings?.reply_greeting_enabled),
+    reply_greeting_template: settings?.reply_greeting_template ?? null,
   };
   return c.json(result);
 });
@@ -949,12 +957,22 @@ api.get("/threads/:id", async (c) => {
     attachments: attachmentsByMessage.get(message.id) ?? [],
     bounces: bouncesByMessage.get(message.id) ?? [],
   }));
+  const contactNames = await contactNamesFor(c.env.DB, [
+    ...messageRows.flatMap((message) => [
+      message.from_address,
+      ...addressList(message.reply_to_addresses),
+      ...addressList(message.to_addresses),
+      ...addressList(message.cc_addresses),
+    ]),
+    ...(parseReplyRecipients((thread as { reply_recipients?: string | null }).reply_recipients ?? null).to ?? []),
+  ]);
   return c.json({
     thread,
     messages: enrichedMessages,
     drafts: drafts.results,
     draft_run: draftRun ?? null,
     notes,
+    contact_names: contactNames,
   });
 });
 
@@ -1409,4 +1427,14 @@ function parsePositiveId(value: string): number | null {
   if (!/^\d+$/.test(value)) return null;
   const id = Number(value);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+/** A stored JSON address list; anything unreadable is an empty list. */
+function addressList(raw: string | null | undefined): string[] {
+  try {
+    const values = JSON.parse(raw || "[]") as unknown;
+    return Array.isArray(values) ? values.filter((value): value is string => typeof value === "string") : [];
+  } catch {
+    return [];
+  }
 }
