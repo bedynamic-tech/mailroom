@@ -7,7 +7,7 @@ import { notifyNewEmail } from "../notifications/push";
 import { notifyNewEmailByEmail } from "../notifications/email";
 import { matchBlockedSender } from "../spam/blocklist";
 import { resolveInboundTarget } from "../inbox/catch-all";
-import { applyMailRules, matchingMailRules, NO_MAIL_RULES } from "./mail-rules";
+import { applyMailRules, deletingMailRules, matchingMailRules, NO_MAIL_RULES } from "./mail-rules";
 import type { MailRuleAddress, MailRuleSubject } from "../../shared/mail-rules";
 import { sendRuleForward, type ForwardedOriginal } from "./rule-forward";
 import { FORWARD_HEADER } from "./send";
@@ -49,6 +49,20 @@ export async function receiveEmail(
   const parsed = await PostalMime.parse(rawBuffer);
   if (await rejectIfBlocked(env, mailbox.id, message, [addressOf(parsed.from)])) return;
   const messageId = parsed.messageId ?? `<raw-${fingerprint}@mailroom.invalid>`;
+
+  // A rule that permanently deletes drops the email here, before anything of
+  // it is stored. It is accepted rather than rejected, so the sender sees no
+  // bounce. If the rules can't be read, the email is kept.
+  const deletedBy = await deletingMailRules(env, mailbox.id, ruleSubject(parsed)).catch((error) => {
+    console.error("Checking delete rules failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return [];
+  });
+  if (deletedBy.length > 0) {
+    console.log("Permanently deleted an email by rule", { ruleIds: deletedBy });
+    return;
+  }
 
   const duplicate = await env.DB.prepare(
     `SELECT msg.id, msg.thread_id, msg.is_auto_submitted

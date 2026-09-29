@@ -18,7 +18,14 @@ const MAIL_RULE_COLUMNS = `r.*, m.address AS mailbox_address, l.name AS label_na
   LEFT JOIN mailboxes m ON m.id = r.mailbox_id
   LEFT JOIN labels l ON l.id = r.label_id`;
 
-const BOOLEAN_FIELDS = ["enabled", "mark_read", "archive", "skip_draft", "skip_notifications"] as const;
+const BOOLEAN_FIELDS = [
+  "enabled",
+  "mark_read",
+  "archive",
+  "skip_draft",
+  "skip_notifications",
+  "permanent_delete",
+] as const;
 const JSON_FIELDS = ["conditions", "forward_to", "forward_cc", "forward_bcc"] as const;
 
 type MailRuleRow = Omit<MailRule, (typeof BOOLEAN_FIELDS)[number] | (typeof JSON_FIELDS)[number]> &
@@ -65,8 +72,8 @@ export async function createMailRule(env: Db, body: unknown): Promise<MailRule> 
   const result = await env.DB.prepare(
     `INSERT INTO mail_rules
        (mailbox_id, name, enabled, conditions, label_id, mark_read, archive, skip_draft,
-        skip_notifications, forward_to, forward_cc, forward_bcc, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        skip_notifications, forward_to, forward_cc, forward_bcc, note, permanent_delete)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(...ruleValues(input))
     .run();
@@ -81,7 +88,7 @@ export async function updateMailRule(env: Db, id: number, body: unknown): Promis
     `UPDATE mail_rules
      SET mailbox_id = ?, name = ?, enabled = ?, conditions = ?, label_id = ?, mark_read = ?,
          archive = ?, skip_draft = ?, skip_notifications = ?, forward_to = ?, forward_cc = ?,
-         forward_bcc = ?, note = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         forward_bcc = ?, note = ?, permanent_delete = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
      WHERE id = ?`,
   )
     .bind(...ruleValues(input), id)
@@ -141,6 +148,7 @@ function ruleValues(input: MailRuleInput): unknown[] {
     JSON.stringify(input.forward_cc),
     JSON.stringify(input.forward_bcc),
     input.note,
+    input.permanent_delete ? 1 : 0,
   ];
 }
 
@@ -158,6 +166,29 @@ export async function matchingMailRules(
     .bind(mailboxId)
     .all<MailRuleRow>();
   return results.map(toMailRule).filter((rule) => mailRuleMatches(rule.conditions, message));
+}
+
+/**
+ * The ids of the enabled Mail Rules for mail to `mailboxId` that permanently
+ * delete `message`, after counting the match on each. The caller then drops
+ * the email before anything of it is stored.
+ */
+export async function deletingMailRules(
+  env: Db,
+  mailboxId: number,
+  message: MailRuleSubject,
+  now = new Date().toISOString(),
+): Promise<number[]> {
+  const matched = (await matchingMailRules(env, mailboxId, message)).filter((rule) => rule.permanent_delete);
+  const ruleIds = matched.map((rule) => rule.id);
+  if (ruleIds.length === 0) return [];
+  await env.DB.prepare(
+    `UPDATE mail_rules SET match_count = match_count + 1, last_matched_at = ?
+     WHERE id IN (${ruleIds.map(() => "?").join(", ")})`,
+  )
+    .bind(now, ...ruleIds)
+    .run();
+  return ruleIds;
 }
 
 export interface RuleForward {

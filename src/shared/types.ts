@@ -407,6 +407,11 @@ export interface MailRuleActions {
   forward_bcc: string[];
   /** Add this plain text as an Internal Note on the Conversation; null for none. */
   note: string | null;
+  /**
+   * Discard the email on arrival: nothing is stored, notified, drafted or
+   * forwarded. A rule that deletes takes no other action.
+   */
+  permanent_delete: boolean;
 }
 
 export interface MailRuleInput extends MailRuleActions {

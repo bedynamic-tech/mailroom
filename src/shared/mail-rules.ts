@@ -86,8 +86,8 @@ export function isConditionGroup(
 /**
  * Validates a Mail Rule from an API request body. Text is trimmed, a domain
  * condition keeps just the domain, and forward recipients are normalized and
- * deduplicated. A rule needs at least one condition and one action, and only
- * a rule for one Inbox may apply a Label.
+ * deduplicated. A rule needs at least one condition and one action, only
+ * a rule for one Inbox may apply a Label, and permanent deletion stands alone.
  */
 export function parseMailRuleInput(value: unknown): MailRuleInput | { error: string } {
   if (!value || typeof value !== "object") return { error: "Invalid rule" };
@@ -118,6 +118,7 @@ export function parseMailRuleInput(value: unknown): MailRuleInput | { error: str
     archive: body.archive ?? false,
     skip_draft: body.skip_draft ?? false,
     skip_notifications: body.skip_notifications ?? false,
+    permanent_delete: body.permanent_delete ?? false,
   };
   for (const [field, flag] of Object.entries(flags)) {
     if (typeof flag !== "boolean") return { error: `Invalid ${field}` };
@@ -146,8 +147,12 @@ export function parseMailRuleInput(value: unknown): MailRuleInput | { error: str
     skip_notifications: flags.skip_notifications as boolean,
     ...forward,
     note,
+    permanent_delete: flags.permanent_delete as boolean,
   };
   if (!hasAction(rule)) return { error: "Choose at least one action" };
+  if (rule.permanent_delete && hasAction({ ...rule, permanent_delete: false })) {
+    return { error: "A rule that permanently deletes email can't take other actions" };
+  }
   return rule;
 }
 
@@ -249,7 +254,8 @@ export function hasAction(rule: MailRuleActions): boolean {
       rule.skip_draft ||
       rule.skip_notifications ||
       rule.forward_to.length > 0 ||
-      rule.note !== null,
+      rule.note !== null ||
+      rule.permanent_delete,
   );
 }
 

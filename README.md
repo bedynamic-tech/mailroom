@@ -117,6 +117,10 @@ Routing, D1, R2 and Web Push.
   notifications, forward, or add a note. **Add a note** opens a text box, and
   each matching email adds that text to its conversation as an internal note
   marked with the rule's name.
+  **Permanently delete it** discards matching emails as they arrive: nothing
+  is stored, notified, drafted or forwarded, the sender gets no bounce, and
+  the email can't be recovered. A deleting rule takes no other action, and it
+  wins over any other rule that matches the same email.
 - **Spam blocking.** Block a sender by address or whole domain, on one inbox or
   all of them, from any message's menu. When a message has several people on
   it, such as Cc'd addresses, you choose which one to block. Blocked mail is
