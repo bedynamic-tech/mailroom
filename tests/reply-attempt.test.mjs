@@ -30,6 +30,8 @@ class FakeDb {
   signature = null;
   messages = [];
   messageBodies = [];
+  // A Conversation started from Mailroom: only a sent Message, no inbound one yet.
+  outboundOnly = false;
 
   prepare(sql) {
     return new FakeStatement(this, sql);
@@ -49,7 +51,21 @@ class FakeDb {
         default_signature_html: this.signature?.fallback ?? null,
       };
     }
+    if (sql.includes("SELECT id, message_id, from_address") && sql.includes("'outbound'")) {
+      if (!this.outboundOnly) return null;
+      const requestedMessageId = args[1];
+      if (requestedMessageId && requestedMessageId !== 4) return null;
+      return {
+        id: 4,
+        message_id: "<started@example.com>",
+        from_address: "support@example.com",
+        reply_to_addresses: "[]",
+        references_ids: "[]",
+        to_addresses: JSON.stringify(["customer@example.com", "billing@example.com"]),
+      };
+    }
     if (sql.includes("SELECT id, message_id, from_address")) {
+      if (this.outboundOnly) return null;
       const requestedMessageId = args[1];
       if (requestedMessageId && requestedMessageId !== 9) return null;
       return {
@@ -471,4 +487,36 @@ test("a reply appends the inbox signature and sends rich text", async () => {
   assert.equal(attempt.signature_html, "<b>Jane</b>");
   assert.equal(attempt.html_body, "<p><i>Thanks</i> for writing</p>");
   assert.deepEqual(fixture.env.DB.messageBodies[0], { text_body: sent.text, html_body: sent.html });
+});
+
+test("a follow-up in a Conversation started from Mailroom goes to the sent email's To", async () => {
+  const fixture = makeEnv();
+  fixture.env.DB.outboundOnly = true;
+  const intent = { attemptId: "attempt-follow-up", threadId: 1, text: "Following up" };
+
+  const first = await sendReplyAttempt(fixture.env, intent);
+
+  assert.equal(first.status, "sent");
+  const [sent] = fixture.sent();
+  assert.deepEqual(sent.to, ["customer@example.com", "billing@example.com"]);
+  assert.equal(sent.headers["In-Reply-To"], "<started@example.com>");
+  assert.equal(fixture.env.DB.attempts.get("attempt-follow-up").inbound_message_id, 4);
+  assert.deepEqual(await sendReplyAttempt(fixture.env, intent), first);
+  assert.equal(fixture.sends(), 1);
+});
+
+test("a follow-up in a Conversation started from Mailroom accepts the reviewed To", async () => {
+  const fixture = makeEnv();
+  fixture.env.DB.outboundOnly = true;
+
+  const result = await sendReplyAttempt(fixture.env, {
+    attemptId: "attempt-follow-up-reviewed",
+    threadId: 1,
+    text: "Following up",
+    to: ["customer@example.com"],
+    expectedRecipients: ["customer@example.com", "billing@example.com"],
+  });
+
+  assert.equal(result.status, "sent");
+  assert.deepEqual(fixture.sent()[0].to, ["customer@example.com"]);
 });
