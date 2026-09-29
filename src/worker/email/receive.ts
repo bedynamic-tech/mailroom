@@ -425,7 +425,8 @@ interface StoredMessageInput {
 
 function insertMessage(env: Env, threadId: number, args: StoredMessageInput) {
   const { parsed } = args;
-  const fromName = parsed.from && "name" in parsed.from ? parsed.from.name : null;
+  // A From header with no display name parses as an empty name; store none.
+  const fromName = (parsed.from && "name" in parsed.from ? parsed.from.name?.trim() : "") || null;
   return env.DB.prepare(
     `INSERT INTO messages
        (thread_id, message_id, in_reply_to, references_ids, direction, sent_by,
