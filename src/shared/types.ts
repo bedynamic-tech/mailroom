@@ -168,6 +168,14 @@ export interface Message {
   bounces: MessageBounce[];
 }
 
+/** The latest bounce for one address, across every sent Message. */
+export interface BouncedRecipient {
+  recipient: string;
+  status: string | null;
+  diagnostic: string;
+  created_at: string;
+}
+
 export interface MessageBounce {
   message_id: number;
   recipient: string;
