@@ -68,6 +68,8 @@ export function RecipientInput(props: {
   };
 
   const full = props.capacity <= 0;
+  // An idle input beside chips leaves the flow, so a chip that fills the row does not wrap an empty line below it.
+  const idle = !focused && draft === "" && props.values.length > 0;
   const query = useDeferredValue(draft.trim().toLowerCase());
   const lookup = focused && !full && !props.disabled && query !== "" && !/[\s,;]/.test(query);
   const contacts = useQuery({
@@ -157,7 +159,7 @@ export function RecipientInput(props: {
         <PopoverPrimitive.Anchor asChild>
           <div
             ref={anchorRef}
-            className="flex min-w-0 flex-wrap items-center gap-1.5 py-1.5"
+            className="relative flex min-w-0 flex-wrap items-center gap-1.5 py-1.5"
             onClick={(event) => {
               if (event.target === event.currentTarget) inputRef.current?.focus();
             }}
@@ -250,7 +252,11 @@ export function RecipientInput(props: {
                   setFocused(false);
                   if (add(draftRef.current)?.length === 0) props.onDismiss?.();
                 }}
-                className={cn("h-7 flex-1 bg-transparent text-sm text-foreground md:h-6 outline-none placeholder:text-muted-foreground", props.values.length > 0 ? "min-w-[1ch]" : "min-w-[12ch]")}
+                className={cn(
+                  "h-7 bg-transparent text-sm text-foreground md:h-6 outline-none placeholder:text-muted-foreground",
+                  idle ? "absolute right-0 w-px opacity-0" : "flex-1",
+                  props.values.length > 0 ? "min-w-[1ch]" : "min-w-[12ch]",
+                )}
               />
             )}
           </div>

@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
+import { Reply } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   addThreadNote,
@@ -73,7 +74,7 @@ import {
   parseReplyRecipients,
   serializeReplyRecipients,
 } from "../../shared/reply-recipients";
-import { RichTextEditor, RichTextPreview, richTextSummary } from "./RichTextEditor";
+import { RichTextEditor, RichTextPreview } from "./RichTextEditor";
 import {
   isBlankRichText,
   plainTextToHtml,
@@ -114,6 +115,7 @@ export function ThreadView(props: {
   const blockArchivesThis = useRef(false);
   const markedRead = useRef<number | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
+  const replyFormRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ccInputRef = useRef<HTMLInputElement>(null);
   const bccInputRef = useRef<HTMLInputElement>(null);
@@ -203,6 +205,13 @@ export function ThreadView(props: {
     setReplyCc(saved.cc);
     setReplyBcc(saved.bcc);
   }, [storedRecipients]);
+
+  const replyCollapsed = useCollapseReplyOnScroll(
+    conversationRef,
+    replyFormRef,
+    props.threadId,
+    Boolean(detail.data),
+  );
 
   useStickToBottom(
     conversationRef,
@@ -444,8 +453,10 @@ export function ThreadView(props: {
 
   const replyMailbox = mailboxes.data?.find((mailbox) => mailbox.id === thread.mailbox_id);
   const replySignature = replyMailbox?.effective_signature_html
-    ? richTextSummary(replyMailbox.effective_signature_html)
-    : "";
+    ? replyMailbox.signature_mode === "custom"
+      ? "Mailbox"
+      : "Default"
+    : null;
 
   const showCc = addingCc || replyCc.length > 0;
   const showBcc = addingBcc || replyBcc.length > 0;
@@ -515,7 +526,7 @@ export function ThreadView(props: {
 
   return (
     <div
-      className="flex h-full min-w-0 flex-col bg-canvas"
+      className="relative flex h-full min-w-0 flex-col bg-canvas"
       onPointerDown={markThreadRead}
       onKeyDown={markThreadRead}
       onWheel={markThreadRead}
@@ -786,8 +797,21 @@ export function ThreadView(props: {
         }}
       />
 
-      <footer className="shrink-0 bg-canvas pt-1 pb-3 sm:pb-5">
-        <div className="mr-auto w-full max-w-[800px] px-4 sm:px-6">
+      {replyCollapsed.collapsed && (
+        <Button
+          onClick={replyCollapsed.expand}
+          aria-label="Reply"
+          title="Reply"
+          size="icon"
+          className="absolute right-4 bottom-4 z-10 size-14 touch:size-14 rounded-full shadow-lg shadow-black/15 [&_svg:not([class*='size-'])]:size-5"
+        >
+          <Reply />
+        </Button>
+      )}
+      <footer
+        className={cn("shrink-0 bg-canvas pt-1 pb-3 sm:pb-5", replyCollapsed.collapsed && "hidden")}
+      >
+        <div ref={replyFormRef} className="mr-auto w-full max-w-[800px] px-4 sm:px-6">
           <Card className="gap-0 py-0 shadow-[0_1px_2px_oklch(0.2_0.012_265/0.04),0_4px_16px_-6px_oklch(0.2_0.012_265/0.08)] transition-shadow focus-within:ring-foreground/25">
             <div className="border-b border-border/70 text-xs">
                 <CopyRecipientsRow
@@ -959,21 +983,20 @@ export function ThreadView(props: {
                 ))}
               </div>
             )}
-            {replySignature && (
-              <p
-                className="truncate px-3.5 pb-2 text-xs text-muted-foreground"
-                title={replySignature}
-              >
-                <span className="text-foreground/70">Signature:</span> {replySignature}
-              </p>
-            )}
-            <div className="flex items-center justify-end px-3 pb-3 sm:justify-between">
-              <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
-                <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
-                <Kbd>Enter</Kbd>
-                <span className="ml-0.5">to send</span>
-              </span>
-              <div className="flex items-center gap-1.5">
+            <div className="flex items-center justify-between gap-2 px-3 pb-3">
+              <div className="flex min-w-0 items-center gap-3 pl-0.5 text-xs text-muted-foreground">
+                {replySignature && (
+                  <span className="min-w-0 truncate" title={`Signature: ${replySignature}`}>
+                    <span className="text-foreground/70">Signature:</span> {replySignature}
+                  </span>
+                )}
+                <span className="hidden shrink-0 items-center gap-1 sm:inline-flex">
+                  <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
+                  <Kbd>Enter</Kbd>
+                  <span className="ml-0.5">to send</span>
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1096,6 +1119,69 @@ export function ThreadView(props: {
       </footer>
     </div>
   );
+}
+
+/** Single-pane widths, where the conversation fills the screen. */
+const SINGLE_PANE_QUERY = "(max-width: 767px)";
+// Scrolls smaller than this are jitter, not the person reading back.
+const SCROLL_UP_PX = 8;
+const AT_BOTTOM_PX = 48;
+
+/**
+ * On phones, scrolling back through a conversation folds the reply form into a
+ * round Reply button so the messages get the whole screen. The form stays
+ * mounted, so a half-written reply is kept. It opens again from the button, or
+ * when the person scrolls back down to the latest message. It never folds
+ * while the form has focus, since that is someone typing.
+ */
+function useCollapseReplyOnScroll(
+  containerRef: React.RefObject<HTMLElement | null>,
+  formRef: React.RefObject<HTMLElement | null>,
+  resetKey: unknown,
+  ready: boolean,
+) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => setCollapsed(false), [resetKey]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!ready || !container) return;
+    const query = window.matchMedia(SINGLE_PANE_QUERY);
+    let lastTop = container.scrollTop;
+    const onScroll = () => {
+      const top = container.scrollTop;
+      const delta = top - lastTop;
+      lastTop = top;
+      if (!query.matches) return;
+      if (delta < -SCROLL_UP_PX) {
+        if (!formRef.current?.contains(document.activeElement)) setCollapsed(true);
+      } else if (
+        delta > 0 &&
+        container.scrollHeight - container.clientHeight - top <= AT_BOTTOM_PX
+      ) {
+        setCollapsed(false);
+      }
+    };
+    const onWidthChange = () => {
+      if (!query.matches) setCollapsed(false);
+    };
+    container.addEventListener("scroll", onScroll, { passive: true });
+    query.addEventListener("change", onWidthChange);
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+      query.removeEventListener("change", onWidthChange);
+    };
+  }, [containerRef, formRef, ready, resetKey]);
+
+  const expand = () => {
+    setCollapsed(false);
+    requestAnimationFrame(() =>
+      formRef.current?.querySelector<HTMLElement>("[contenteditable=true]")?.focus(),
+    );
+  };
+
+  return { collapsed, expand };
 }
 
 function CopyRecipientsRow(props: {
