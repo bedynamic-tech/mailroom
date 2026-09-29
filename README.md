@@ -36,13 +36,16 @@ Routing, D1, R2 and Web Push.
   conversation folds the reply box into a round **Reply** button, keeping
   anything already written. Tap it, or scroll back down to the latest
   message, to open the reply box again.
-- **Send status and bounces.** Every email sent from Mailroom shows **Sent**
-  at the bottom right of its card once the email provider has accepted it.
-  When a bounce notice comes back for any recipient, the mark turns into a red
-  exclamation point labeled **Bounced**. Hover over it, or tap it on a phone,
-  to see which address bounced and the receiving server's message. Bounces
-  are tracked per recipient, so a Cc that bounces is shown even when the To
-  was delivered. The bounce notice itself still arrives as its own email.
+- **Send status and bounces.** Every email sent from Mailroom shows a small
+  check at the bottom right of its card once the email provider has accepted
+  it. When any recipient bounces, the check turns into a red exclamation
+  point. Hover over it, or tap it on a phone, to see which
+  address bounced and the receiving server's message. Bounces are tracked per
+  recipient, so a Cc that bounces is shown even when the To was delivered.
+  Cloudflare keeps bounce notices for itself, so Mailroom learns about bounces
+  from Cloudflare's Email Sending events; subscribe each sending domain once
+  as described in [docs/deployment.md](docs/deployment.md#track-bounces).
+  Bounce notices that do reach an Inbox are read too.
 - **Opens at the latest message.** A conversation opens scrolled to the bottom
   and stays there while emails and images finish loading, until you scroll up.
 - **Internal notes.** Leave notes for your team on any conversation. Write in
