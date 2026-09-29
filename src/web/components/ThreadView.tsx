@@ -1131,8 +1131,9 @@ const AT_BOTTOM_PX = 48;
  * On phones, scrolling back through a conversation folds the reply form into a
  * round Reply button so the messages get the whole screen. The form stays
  * mounted, so a half-written reply is kept. It opens again from the button, or
- * when the person scrolls back down to the latest message. It never folds
- * while the form has focus, since that is someone typing.
+ * when the person scrolls back down to the latest message. Scrolling up folds
+ * it even while it has focus, since focus stays in the editor after the
+ * keyboard is put away.
  */
 function useCollapseReplyOnScroll(
   containerRef: React.RefObject<HTMLElement | null>,
@@ -1149,13 +1150,20 @@ function useCollapseReplyOnScroll(
     if (!ready || !container) return;
     const query = window.matchMedia(SINGLE_PANE_QUERY);
     let lastTop = container.scrollTop;
+    let lastHeight = container.clientHeight;
     const onScroll = () => {
       const top = container.scrollTop;
       const delta = top - lastTop;
       lastTop = top;
-      if (!query.matches) return;
+      // A scroll caused by the view resizing (the keyboard opening, the form
+      // folding or opening) is layout, not the person reading back.
+      const resized = container.clientHeight !== lastHeight;
+      lastHeight = container.clientHeight;
+      if (!query.matches || resized) return;
       if (delta < -SCROLL_UP_PX) {
-        if (!formRef.current?.contains(document.activeElement)) setCollapsed(true);
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && formRef.current?.contains(active)) active.blur();
+        setCollapsed(true);
       } else if (
         delta > 0 &&
         container.scrollHeight - container.clientHeight - top <= AT_BOTTOM_PX
