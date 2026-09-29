@@ -97,8 +97,6 @@ export function parseMailRuleInput(value: unknown): MailRuleInput | { error: str
   if (mailboxId !== null && !isPositiveId(mailboxId)) {
     return { error: "Choose an inbox, or all inboxes" };
   }
-  const boardColumnId = body.board_column_id ?? null;
-  if (boardColumnId !== null && !isPositiveId(boardColumnId)) return { error: "Choose a board column" };
   const labelId = body.label_id ?? null;
   if (labelId !== null && !isPositiveId(labelId)) return { error: "Choose a label" };
   if (labelId !== null && mailboxId === null) {
@@ -147,7 +145,6 @@ export function parseMailRuleInput(value: unknown): MailRuleInput | { error: str
     skip_draft: flags.skip_draft as boolean,
     skip_notifications: flags.skip_notifications as boolean,
     ...forward,
-    board_column_id: boardColumnId as number | null,
     note,
   };
   if (!hasAction(rule)) return { error: "Choose at least one action" };
@@ -252,7 +249,6 @@ export function hasAction(rule: MailRuleActions): boolean {
       rule.skip_draft ||
       rule.skip_notifications ||
       rule.forward_to.length > 0 ||
-      rule.board_column_id !== null ||
       rule.note !== null,
   );
 }
@@ -325,7 +321,6 @@ export function combineMailRuleActions(rules: MailRuleActions[]): {
   archive: boolean;
   skip_draft: boolean;
   skip_notifications: boolean;
-  board_column_id: number | null;
 } {
   return {
     label_ids: [...new Set(rules.flatMap((rule) => (rule.label_id === null ? [] : [rule.label_id])))],
@@ -333,8 +328,6 @@ export function combineMailRuleActions(rules: MailRuleActions[]): {
     archive: rules.some((rule) => rule.archive),
     skip_draft: rules.some((rule) => rule.skip_draft),
     skip_notifications: rules.some((rule) => rule.skip_notifications),
-    // One Card per Conversation: the first matching rule that makes one picks its Column.
-    board_column_id: rules.find((rule) => rule.board_column_id !== null)?.board_column_id ?? null,
   };
 }
 

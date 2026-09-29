@@ -2,7 +2,6 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { requireSameOrigin } from "./csrf.ts";
 import { composeApi, copyAddresses } from "./compose.ts";
-import { boardApi } from "./board.ts";
 import { contactsApi } from "./contacts.ts";
 import { blockedSendersApi } from "./blocked-senders.ts";
 import { mailRulesApi } from "./mail-rules.ts";
@@ -72,14 +71,12 @@ import type {
   Message,
   MessageBounce,
   PlaybookInput,
-  ThreadBoardCard,
   ThreadLabel,
 } from "../../shared/types";
 
 export const api = new Hono<{ Bindings: Env }>();
 api.use("*", requireSameOrigin);
 api.route("/compose", composeApi);
-api.route("/board", boardApi);
 api.route("/contacts", contactsApi);
 api.route("/blocked-senders", blockedSendersApi);
 api.route("/mail-rules", mailRulesApi);
@@ -93,8 +90,7 @@ api.get("/settings/general", async (c) => {
       `SELECT browser_notifications_enabled, email_notifications_enabled, email_notification_address,
               email_notification_from_name, email_notification_from_mailbox_id,
               email_notification_subject, email_notification_body, auto_create_contacts,
-              default_signature_html, browser_new_email, email_new_email, browser_replies, email_replies,
-              browser_board_reminders, email_board_reminders
+              default_signature_html, browser_new_email, email_new_email, browser_replies, email_replies
        FROM global_settings WHERE id = 1`,
     ).first<
       StoredNotificationTemplate & {
@@ -108,8 +104,6 @@ api.get("/settings/general", async (c) => {
         email_new_email: number;
         browser_replies: number;
         email_replies: number;
-        browser_board_reminders: number;
-        email_board_reminders: number;
       }
     >(),
     c.env.DB.prepare("SELECT COUNT(*) AS count FROM push_subscriptions")
@@ -138,8 +132,6 @@ api.get("/settings/general", async (c) => {
     email_new_email: Boolean(settings?.email_new_email ?? 1),
     browser_replies: Boolean(settings?.browser_replies ?? 1),
     email_replies: Boolean(settings?.email_replies ?? 1),
-    browser_board_reminders: Boolean(settings?.browser_board_reminders ?? 1),
-    email_board_reminders: Boolean(settings?.email_board_reminders ?? 1),
   };
   return c.json(result);
 });
@@ -201,11 +193,9 @@ const NOTIFICATION_TYPE_COLUMNS = {
   email_new_email: "email_new_email",
   browser_replies: "browser_replies",
   email_replies: "email_replies",
-  browser_board_reminders: "browser_board_reminders",
-  email_board_reminders: "email_board_reminders",
 } as const;
 
-/** What Browser and Email Notifications carry: new email, replies and Board Reminders. */
+/** What Browser and Email Notifications carry: new email and replies. */
 api.put("/settings/notification-types", async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const entries = Object.entries(body ?? {});
@@ -843,7 +833,6 @@ api.get("/threads", async (c) => {
     .all();
   const rows = results as unknown as Array<{ id: number; labels: ThreadLabel[] }>;
   await attachLabels(c.env, rows);
-  await attachBoardCardCounts(c.env, rows);
   return c.json(rows);
 });
 
@@ -890,7 +879,7 @@ api.get("/threads/:id", async (c) => {
   if (!thread) return c.json({ error: "thread not found" }, 404);
   await attachLabels(c.env, [thread as { id: number; labels: ThreadLabel[] }]);
 
-  const [messages, drafts, draftRun, boardCards, suggestedBoardCards, notes] = await Promise.all([
+  const [messages, drafts, draftRun, notes] = await Promise.all([
     c.env.DB.prepare("SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at").bind(id).all(),
     c.env.DB.prepare(
       `SELECT d.*, p.name AS playbook_name
@@ -916,32 +905,6 @@ api.get("/threads/:id", async (c) => {
     )
       .bind(id)
       .first<DraftRun>(),
-    c.env.DB.prepare(
-      `SELECT bc.id, bc.title, bc.column_id, col.name AS column_name
-       FROM board_card_threads bct
-       JOIN board_cards bc ON bc.id = bct.card_id
-       JOIN board_columns col ON col.id = bc.column_id
-       WHERE bct.thread_id = ?
-       ORDER BY col.position, bc.position, bc.id`,
-    )
-      .bind(id)
-      .all<ThreadBoardCard>(),
-    // Cards already tracking other mail from this Conversation's latest sender.
-    c.env.DB.prepare(
-      `SELECT bc.id, bc.title, bc.column_id, col.name AS column_name
-       FROM board_cards bc
-       JOIN board_columns col ON col.id = bc.column_id
-       WHERE bc.id NOT IN (SELECT card_id FROM board_card_threads WHERE thread_id = ?1)
-         AND bc.id IN (
-           SELECT link.card_id FROM board_card_threads link
-           JOIN messages msg ON msg.thread_id = link.thread_id AND msg.direction = 'inbound'
-           WHERE msg.from_address = ?2 COLLATE NOCASE
-         )
-       ORDER BY bc.updated_at DESC, bc.id DESC
-       LIMIT 3`,
-    )
-      .bind(Number(id), (thread as { last_from_address?: string | null }).last_from_address ?? "")
-      .all<ThreadBoardCard>(),
     listThreadNotes(c.env.DB, Number(id)),
   ]);
 
@@ -986,12 +949,10 @@ api.get("/threads/:id", async (c) => {
     bounces: bouncesByMessage.get(message.id) ?? [],
   }));
   return c.json({
-    thread: { ...thread, board_card_count: boardCards.results.length },
+    thread,
     messages: enrichedMessages,
     drafts: drafts.results,
     draft_run: draftRun ?? null,
-    board_cards: boardCards.results,
-    suggested_board_cards: suggestedBoardCards.results,
     notes,
   });
 });
@@ -1360,28 +1321,11 @@ api.get("/search", async (c) => {
     .all();
   const rows = results as unknown as Array<{ id: number; labels: ThreadLabel[] }>;
   await attachLabels(c.env, rows);
-  await attachBoardCardCounts(c.env, rows);
   return c.json(rows);
 });
 
 const MAX_LABELS_PER_MAILBOX = 20;
 const THREAD_PAGE_SIZE = 50;
-
-async function attachBoardCardCounts(
-  env: Env,
-  rows: Array<{ id: number; board_card_count?: number }>,
-): Promise<void> {
-  if (rows.length === 0) return;
-  const { results } = await env.DB.prepare(
-    `SELECT thread_id, COUNT(*) AS count FROM board_card_threads
-     WHERE thread_id IN (SELECT value FROM json_each(?))
-     GROUP BY thread_id`,
-  )
-    .bind(JSON.stringify(rows.map((row) => row.id)))
-    .all<{ thread_id: number; count: number }>();
-  const counts = new Map(results.map((row) => [row.thread_id, Number(row.count)]));
-  for (const row of rows) row.board_card_count = counts.get(row.id) ?? 0;
-}
 
 async function attachLabels(
   env: Env,

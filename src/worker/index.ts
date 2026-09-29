@@ -4,7 +4,6 @@ import { api } from "./api";
 import { requireWebAccess } from "./api/access.ts";
 import { processDraftRun } from "./agent/draft";
 import { receiveEmail } from "./email/receive";
-import { sendDueReminders } from "./notifications/reminders";
 
 const app = new Hono<{ Bindings: Env }>();
 app.use("/api/*", requireWebAccess);
@@ -13,10 +12,6 @@ app.route("/api", api);
 export default {
   fetch: withMcp(app),
   email: receiveEmail,
-  // Every 5 minutes (see triggers in wrangler.jsonc): send Board Item reminders.
-  scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): void {
-    ctx.waitUntil(sendDueReminders(env));
-  },
   async queue(batch: MessageBatch<{ runId: number }>, env: Env): Promise<void> {
     await Promise.all(
       batch.messages.map(async (message) => {

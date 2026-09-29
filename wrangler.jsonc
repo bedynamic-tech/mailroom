@@ -83,9 +83,10 @@
       }
     ]
   },
-  // Sends Board Item reminders every 5 minutes.
+  // No scheduled jobs. The empty list clears the cron trigger earlier
+  // versions used for Board reminders; leaving the key out would keep it.
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": []
   },
   "observability": {
     "enabled": true

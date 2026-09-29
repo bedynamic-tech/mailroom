@@ -175,7 +175,6 @@ export function NotificationSettings(props: {
 const NOTIFICATION_TYPES = [
   { key: "new_email", label: "New email", detail: "When an email starts a new conversation in any inbox." },
   { key: "replies", label: "Replies", detail: "When a new message arrives in an existing conversation." },
-  { key: "board_reminders", label: "Board reminders", detail: "When a board item's reminder is due." },
 ] as const;
 
 /** Checkboxes under a notification toggle: which notifications that channel sends. */

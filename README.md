@@ -60,10 +60,10 @@ Routing, D1, R2 and Web Push.
   or archive in bulk, and restore or permanently delete archived conversations.
 - **Universal search.** The search box in the top right (or Ctrl K / Cmd K,
   and the search icon on phones) finds conversations by subject, message text,
-  sender or recipient, along with internal notes, board items and their notes,
-  rules (name, note, condition values and forward addresses) and contacts.
-  Results are grouped by type, every word must match, and choosing one opens
-  it: the conversation, the board item, the rule's editor or the contact.
+  sender or recipient, along with internal notes, rules (name, note,
+  condition values and forward addresses) and contacts. Results are grouped
+  by type, every word must match, and choosing one opens it: the
+  conversation, the rule's editor or the contact.
 - **Contacts.** Keep names, companies, phone numbers and notes, see each
   contact's conversations, and autocomplete them in To, Cc and Bcc. Give a
   contact several email addresses and edit them at any time: mail from any of
@@ -74,27 +74,6 @@ Routing, D1, R2 and Web Push.
   sign up to. Caught mail is badged and shows the address it was sent to,
   replies go out from that address, and any address can become its own inbox
   or be blocked if spammers find it.
-- **Board.** Track work on a Kanban board from the sidebar. Add, rename,
-  reorder and delete columns, add items with the plus on any column, and drag
-  items between columns on desktop or phone (press and hold on a touch
-  screen). Create an item from any message's menu in a conversation,
-  prefilled from the subject, or add the conversation to an item already on
-  the board. Opening an item shows its name, description, date added, column,
-  timestamped notes you can add over time, and its related conversations. The
-  Edit button changes the name, description and column, links or unlinks
-  conversations, and deletes the item. Linking searches your mail and
-  suggests new mail from the senders the item already tracks; a conversation
-  from one of those senders offers to link itself to their item. Items link
-  back to their conversations, and conversations show the items they are on,
-  both in the list and above the messages. Rules can also create items
-  automatically.
-- **Due dates and reminders.** Give any board item a due date and time, and
-  optionally a reminder (at the due time, or from 5 minutes to 1 week
-  before). Cards show when they are due and turn red once overdue. Reminders
-  arrive through your notifications: check **Board reminders** under browser
-  or email notifications in **Settings > Notifications**. Reminders are
-  checked every 5 minutes, so one can arrive up to 5 minutes after its set
-  time, and each one is sent once.
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.
@@ -108,8 +87,6 @@ Routing, D1, R2 and Web Push.
   Images an email shows in its body, such as signature logos, are not listed
   again as attachments.
 
-<img width="2800" height="1800" alt="board" src="https://github.com/user-attachments/assets/175bb19f-b17e-4b3d-9ce5-6933fceb7198" />
-
 ### Automation
 
 - **AI reply drafts.** Per-inbox drafting with custom instructions and
@@ -117,11 +94,9 @@ Routing, D1, R2 and Web Push.
 - **Automatic labels.** Organize incoming mail with natural-language rules.
 - **Rules.** Build IF / AND / OR conditions on sender, recipients, subject, body
   and attachments, then label, mark read, archive, skip drafts or
-  notifications, forward, create a board item, or add a note. A board item
-  goes in the column the rule picks, takes its name from the subject and links
-  the conversation; a conversation already on the board gets no second item.
-  **Add a note** opens a text box, and each matching email adds that text to
-  its conversation as an internal note marked with the rule's name.
+  notifications, forward, or add a note. **Add a note** opens a text box, and
+  each matching email adds that text to its conversation as an internal note
+  marked with the rule's name.
 - **Spam blocking.** Block a sender by address or whole domain, on one inbox or
   all of them, from any message's menu. When a message has several people on
   it, such as Cc'd addresses, you choose which one to block. Blocked mail is
@@ -133,9 +108,9 @@ Routing, D1, R2 and Web Push.
   send replies through scoped OAuth access.
 - **Notifications.** In **Settings > Notifications**, turn on browser push
   notifications, email notifications to one address, or both. Under each,
-  checkboxes choose what it sends: **New email** (a new conversation),
-  **Replies** (a new message in an existing conversation) and **Board
-  reminders**, all checked by default.
+  checkboxes choose what it sends: **New email** (a new conversation) and
+  **Replies** (a new message in an existing conversation), both checked
+  by default.
 - **Private by default.** Everything runs in your own account, with Cloudflare
   Access protecting the web app.
 

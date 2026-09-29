@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import type {
-  SearchBoardItemResult,
   SearchContactResult,
   SearchConversationResult,
   SearchNoteResult,
@@ -19,8 +18,8 @@ const EXCERPT_LENGTH = 160;
 
 /**
  * The universal search behind the box in the top right. One query finds
- * Conversations (subject, body and addresses), Internal Notes, Board Items
- * with their notes, Mail Rules and Contacts. Every word must match; each
+ * Conversations (subject, body and addresses), Internal Notes, Mail Rules
+ * and Contacts. Every word must match; each
  * word matches the start of a word in message bodies and anywhere else.
  */
 export const universalSearchApi = new Hono<SearchEnv>();
@@ -30,22 +29,19 @@ universalSearchApi.get("/", async (c) => {
   const results: UniversalSearchResults = {
     conversations: [],
     notes: [],
-    board_items: [],
     rules: [],
     contacts: [],
   };
   if (terms.length === 0) return c.json(results);
   const db = c.env.DB;
-  const [conversations, notes, boardItems, rules, contacts] = await Promise.all([
+  const [conversations, notes, rules, contacts] = await Promise.all([
     searchConversations(db, terms),
     searchNotes(db, terms),
-    searchBoardItems(db, terms),
     searchRules(db, terms),
     searchContacts(db, terms),
   ]);
   results.conversations = conversations;
   results.notes = notes;
-  results.board_items = boardItems;
   results.rules = rules;
   results.contacts = contacts;
   return c.json(results);
@@ -229,60 +225,6 @@ async function searchNotes(db: D1Database, terms: string[]): Promise<SearchNoteR
     excerpt: excerpt(row.text_body, terms),
     created_at: row.created_at,
   }));
-}
-
-async function searchBoardItems(
-  db: D1Database,
-  terms: string[],
-): Promise<SearchBoardItemResult[]> {
-  const where = everyTermIn(["c.title", "COALESCE(c.description, '')", "COALESCE(notes.bodies, '')"], terms);
-  const { results } = await db
-    .prepare(
-      `SELECT c.id, c.title, c.description, col.name AS column_name, notes.bodies
-       FROM board_cards c
-       JOIN board_columns col ON col.id = c.column_id
-       LEFT JOIN (
-         SELECT card_id, group_concat(body, char(10)) AS bodies FROM board_card_notes GROUP BY card_id
-       ) notes ON notes.card_id = c.id
-       WHERE ${where.sql}
-       ORDER BY c.updated_at DESC, c.id DESC LIMIT ?`,
-    )
-    .bind(...where.values, GROUP_LIMIT)
-    .all<{
-      id: number;
-      title: string;
-      description: string | null;
-      column_name: string;
-      bodies: string | null;
-    }>();
-  const ids = results.map((row) => row.id);
-  const notesByCard = new Map<number, string[]>();
-  if (ids.length) {
-    const { results: notes } = await db
-      .prepare(
-        `SELECT card_id, body FROM board_card_notes
-         WHERE card_id IN (SELECT value FROM json_each(?))
-         ORDER BY created_at DESC, id DESC`,
-      )
-      .bind(JSON.stringify(ids))
-      .all<{ card_id: number; body: string }>();
-    for (const note of notes) {
-      const list = notesByCard.get(note.card_id) ?? [];
-      list.push(note.body);
-      notesByCard.set(note.card_id, list);
-    }
-  }
-  return results.map((row) => {
-    const note = (notesByCard.get(row.id) ?? []).find((body) => containsAny(body, terms));
-    const fromNote = !containsAny(row.description, terms) && Boolean(note);
-    return {
-      id: row.id,
-      title: row.title,
-      column_name: row.column_name,
-      excerpt: excerpt(fromNote ? note : row.description, terms),
-      matched_note: fromNote,
-    };
-  });
 }
 
 async function searchRules(db: D1Database, terms: string[]): Promise<SearchRuleResult[]> {

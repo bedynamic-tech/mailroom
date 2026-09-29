@@ -81,9 +81,6 @@ export async function deleteInbox(
       `DELETE FROM thread_labels WHERE thread_id IN (${threadIds})`,
     ).bind(inbox.id),
     env.DB.prepare(
-      `DELETE FROM board_card_threads WHERE thread_id IN (${threadIds})`,
-    ).bind(inbox.id),
-    env.DB.prepare(
       `DELETE FROM thread_notes WHERE thread_id IN (${threadIds})`,
     ).bind(inbox.id),
     env.DB.prepare(

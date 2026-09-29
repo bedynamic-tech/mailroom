@@ -60,18 +60,6 @@ _Avoid_: Filter, automation, playbook
 One Mail Rule's forward of one inbound Message, sent from the Inbox that received it with the original's headers and text, as many of its attachments as the send limits allow, and Reply-To set to the original sender. A rule forwards a Message at most once, never to one of the workspace's own Inboxes, and never forwards an email that is itself a Rule Forward, so rules cannot loop. Forwards count against a workspace-wide daily limit; a failed forward is recorded and shown on its rule, not retried.
 _Avoid_: Auto-forward, redirect
 
-**Board**:
-The workspace's one Kanban board, with Columns people add, rename, reorder and delete. It starts with To do, In progress and Done, and always keeps at least one Column. Deleting a Column deletes its Board Items but never their Conversations.
-_Avoid_: Project, pipeline, task list
-
-**Board Item**:
-A card on the Board with a title, an optional description and the time it was added, in one Column, ordered within it by dragging. Notes can be added to it over time, each stamped with when it was written. It can link any number of Conversations, and a Conversation can be on any number of Board Items; each Conversation shows the Board Items it is on. A Board Item suggests newer Conversations from the senders of the Conversations it links, and a Conversation offers the Board Items that track its latest sender. "Create board item" on a Message starts one titled from the Conversation's subject and linked to it. Deleting a Conversation removes its links and keeps the Board Items. A Board Item can have a due time and a Board Reminder.
-_Avoid_: Task, ticket, card
-
-**Board Reminder**:
-A notice that a Board Item is coming due, sent once at the time chosen on the Item (at its due time or a set time before). It travels through Browser Notifications and Email Notifications: each carries Board Reminders while it is on and its Board reminders box is checked (the default). A due time already past when saved never reminds; changing the due time or reminder schedules it again.
-_Avoid_: Alarm, alert, due notification
-
 **Internal Note**:
 Rich text a person leaves on a Conversation for the rest of the team, added from the reply box with "Add internal note" or by a Mail Rule's "Add a note" action (plain text, marked with the rule's name), and shown tinted yellow among the Messages in the order it was written. It is never a Message: it is not sent, quoted, forwarded by a Mail Rule, given to Agent Drafts or the MCP Server, or included in Notifications, and it does not change the Conversation's order, snippet or read state. Deleting the Conversation deletes its Internal Notes.
 _Avoid_: Comment, private message, annotation
@@ -121,9 +109,9 @@ The ordered email exchange grouped under one customer request. An archived Conve
 _Avoid_: Ticket, chat
 
 **Browser Notifications**:
-A workspace-wide opt-in that sends notifications to every subscribed browser: new email and replies across all Inboxes, and Board Reminders, each with its own checkbox (all checked by default). New email is a Message that opens a Conversation; a reply is one added to an existing Conversation. Each browser maintains its own Push Subscription; turning the global setting off disables delivery and clears all stored subscriptions.
+A workspace-wide opt-in that sends notifications to every subscribed browser: new email and replies across all Inboxes, each with its own checkbox (both checked by default). New email is a Message that opens a Conversation; a reply is one added to an existing Conversation. Each browser maintains its own Push Subscription; turning the global setting off disables delivery and clears all stored subscriptions.
 _Avoid_: Inbox notifications, notification channel
 
 **Email Notifications**:
-A workspace-wide opt-in that sends notifications to one external email address: a short notice of new email and replies across all Inboxes, and Board Reminders, each with its own checkbox (all checked by default). Its template (sender name, sending Inbox, subject and body with `{{placeholder}}` values) is editable; by default the notice is sent from the Inbox that received the email. It is marked auto-generated; mail from any Inbox never produces a notice.
+A workspace-wide opt-in that sends notifications to one external email address: a short notice of new email and replies across all Inboxes, each with its own checkbox (both checked by default). Its template (sender name, sending Inbox, subject and body with `{{placeholder}}` values) is editable; by default the notice is sent from the Inbox that received the email. It is marked auto-generated; mail from any Inbox never produces a notice.
 _Avoid_: Forwarding, digest, alert email

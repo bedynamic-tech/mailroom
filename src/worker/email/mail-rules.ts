@@ -1,4 +1,3 @@
-import { cardTitleFromSubject } from "../../shared/board.ts";
 import {
   combineMailRuleActions,
   mailRuleMatches,
@@ -11,15 +10,13 @@ import type { MailRule, MailRuleInput } from "../../shared/types.ts";
 type Db = { DB: D1Database };
 
 const MAIL_RULE_COLUMNS = `r.*, m.address AS mailbox_address, l.name AS label_name,
-    bc.name AS board_column_name,
     (SELECT COUNT(*) FROM mail_rule_forwards f
      WHERE f.rule_id = r.id AND f.status = 'sent') AS forward_count,
     (SELECT f.error FROM mail_rule_forwards f
      WHERE f.rule_id = r.id ORDER BY f.id DESC LIMIT 1) AS last_forward_error
   FROM mail_rules r
   LEFT JOIN mailboxes m ON m.id = r.mailbox_id
-  LEFT JOIN labels l ON l.id = r.label_id
-  LEFT JOIN board_columns bc ON bc.id = r.board_column_id`;
+  LEFT JOIN labels l ON l.id = r.label_id`;
 
 const BOOLEAN_FIELDS = ["enabled", "mark_read", "archive", "skip_draft", "skip_notifications"] as const;
 const JSON_FIELDS = ["conditions", "forward_to", "forward_cc", "forward_bcc"] as const;
@@ -68,8 +65,8 @@ export async function createMailRule(env: Db, body: unknown): Promise<MailRule> 
   const result = await env.DB.prepare(
     `INSERT INTO mail_rules
        (mailbox_id, name, enabled, conditions, label_id, mark_read, archive, skip_draft,
-        skip_notifications, forward_to, forward_cc, forward_bcc, board_column_id, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        skip_notifications, forward_to, forward_cc, forward_bcc, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(...ruleValues(input))
     .run();
@@ -84,7 +81,7 @@ export async function updateMailRule(env: Db, id: number, body: unknown): Promis
     `UPDATE mail_rules
      SET mailbox_id = ?, name = ?, enabled = ?, conditions = ?, label_id = ?, mark_read = ?,
          archive = ?, skip_draft = ?, skip_notifications = ?, forward_to = ?, forward_cc = ?,
-         forward_bcc = ?, board_column_id = ?, note = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         forward_bcc = ?, note = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
      WHERE id = ?`,
   )
     .bind(...ruleValues(input), id)
@@ -115,12 +112,6 @@ async function validate(env: Db, body: unknown): Promise<MailRuleInput> {
       .first();
     if (!label) throw new MailRuleError("That label doesn't belong to the chosen inbox", 400);
   }
-  if (input.board_column_id !== null) {
-    const column = await env.DB.prepare("SELECT id FROM board_columns WHERE id = ?")
-      .bind(input.board_column_id)
-      .first();
-    if (!column) throw new MailRuleError("That board column no longer exists", 400);
-  }
   const recipients = [...input.forward_to, ...input.forward_cc, ...input.forward_bcc];
   if (recipients.length > 0) {
     // Forwarding into the workspace would store the same email again, or loop.
@@ -149,7 +140,6 @@ function ruleValues(input: MailRuleInput): unknown[] {
     JSON.stringify(input.forward_to),
     JSON.stringify(input.forward_cc),
     JSON.stringify(input.forward_bcc),
-    input.board_column_id,
     input.note,
   ];
 }
@@ -195,7 +185,7 @@ export const NO_MAIL_RULES: AppliedMailRules = {
 /**
  * Evaluates the enabled Mail Rules for the Inbox `mailboxId` (and those for
  * all Inboxes) against a stored inbound Message, applies the Labels, read,
- * archive, note and board item actions of every match to its Conversation,
+ * archive and note actions of every match to its Conversation,
  * and records the matches. The caller honours the returned skips and sends the forwards.
  */
 export async function applyMailRules(
@@ -241,9 +231,6 @@ export async function applyMailRules(
     );
   }
   await env.DB.batch(statements);
-  if (actions.board_column_id !== null) {
-    await createRuleBoardCard(env, actions.board_column_id, args.threadId, args.message.subject);
-  }
 
   return {
     ruleIds,
@@ -253,26 +240,4 @@ export async function applyMailRules(
       .filter((rule) => rule.forward_to.length > 0)
       .map((rule) => ({ ruleId: rule.id, to: rule.forward_to, cc: rule.forward_cc, bcc: rule.forward_bcc })),
   };
-}
-
-/**
- * Adds a Card for the Conversation to the end of the Column, linked to it.
- * A Conversation already on the Board gets no second Card, so replies to it
- * don't pile up Cards.
- */
-async function createRuleBoardCard(env: Db, columnId: number, threadId: number, subject: string): Promise<void> {
-  const title = cardTitleFromSubject(subject) || "(no subject)";
-  const card = await env.DB.prepare(
-    `INSERT INTO board_cards (column_id, title, position)
-     SELECT ?1, ?2, (SELECT COALESCE(MAX(position) + 1, 0) FROM board_cards WHERE column_id = ?1)
-     WHERE EXISTS (SELECT 1 FROM board_columns WHERE id = ?1)
-       AND NOT EXISTS (SELECT 1 FROM board_card_threads WHERE thread_id = ?3)
-     RETURNING id`,
-  )
-    .bind(columnId, title, threadId)
-    .first<{ id: number }>();
-  if (!card) return;
-  await env.DB.prepare("INSERT OR IGNORE INTO board_card_threads (card_id, thread_id) VALUES (?, ?)")
-    .bind(card.id, threadId)
-    .run();
 }

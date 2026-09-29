@@ -22,10 +22,6 @@ function fixture(t) {
              (2, 2, '<b@x>', 'inbound', 'dana@finance.test', 'Dana Finance', 'Broken invoice',
               'Our finance team needs the VAT number on invoice 2291.');
     INSERT INTO thread_notes (thread_id, text_body) VALUES (1, 'Called Stripe, refund approved');
-    INSERT INTO board_cards (id, column_id, title, description, position)
-      VALUES (1, 1, 'Reissue invoice 2291', 'Add the VAT number', 0),
-             (2, 2, 'Fix login', NULL, 0);
-    INSERT INTO board_card_notes (card_id, body) VALUES (2, 'Waiting on the Stripe webhook');
     INSERT INTO mail_rules (id, name, conditions, note, forward_to)
       VALUES (1, 'Invoices to accounting',
               '{"match":"all","items":[{"field":"subject","operator":"contains","value":"invoice"}]}',
@@ -53,7 +49,7 @@ function fixture(t) {
 test("an empty query finds nothing", async (t) => {
   const { search } = fixture(t);
   assert.deepEqual(await search("   "), {
-    conversations: [], notes: [], board_items: [], rules: [], contacts: [],
+    conversations: [], notes: [], rules: [], contacts: [],
   });
 });
 
@@ -73,16 +69,10 @@ test("every word must match", async (t) => {
   assert.deepEqual((await search("invoice refund")).conversations, []);
 });
 
-test("internal notes, board items and their notes, rules and contacts are found", async (t) => {
+test("internal notes, rules and contacts are found", async (t) => {
   const { search } = fixture(t);
   const stripe = await search("stripe");
   assert.deepEqual(stripe.notes.map((note) => [note.thread_id, note.thread_subject]), [[1, "Refund request"]]);
-  assert.deepEqual(stripe.board_items.map((item) => [item.id, item.matched_note]), [[2, true]]);
-  assert.match(stripe.board_items[0].excerpt, /webhook/);
-  assert.equal(stripe.board_items[0].column_name, "In progress");
-
-  const vat = await search("vat");
-  assert.deepEqual(vat.board_items.map((item) => item.id), [1]);
 
   assert.deepEqual((await search("accounting")).rules.map((rule) => [rule.id, rule.excerpt]), [[1, ""]]);
   assert.deepEqual((await search("books@")).rules.map((rule) => rule.excerpt), ["Forwards to books@accounting.test"]);

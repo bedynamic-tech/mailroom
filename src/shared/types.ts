@@ -50,10 +50,6 @@ export interface GeneralSettings {
   browser_replies: boolean;
   /** Email Notifications, while on, carry replies in existing Conversations. */
   email_replies: boolean;
-  /** Browser Notifications, while on, also carry Board Reminders. */
-  browser_board_reminders: boolean;
-  /** Email Notifications, while on, also carry Board Reminders. */
-  email_board_reminders: boolean;
 }
 
 export interface EmailNotificationTemplate {
@@ -138,8 +134,6 @@ export interface ThreadSummary {
   /** Recipients edited in the reply box, as JSON (see shared/reply-recipients.ts); null when unedited. */
   reply_recipients: string | null;
   labels: ThreadLabel[];
-  /** How many Board Cards link this Conversation. */
-  board_card_count: number;
 }
 
 export interface Attachment {
@@ -199,9 +193,6 @@ export interface ThreadDetail {
   messages: Message[];
   drafts: Draft[];
   draft_run: DraftRun | null;
-  board_cards: ThreadBoardCard[];
-  /** Board Cards linking other Conversations from this Conversation's latest sender. */
-  suggested_board_cards: ThreadBoardCard[];
   /** Internal Notes on this Conversation, oldest first. Never sent to anyone. */
   notes: ThreadNote[];
 }
@@ -217,81 +208,6 @@ export interface ThreadNote {
   /** That rule's current name, or null once it is deleted. */
   mail_rule_name: string | null;
   created_at: string;
-}
-
-/** A Board Card linked to a Conversation, as shown on that Conversation. */
-export interface ThreadBoardCard {
-  id: number;
-  title: string;
-  column_id: number;
-  column_name: string;
-}
-
-export interface BoardColumn {
-  id: number;
-  name: string;
-  position: number;
-}
-
-export interface BoardCardConversation {
-  id: number;
-  subject: string;
-  status: ThreadSummary["status"];
-  mailbox_address: string;
-}
-
-/** A Conversation suggested for a Board Card because it shares a sender with one it links. */
-export interface RelatedConversation extends BoardCardConversation {
-  last_from: string | null;
-  last_message_at: string;
-}
-
-export interface BoardCard {
-  id: number;
-  column_id: number;
-  title: string;
-  description: string | null;
-  position: number;
-  created_at: string;
-  updated_at: string;
-  note_count: number;
-  /** When the Item should be done (UTC ISO), or null. */
-  due_at: string | null;
-  /** IANA time zone the due time was picked in. */
-  due_time_zone: string | null;
-  /** Minutes before due_at to remind (0 = at the due time); null means no reminder. */
-  reminder_minutes: number | null;
-  /** When the reminder went out; null while it is still to come. */
-  reminder_sent_at: string | null;
-  conversations: BoardCardConversation[];
-}
-
-export interface BoardCardNote {
-  id: number;
-  card_id: number;
-  body: string;
-  created_at: string;
-}
-
-/** A Board Card with its Notes, as shown when it is opened. */
-export interface BoardCardDetail extends BoardCard {
-  notes: BoardCardNote[];
-}
-
-export interface Board {
-  columns: BoardColumn[];
-  cards: BoardCard[];
-}
-
-export interface BoardCardInput {
-  column_id?: number;
-  title?: string;
-  description?: string | null;
-  thread_ids?: number[];
-  /** Send with reminder_minutes and due_time_zone; null clears the due time. */
-  due_at?: string | null;
-  due_time_zone?: string | null;
-  reminder_minutes?: number | null;
 }
 
 export type DraftRunStatus = "queued" | "generating" | "ready" | "failed" | "superseded";
@@ -473,11 +389,6 @@ export interface MailRuleActions {
   forward_to: string[];
   forward_cc: string[];
   forward_bcc: string[];
-  /**
-   * Create a Board Card in this Column, titled from the subject and linked to
-   * the Conversation, unless the Conversation is already on the Board.
-   */
-  board_column_id: number | null;
   /** Add this plain text as an Internal Note on the Conversation; null for none. */
   note: string | null;
 }
@@ -494,7 +405,6 @@ export interface MailRule extends MailRuleInput {
   id: number;
   mailbox_address: string | null;
   label_name: string | null;
-  board_column_name: string | null;
   /** How many inbound emails this rule has matched. */
   match_count: number;
   last_matched_at: string | null;
@@ -530,16 +440,6 @@ export interface SearchNoteResult {
   created_at: string;
 }
 
-/** One Board Item found by its title, description or one of its notes. */
-export interface SearchBoardItemResult {
-  id: number;
-  title: string;
-  column_name: string;
-  /** Text around the match in the description or a note, or empty when only the title matched. */
-  excerpt: string;
-  matched_note: boolean;
-}
-
 export interface SearchRuleResult {
   id: number;
   name: string;
@@ -559,7 +459,6 @@ export interface SearchContactResult {
 export interface UniversalSearchResults {
   conversations: SearchConversationResult[];
   notes: SearchNoteResult[];
-  board_items: SearchBoardItemResult[];
   rules: SearchRuleResult[];
   contacts: SearchContactResult[];
 }
