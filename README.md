@@ -90,7 +90,8 @@ Routing, D1, R2 and Web Push.
   on each device.
   In dark mode, simple emails are shown in dark colors, and emails that ship
   their own dark styles use them. Designed emails with their own backgrounds
-  (newsletters, receipts) keep their original colors. Any email can be
+  (newsletters, receipts) keep their original colors. Any text that would
+  still be hard to read on its dark background is given a readable color. Any email can be
   switched from its **...** menu with **Show original colors** or **Show in
   dark colors**.
   Images an email shows in its body, such as signature logos, are not listed
