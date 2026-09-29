@@ -134,7 +134,9 @@ Routing, D1, R2 and Web Push.
   notifications, email notifications to one address, or both. Under each,
   checkboxes choose what it sends: **New email** (a new conversation) and
   **Replies** (a new message in an existing conversation), both checked
-  by default.
+  by default. Browser push works in Chrome, Edge, Firefox and Safari. On
+  iPhone and iPad, add Mailroom + to the Home Screen and turn notifications
+  on from the app opened there.
 - **Private by default.** Everything runs in your own account, with Cloudflare
   Access protecting the web app.
 

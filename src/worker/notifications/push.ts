@@ -1,5 +1,5 @@
-import { buildPushHTTPRequest } from "@pushforge/builder";
 import type { BrowserPushSubscription } from "../../shared/types";
+import { buildWebPushRequest } from "./web-push.ts";
 
 interface StoredPushSubscription {
   endpoint: string;
@@ -135,18 +135,20 @@ export async function pushToSubscribedBrowsers(env: Env, message: PushMessage): 
           endpoint: subscription.endpoint,
           keys: { p256dh: subscription.p256dh, auth: subscription.auth },
         };
-        const request = await buildPushHTTPRequest({
-          privateJWK,
+        const request = await buildWebPushRequest({
           subscription: pushSubscription,
-          message: {
-            payload: { title: message.title, body: message.body, tag: message.tag, data: message.data },
-            adminContact,
-            options: {
-              ttl: 60 * 60,
-              urgency: "normal",
-              topic: message.topic,
-            },
-          },
+          privateJWK,
+          subject: adminContact,
+          payload: JSON.stringify({
+            title: message.title,
+            body: message.body,
+            tag: message.tag,
+            data: message.data,
+          }),
+          ttl: 60 * 60,
+          // Urgency is left at the protocol default (normal); Apple's service
+          // has rejected an explicit "normal" in the past.
+          topic: message.topic,
         });
         const response = await fetch(request.endpoint, {
           method: "POST",
@@ -164,6 +166,7 @@ export async function pushToSubscribedBrowsers(env: Env, message: PushMessage): 
         console.error("Browser notification delivery failed", {
           statusCode: response.status,
           endpointOrigin: endpointOrigin(subscription.endpoint),
+          reason: (await response.text().catch(() => "")).slice(0, 200),
         });
       } catch (error) {
         console.error("Browser notification delivery failed", {
