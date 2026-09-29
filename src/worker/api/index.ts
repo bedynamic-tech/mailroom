@@ -1344,12 +1344,15 @@ const THREAD_PAGE_SIZE = 50;
 const LATEST_RECIPIENT_SQL = `CASE WHEN latest_message.direction = 'outbound'
   THEN json_extract(latest_message.to_addresses, '$[0]') END`;
 
-// Who a Conversation is with, for the list: the latest sender, or, when the
+// Who a Conversation is with, for the list: the latest sender, named by the
+// name on their mail, else by their Contact, else the address; or, when the
 // Inbox started it and nobody has written back, the person it was sent to,
 // named by their Contact, else by the name on their own mail, else the address.
 // Expects `latest_message` and `latest_inbound` joins.
 const THREAD_CORRESPONDENT_COLUMNS = `COALESCE(
-         latest_inbound.from_name,
+         NULLIF(trim(latest_inbound.from_name), ''),
+         (SELECT c.name FROM contact_addresses ca JOIN contacts c ON c.id = ca.contact_id
+          WHERE ca.address = latest_inbound.from_address AND trim(COALESCE(c.name, '')) <> ''),
          latest_inbound.from_address,
          (SELECT c.name FROM contact_addresses ca JOIN contacts c ON c.id = ca.contact_id
           WHERE ca.address = ${LATEST_RECIPIENT_SQL} AND trim(COALESCE(c.name, '')) <> ''),

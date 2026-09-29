@@ -701,6 +701,7 @@ export function ThreadView(props: {
               ) : (
                 <MessageCard
                   message={entry.item}
+                  contactNames={detail.data.contact_names}
                   catchAllRecipient={thread.catch_all_recipient}
                   onBlockSender={
                     blockCandidatesFor(entry.item, ownAddresses).length > 0
@@ -1249,10 +1250,12 @@ function MessageConnector() {
 
 function MessageCard({
   message,
+  contactNames,
   catchAllRecipient,
   onBlockSender,
 }: {
   message: Message;
+  contactNames?: Record<string, string>;
   catchAllRecipient: string | null;
   onBlockSender?: () => void;
 }) {
@@ -1270,9 +1273,10 @@ function MessageCard({
     return message.attachments.filter((attachment) => !inline.has(attachment.id));
   }, [message.attachments, message.html_body]);
   const isOutbound = message.direction === "outbound";
-  const displayName = isOutbound
-    ? message.from_name || message.from_address
-    : message.from_name || message.from_address;
+  // Mail sent with a bare address has no name; fall back to their Contact.
+  const senderName =
+    message.from_name?.trim() || contactNames?.[message.from_address.toLowerCase()]?.trim() || "";
+  const displayName = senderName || message.from_address;
   const { main, quoted } = splitQuotedTail(message.text_body ?? "");
   const to = parseAddressList(message.to_addresses);
   const cc = parseAddressList(message.cc_addresses);

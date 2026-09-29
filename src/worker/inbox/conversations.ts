@@ -110,7 +110,7 @@ export async function searchConversations(env: InboxDataEnv, input: SearchConver
               ORDER BY nm.created_at DESC, nm.id DESC LIMIT 1),
              json_extract(latest_message.to_addresses, '$[0]'),
              '')
-         ELSE COALESCE(latest_message.from_name, latest_message.from_address)
+         ELSE COALESCE(NULLIF(trim(latest_message.from_name), ''), latest_message.from_address)
        END AS correspondent,
        (SELECT COUNT(*) FROM drafts d
         WHERE d.thread_id = t.id AND d.status = 'pending'
