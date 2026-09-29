@@ -84,7 +84,8 @@ Routing, D1, R2 and Web Push.
   before). Cards show when they are due and turn red once overdue. Reminders
   arrive through your notifications: check **Board reminders** under browser
   or email notifications in **Settings > Notifications**. Reminders are
-  checked every minute and each one is sent once.
+  checked every 5 minutes, so one can arrive up to 5 minutes after its set
+  time, and each one is sent once.
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.

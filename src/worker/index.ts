@@ -13,7 +13,7 @@ app.route("/api", api);
 export default {
   fetch: withMcp(app),
   email: receiveEmail,
-  // Every minute (see triggers in wrangler.jsonc): send Board Item reminders.
+  // Every 5 minutes (see triggers in wrangler.jsonc): send Board Item reminders.
   scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): void {
     ctx.waitUntil(sendDueReminders(env));
   },
