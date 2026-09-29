@@ -67,6 +67,22 @@
   }
 }
 
+/* Top inset for the app shell and full-screen sheets. Since iOS 26, an app
+   opened from the Home Screen gets a system blur (drawn above the page, so
+   CSS cannot remove it) over roughly 40pt below the status bar. Push content
+   clear of it there; Safari and other browsers keep the plain safe area.
+   Landscape phones hide the status bar, so they skip the extra space. */
+:root {
+  --app-inset-top: env(safe-area-inset-top, 0px);
+}
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) and (orientation: portrait) {
+    :root {
+      --app-inset-top: calc(env(safe-area-inset-top, 0px) + 2rem);
+    }
+  }
+}
+
 /* iOS zooms the page when a field under 16px takes focus. Unlayered so it
    wins over the smaller text utilities fields use on desktop. */
 @media (max-width: 767px), (pointer: coarse) {
