@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildNewEmailNotification,
-  describeBrowser,
   validatePushSubscription,
 } from "../src/worker/notifications/push.ts";
 
@@ -58,20 +57,4 @@ test("accepts only complete HTTPS Push Subscriptions", () => {
   assert.equal(validatePushSubscription({ ...valid, endpoint: "http://push.example.com/abc" }), false);
   assert.equal(validatePushSubscription({ ...valid, keys: { ...valid.keys, auth: "short" } }), false);
   assert.equal(validatePushSubscription({ ...valid, expirationTime: -1 }), false);
-});
-
-test("names the browser behind a Push Subscription", () => {
-  assert.equal(
-    describeBrowser("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:143.0) Gecko/20100101 Firefox/143.0"),
-    "Firefox on macOS",
-  );
-  assert.equal(
-    describeBrowser("Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"),
-    "Safari on iPhone",
-  );
-  assert.equal(
-    describeBrowser("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0"),
-    "Edge on Windows",
-  );
-  assert.equal(describeBrowser(null), "Unknown browser");
 });

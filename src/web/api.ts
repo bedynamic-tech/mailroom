@@ -130,9 +130,8 @@ export const syncBrowserNotifications = (subscription: BrowserPushSubscription) 
 export interface BrowserPushTestResult {
   subscriptions: number;
   delivered: number;
-  deliveredTo: string[];
   removed: number;
-  failures: { browser: string; service: string; status: number; reason: string }[];
+  failures: { service: string; status: number; reason: string }[];
 }
 
 export const testBrowserNotifications = () =>
