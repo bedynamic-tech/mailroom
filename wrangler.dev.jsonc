@@ -52,8 +52,5 @@
         "max_retries": 1
       }
     ]
-  },
-  "triggers": {
-    "crons": ["*/5 * * * *"]
   }
 }

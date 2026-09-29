@@ -18,13 +18,13 @@ import { cn } from "@/lib/utils";
 import type { UniversalSearchResults } from "../../shared/types";
 import { searchEverything } from "../api";
 import { formatTime } from "../lib";
-import { BoardIcon, ContactsIcon, MailIcon, NoteIcon, SearchIcon, XIcon } from "./Icons";
+import { ContactsIcon, MailIcon, NoteIcon, SearchIcon, XIcon } from "./Icons";
 
 const SearchContext = createContext<() => void>(() => {});
 /** Opens the universal search. */
 export const useUniversalSearch = () => useContext(SearchContext);
 
-type ResultKind = "conversation" | "note" | "board" | "rule" | "contact";
+type ResultKind = "conversation" | "note" | "rule" | "contact";
 
 interface ResultRow {
   key: string;
@@ -38,7 +38,6 @@ interface ResultRow {
 const GROUPS: Array<{ kind: ResultKind; label: string }> = [
   { kind: "conversation", label: "Conversations" },
   { kind: "note", label: "Internal notes" },
-  { kind: "board", label: "Board items" },
   { kind: "rule", label: "Rules" },
   { kind: "contact", label: "Contacts" },
 ];
@@ -73,14 +72,6 @@ function toRows(results: UniversalSearchResults): ResultRow[] {
         .join(" · "),
       excerpt: "",
       path: threadPath(row.thread_id, row.thread_status),
-    })),
-    ...results.board_items.map((row) => ({
-      key: `board-${row.id}`,
-      kind: "board" as const,
-      title: row.title,
-      meta: row.matched_note ? `${row.column_name} · In a note` : row.column_name,
-      excerpt: row.excerpt,
-      path: `/board/cards/${row.id}`,
     })),
     ...results.rules.map((row) => ({
       key: `rule-${row.id}`,
@@ -210,7 +201,7 @@ function UniversalSearchDialog(props: { open: boolean; onOpenChange: (open: bool
       >
         <DialogTitle className="sr-only">Search everything</DialogTitle>
         <DialogDescription className="sr-only">
-          Search conversations, internal notes, board items, rules and contacts.
+          Search conversations, internal notes, rules and contacts.
         </DialogDescription>
         <div className="flex items-center gap-2 border-b px-3 max-sm:pt-1">
           <SearchIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -230,7 +221,7 @@ function UniversalSearchDialog(props: { open: boolean; onOpenChange: (open: bool
                 choose(rows[active]);
               }
             }}
-            placeholder="Search emails, notes, board items, rules and contacts"
+            placeholder="Search emails, notes, rules and contacts"
             aria-label="Search everything"
             role="combobox"
             aria-expanded={rows.length > 0}
@@ -265,7 +256,7 @@ function UniversalSearchDialog(props: { open: boolean; onOpenChange: (open: bool
         >
           {!deferred ? (
             <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-              Find conversations, internal notes, board items, rules and contacts.
+              Find conversations, internal notes, rules and contacts.
             </p>
           ) : results.isError ? (
             <p className="px-3 py-8 text-center text-sm text-destructive">
@@ -360,8 +351,6 @@ function ResultIcon(props: { kind: ResultKind }) {
         <MailIcon className={className} />
       ) : props.kind === "note" ? (
         <NoteIcon className={`${className} text-amber-600 dark:text-amber-400`} />
-      ) : props.kind === "board" ? (
-        <BoardIcon className={className} />
       ) : props.kind === "rule" ? (
         <ListFilter className={className} />
       ) : (

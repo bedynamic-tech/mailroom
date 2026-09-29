@@ -13,7 +13,6 @@ import {
   discardDraft,
   fetchMailboxes,
   fetchThread,
-  linkBoardCard,
   markRead,
   retryDraftRun,
   saveReplyRecipients,
@@ -47,7 +46,6 @@ import { useStickToBottom } from "../use-stick-to-bottom";
 import {
   ArchiveIcon,
   ArrowLeftIcon,
-  BoardIcon,
   ChevronUpIcon,
   ContrastIcon,
   InboxIcon,
@@ -64,8 +62,6 @@ import {
 } from "./Icons";
 import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
 import { BlockSenderDialog } from "./BlockSenderDialog";
-import { AddToBoardCardDialog, BoardCardDialog, type CardDialogTarget } from "./BoardDialogs";
-import { cardTitleFromSubject } from "../../shared/board";
 import { CatchAllBadge } from "./CatchAllBadge";
 import { DeliveryStatus } from "./DeliveryStatus";
 import { BlockAddressDialog, CreateInboxFromAddressDialog } from "./CatchAllDialogs";
@@ -109,8 +105,6 @@ export function ThreadView(props: {
   const [blocking, setBlocking] = useState<{ sender: string; options: BlockCandidate[] } | null>(null);
   const [creatingInbox, setCreatingInbox] = useState(false);
   const [blockingAddress, setBlockingAddress] = useState(false);
-  const [boardTarget, setBoardTarget] = useState<CardDialogTarget | null>(null);
-  const [addingToCard, setAddingToCard] = useState(false);
   const navigate = useNavigate();
   const seenDraftIds = useRef(new Set<number>());
   const blockArchivesThis = useRef(false);
@@ -320,14 +314,6 @@ export function ThreadView(props: {
     onSuccess: invalidateAll,
   });
 
-  const linkSuggested = useMutation({
-    mutationFn: (cardId: number) => linkBoardCard(cardId, props.threadId),
-    onSuccess: () => {
-      invalidateAll();
-      queryClient.invalidateQueries({ queryKey: ["board"] });
-    },
-  });
-
   const startDraft = useMutation({
     mutationFn: () => createDraft(props.threadId),
     onSuccess: invalidateAll,
@@ -379,12 +365,6 @@ export function ThreadView(props: {
 
   const { thread, messages, drafts, notes } = detail.data;
   const timeline = conversationTimeline(messages, notes);
-  const boardConversation = {
-    id: thread.id,
-    subject: thread.subject,
-    status: thread.status,
-    mailbox_address: thread.mailbox_address,
-  };
   const ownAddresses = new Set(
     [
       thread.mailbox_address,
@@ -408,12 +388,6 @@ export function ThreadView(props: {
       return fromDomain === domain || fromDomain.endsWith(`.${domain}`);
     });
 
-  const createBoardItem = () =>
-    setBoardTarget({
-      kind: "create",
-      title: cardTitleFromSubject(thread.subject) || "Follow up",
-      conversation: boardConversation,
-    });
   const agentStatus = deriveAgentDraftStatus({
     pendingDraftCount: drafts.length,
     runStatus: detail.data.draft_run?.status ?? null,
@@ -669,65 +643,6 @@ export function ThreadView(props: {
         </div>
       )}
 
-      {detail.data.suggested_board_cards.length > 0 && (
-        <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b bg-muted/40 px-4 py-2 text-xs text-muted-foreground md:px-6">
-          <span className="shrink-0">
-            {detail.data.suggested_board_cards.length === 1
-              ? "Board item from this sender:"
-              : "Board items from this sender:"}
-          </span>
-          {detail.data.suggested_board_cards.map((card) => (
-            <span
-              key={card.id}
-              className="inline-flex h-6 max-w-72 shrink-0 items-center gap-1 rounded-md border bg-background pl-2 text-xs text-foreground touch:h-8"
-            >
-              <button
-                type="button"
-                onClick={() => navigate(`/board/cards/${card.id}`)}
-                className="min-w-0 truncate font-medium outline-none hover:underline focus-visible:underline"
-                title={`${card.title} (${card.column_name})`}
-              >
-                {card.title}
-              </button>
-              <button
-                type="button"
-                disabled={linkSuggested.isPending}
-                onClick={() => linkSuggested.mutate(card.id)}
-                className="flex h-full shrink-0 items-center gap-1 rounded-r-md border-l px-2 text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-                aria-label={`Link this conversation to ${card.title}`}
-              >
-                <PlusIcon className="h-3 w-3" />
-                Link
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {detail.data.board_cards.length > 0 && (
-        <nav
-          aria-label="Board items"
-          className="flex shrink-0 items-center gap-2 overflow-x-auto border-b bg-background px-4 py-2 text-xs text-muted-foreground md:px-6"
-        >
-          <span className="flex shrink-0 items-center gap-1.5">
-            <BoardIcon className="h-3.5 w-3.5" />
-            On the board
-          </span>
-          {detail.data.board_cards.map((card) => (
-            <button
-              key={card.id}
-              type="button"
-              onClick={() => navigate(`/board/cards/${card.id}`)}
-              title={`${card.title} (${card.column_name})`}
-              className="inline-flex h-6 max-w-64 shrink-0 items-center gap-1.5 rounded-md border bg-background px-2 text-xs text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 touch:h-8"
-            >
-              <span className="min-w-0 truncate font-medium">{card.title}</span>
-              <span className="shrink-0 text-muted-foreground">{card.column_name}</span>
-            </button>
-          ))}
-        </nav>
-      )}
-
       <div ref={conversationRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="mr-auto w-full max-w-[1100px] px-4 py-5 sm:px-6 md:py-6">
           {timeline.map((entry, index) => (
@@ -743,8 +658,6 @@ export function ThreadView(props: {
                 <MessageCard
                   message={entry.item}
                   catchAllRecipient={thread.catch_all_recipient}
-                  onCreateBoardItem={createBoardItem}
-                  onAddToBoardItem={() => setAddingToCard(true)}
                   onBlockSender={
                     blockCandidatesFor(entry.item, ownAddresses).length > 0
                       ? () => openBlockSender(entry.item)
@@ -789,19 +702,6 @@ export function ThreadView(props: {
           }}
         />
       )}
-      <BoardCardDialog
-        target={boardTarget}
-        onOpenChange={(open) => !open && setBoardTarget(null)}
-      />
-      <AddToBoardCardDialog
-        open={addingToCard}
-        conversation={boardConversation}
-        onOpenChange={setAddingToCard}
-        onCreateNew={() => {
-          setAddingToCard(false);
-          createBoardItem();
-        }}
-      />
 
       {replyCollapsed.collapsed && (
         <Button
@@ -1273,14 +1173,10 @@ function MessageConnector() {
 function MessageCard({
   message,
   catchAllRecipient,
-  onCreateBoardItem,
-  onAddToBoardItem,
   onBlockSender,
 }: {
   message: Message;
   catchAllRecipient: string | null;
-  onCreateBoardItem: () => void;
-  onAddToBoardItem: () => void;
   onBlockSender?: () => void;
 }) {
   const [showQuoted, setShowQuoted] = useState(false);
@@ -1304,6 +1200,7 @@ function MessageCard({
   const to = parseAddressList(message.to_addresses);
   const cc = parseAddressList(message.cc_addresses);
   const bcc = isOutbound ? parseAddressList(message.bcc_addresses) : [];
+  const hasMenu = Boolean((dark && message.html_body) || onBlockSender);
 
   return (
     <Card className="gap-0 p-4 sm:p-5">
@@ -1347,49 +1244,40 @@ function MessageCard({
         >
           {formatTime(message.created_at)}
         </time>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="-mt-0.5 -mr-1.5 text-muted-foreground"
-              aria-label="Message options"
-              title="More"
-            >
-              <MoreIcon className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {dark && message.html_body && (
-              <>
-                <DropdownMenuItem
-                  onSelect={() => setChosenAppearance(appearance === "dark" ? "original" : "dark")}
-                >
-                  <ContrastIcon />
-                  {appearance === "dark" ? "Show original colors" : "Show in dark colors"}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            )}
-            <DropdownMenuItem onSelect={onCreateBoardItem}>
-              <PlusIcon />
-              Create board item
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onAddToBoardItem}>
-              <BoardIcon />
-              Add to board item
-            </DropdownMenuItem>
-            {onBlockSender && (
-              <>
-                <DropdownMenuSeparator />
+        {hasMenu && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="-mt-0.5 -mr-1.5 text-muted-foreground"
+                aria-label="Message options"
+                title="More"
+              >
+                <MoreIcon className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {dark && message.html_body && (
+                <>
+                  <DropdownMenuItem
+                    onSelect={() => setChosenAppearance(appearance === "dark" ? "original" : "dark")}
+                  >
+                    <ContrastIcon />
+                    {appearance === "dark" ? "Show original colors" : "Show in dark colors"}
+                  </DropdownMenuItem>
+                  {onBlockSender && <DropdownMenuSeparator />}
+                </>
+              )}
+              {onBlockSender && (
                 <DropdownMenuItem variant="destructive" onSelect={onBlockSender}>
                   <ShieldBanIcon />
                   Block sender…
                 </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {message.html_body ? (
