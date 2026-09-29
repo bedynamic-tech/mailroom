@@ -1149,10 +1149,15 @@ function useCollapseReplyOnScroll(
     const container = containerRef.current;
     if (!ready || !container) return;
     const query = window.matchMedia(SINGLE_PANE_QUERY);
-    let lastTop = container.scrollTop;
+    // iOS rubber-bands past either end, reporting a scrollTop outside the
+    // scrollable range until the bounce settles. Clamping keeps the spring back
+    // from a bottom overscroll from reading as the person scrolling up.
+    const clampedTop = () =>
+      Math.min(Math.max(container.scrollTop, 0), container.scrollHeight - container.clientHeight);
+    let lastTop = clampedTop();
     let lastHeight = container.clientHeight;
     const onScroll = () => {
-      const top = container.scrollTop;
+      const top = clampedTop();
       const delta = top - lastTop;
       lastTop = top;
       // A scroll caused by the view resizing (the keyboard opening, the form
