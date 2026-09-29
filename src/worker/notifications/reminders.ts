@@ -2,7 +2,7 @@ import { sendEmail, type SendEmailEnv } from "../email/send.ts";
 import { formatDueTime } from "../../shared/board.ts";
 import { pushToSubscribedBrowsers, type PushMessage } from "./push.ts";
 
-/** Most reminders sent in one scheduler run; the rest go out a minute later. */
+/** Most reminders sent in one scheduler run; the rest go out in the next run, 5 minutes later. */
 const BATCH_SIZE = 25;
 
 export interface DueReminder {

@@ -83,9 +83,9 @@
       }
     ]
   },
-  // Sends Board Item reminders.
+  // Sends Board Item reminders every 5 minutes.
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": ["*/5 * * * *"]
   },
   "observability": {
     "enabled": true
