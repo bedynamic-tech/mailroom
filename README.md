@@ -88,7 +88,9 @@ Routing, D1, R2 and Web Push.
   contact's conversations, and autocomplete them in To, Cc and Bcc. Give a
   contact several email addresses and edit them at any time: mail from any of
   them shows up under that contact, and new email goes to the one marked
-  primary. Import from CSV or vCard.
+  primary. A contact's name is used for its senders in the conversation list
+  and on each message, in place of the name on the email. Import from CSV or
+  vCard.
 - **Catch-all.** Make one inbox per domain receive mail for any address that
   has no inbox of its own, such as a different address for each service you
   sign up to. Caught mail is badged and shows the address it was sent to,

@@ -1273,9 +1273,9 @@ function MessageCard({
     return message.attachments.filter((attachment) => !inline.has(attachment.id));
   }, [message.attachments, message.html_body]);
   const isOutbound = message.direction === "outbound";
-  // Mail sent with a bare address has no name; fall back to their Contact.
+  // The Contact name is ours, so it wins over the name on the mail.
   const senderName =
-    message.from_name?.trim() || contactNames?.[message.from_address.toLowerCase()]?.trim() || "";
+    contactNames?.[message.from_address.toLowerCase()]?.trim() || message.from_name?.trim() || "";
   const displayName = senderName || message.from_address;
   const { main, quoted } = splitQuotedTail(message.text_body ?? "");
   const to = parseAddressList(message.to_addresses);

@@ -163,7 +163,10 @@ async function searchConversations(
   const { results } = await db
     .prepare(
       `SELECT t.id, t.subject, t.status, t.snippet, t.last_message_at, m.address AS mailbox_address,
-         (SELECT COALESCE(NULLIF(trim(li.from_name), ''), li.from_address) FROM messages li
+         (SELECT COALESCE(
+                  (SELECT c.name FROM contact_addresses ca JOIN contacts c ON c.id = ca.contact_id
+                   WHERE ca.address = li.from_address AND trim(COALESCE(c.name, '')) <> ''),
+                  NULLIF(trim(li.from_name), ''), li.from_address) FROM messages li
           WHERE li.thread_id = t.id AND li.direction = 'inbound'
           ORDER BY li.created_at DESC, li.id DESC LIMIT 1) AS sender
        FROM threads t JOIN mailboxes m ON m.id = t.mailbox_id
