@@ -6,6 +6,7 @@ interface StoredPushSubscription {
   expiration_time: number | null;
   p256dh: string;
   auth: string;
+  user_agent: string | null;
 }
 
 export interface NewEmailNotificationInput {
@@ -115,6 +116,8 @@ export interface PushMessage {
 }
 
 export interface PushFailure {
+  /** Readable browser name, e.g. "Firefox on macOS". */
+  browser: string;
   /** Push service origin, e.g. https://web.push.apple.com. */
   service: string;
   /** HTTP status from the push service; 0 when the request never completed. */
@@ -126,6 +129,8 @@ export interface PushResult {
   /** Stored subscriptions a send was attempted for. */
   subscriptions: number;
   delivered: number;
+  /** Readable names of the browsers the push service accepted it for. */
+  deliveredTo: string[];
   /** Subscriptions the push service reported gone, now forgotten. */
   removed: number;
   failures: PushFailure[];
@@ -136,13 +141,13 @@ export interface PushResult {
  * ones the push service reports gone. Callers check their own setting first.
  */
 export async function pushToSubscribedBrowsers(env: Env, message: PushMessage): Promise<PushResult> {
-  const result: PushResult = { subscriptions: 0, delivered: 0, removed: 0, failures: [] };
+  const result: PushResult = { subscriptions: 0, delivered: 0, deliveredTo: [], removed: 0, failures: [] };
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_JWK || !env.VAPID_SUBJECT) return result;
   const privateJWK = env.VAPID_PRIVATE_JWK;
   const adminContact = env.VAPID_SUBJECT;
 
   const { results } = await env.DB.prepare(
-    `SELECT endpoint, expiration_time, p256dh, auth
+    `SELECT endpoint, expiration_time, p256dh, auth, user_agent
      FROM push_subscriptions ORDER BY id`,
   ).all<StoredPushSubscription>();
   result.subscriptions = results.length;
@@ -179,6 +184,7 @@ export async function pushToSubscribedBrowsers(env: Env, message: PushMessage): 
         });
         if (response.ok) {
           result.delivered += 1;
+          result.deliveredTo.push(describeBrowser(subscription.user_agent));
           return;
         }
         if (response.status === 404 || response.status === 410) {
@@ -186,6 +192,7 @@ export async function pushToSubscribedBrowsers(env: Env, message: PushMessage): 
           return;
         }
         const failure = {
+          browser: describeBrowser(subscription.user_agent),
           service: endpointOrigin(subscription.endpoint),
           status: response.status,
           reason: (await response.text().catch(() => "")).trim().slice(0, 200),
@@ -194,6 +201,7 @@ export async function pushToSubscribedBrowsers(env: Env, message: PushMessage): 
         console.error("Browser notification delivery failed", failure);
       } catch (error) {
         const failure = {
+          browser: describeBrowser(subscription.user_agent),
           service: endpointOrigin(subscription.endpoint),
           status: 0,
           reason: error instanceof Error ? error.message : "unknown",
@@ -213,6 +221,34 @@ export async function pushToSubscribedBrowsers(env: Env, message: PushMessage): 
     result.removed = deadEndpoints.length;
   }
   return result;
+}
+
+/** "Firefox on macOS" from the User-Agent saved with the subscription. */
+export function describeBrowser(userAgent: string | null): string {
+  if (!userAgent) return "Unknown browser";
+  const browser = /Firefox\/|FxiOS\//.test(userAgent)
+    ? "Firefox"
+    : /Edg(A|iOS)?\//.test(userAgent)
+      ? "Edge"
+      : /Chrome\/|CriOS\//.test(userAgent)
+        ? "Chrome"
+        : /Safari\/|AppleWebKit\//.test(userAgent)
+          ? "Safari"
+          : "Browser";
+  const os = /iPhone/.test(userAgent)
+    ? "iPhone"
+    : /iPad/.test(userAgent)
+      ? "iPad"
+      : /Android/.test(userAgent)
+        ? "Android"
+        : /Mac OS X|Macintosh/.test(userAgent)
+          ? "macOS"
+          : /Windows/.test(userAgent)
+            ? "Windows"
+            : /Linux|CrOS/.test(userAgent)
+              ? "Linux"
+              : "";
+  return os ? `${browser} on ${os}` : browser;
 }
 
 function endpointOrigin(endpoint: string): string {

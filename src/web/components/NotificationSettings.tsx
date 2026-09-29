@@ -80,8 +80,10 @@ export function NotificationSettings(props: {
     mutationFn: async () => {
       // Make sure this browser is on the server's list before testing it.
       const subscription = await currentBrowserPushSubscription();
-      if (subscription) await syncBrowserNotifications(subscription);
-      return testBrowserNotifications();
+      const registered = subscription
+        ? (await syncBrowserNotifications(subscription)).registered
+        : false;
+      return { ...(await testBrowserNotifications()), thisBrowserRegistered: registered };
     },
   });
 
@@ -172,7 +174,9 @@ export function NotificationSettings(props: {
                 {globalEnabled && sendTest.isSuccess && (
                   <p
                     className={`mt-1 text-xs leading-5 ${
-                      sendTest.data.delivered === sendTest.data.subscriptions && sendTest.data.delivered > 0
+                      sendTest.data.delivered === sendTest.data.subscriptions &&
+                      sendTest.data.delivered > 0 &&
+                      sendTest.data.thisBrowserRegistered
                         ? "text-muted-foreground"
                         : "text-destructive"
                     }`}
@@ -437,15 +441,21 @@ function notificationDescription(state: {
   return "Get notifications in this browser.";
 }
 
-function browserTestMessage(result: BrowserPushTestResult): string {
+function browserTestMessage(
+  result: BrowserPushTestResult & { thisBrowserRegistered: boolean },
+): string {
+  const notHere = result.thisBrowserRegistered
+    ? ""
+    : " This browser is not registered, so it will not get notifications. Press Enable on this browser.";
   if (result.subscriptions === 0) {
-    return "No browsers are registered for notifications. Turn notifications off and on again in each browser.";
+    return `No browsers are registered for notifications.${notHere}`;
   }
   const browsers = (count: number) => `${count} ${count === 1 ? "browser" : "browsers"}`;
+  const names = result.deliveredTo.length > 0 ? ` (${result.deliveredTo.join(", ")})` : "";
   if (result.failures.length === 0 && result.removed === 0) {
-    return `Sent to ${browsers(result.delivered)}. It should appear in a few seconds.`;
+    return `Sent to ${browsers(result.delivered)}${names}. It should appear in a few seconds.${notHere}`;
   }
-  const parts = [`Delivered to ${result.delivered} of ${browsers(result.subscriptions)}.`];
+  const parts = [`Delivered to ${result.delivered} of ${browsers(result.subscriptions)}${names}.`];
   if (result.removed > 0) {
     parts.push(`${browsers(result.removed)} had expired and must be turned on again.`);
   }
@@ -454,11 +464,11 @@ function browserTestMessage(result: BrowserPushTestResult): string {
     const detail = failure.reason ? `: ${failure.reason}` : "";
     parts.push(
       failure.status
-        ? `${service} refused it (${failure.status}${detail}).`
-        : `${service} could not be reached${failure.reason ? ` (${failure.reason})` : ""}.`,
+        ? `${failure.browser}: ${service} refused it (${failure.status}${detail}).`
+        : `${failure.browser}: ${service} could not be reached${failure.reason ? ` (${failure.reason})` : ""}.`,
     );
   }
-  return parts.join(" ");
+  return parts.join(" ") + notHere;
 }
 
 function notificationErrorMessage(error: Error): string {
