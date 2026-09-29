@@ -36,6 +36,17 @@ Routing, D1, R2 and Web Push.
   conversation folds the reply box into a round **Reply** button, keeping
   anything already written. Tap it, or scroll back down to the latest
   message, to open the reply box again.
+- **Reply greeting.** Turn on **Add a greeting to replies** in
+  **Settings > General** and each reply box starts with a greeting such as
+  `Jane,` followed by a blank line, with the cursor on the line below, as if
+  you had typed it and pressed Enter twice. The greeting is editable there;
+  `{first_name}` stands for the first name of the first To recipient, taken
+  from their contact or, failing that, the name on their latest email in the
+  conversation (the default is `{first_name},`, and `Hi {first_name},` also
+  works). When no name is known the reply starts empty. The greeting follows
+  the To field until you edit the text, never replaces text you have written,
+  and gives way to an AI draft. A reply holding only the greeting cannot be
+  sent. It is off by default.
 - **Send status and bounces.** Every email sent from Mailroom shows a small
   check at the bottom right of its card once the email provider has accepted
   it. When any recipient bounces, the check turns into a red exclamation

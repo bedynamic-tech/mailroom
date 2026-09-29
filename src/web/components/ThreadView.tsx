@@ -11,6 +11,7 @@ import {
   deleteThread,
   deleteThreadNote,
   discardDraft,
+  fetchGeneralSettings,
   fetchMailboxes,
   fetchThread,
   markRead,
@@ -72,6 +73,7 @@ import {
   serializeReplyRecipients,
 } from "../../shared/reply-recipients";
 import { RichTextEditor, RichTextPreview } from "./RichTextEditor";
+import { firstNameFrom, replyGreetingHtml, replyGreetingLine } from "../../shared/reply-greeting";
 import {
   isBlankRichText,
   plainTextToHtml,
@@ -118,9 +120,17 @@ export function ThreadView(props: {
   const ccField = useRef<RecipientInputHandle>(null);
   const bccField = useRef<RecipientInputHandle>(null);
   const attemptIds = useRef(new Map<string, { text: string; id: string }>());
+  // The Reply greeting line in the reply box: undefined until one is added (or
+  // the user starts writing first), null once the user takes over the text.
+  const insertedGreeting = useRef<string | null | undefined>(undefined);
 
   // Own Inbox addresses are never copied on Reply all.
   const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: fetchMailboxes });
+
+  const generalSettings = useQuery({
+    queryKey: ["settings", "general"],
+    queryFn: fetchGeneralSettings,
+  });
 
   const detail = useQuery({
     queryKey: ["thread", props.threadId],
@@ -160,6 +170,7 @@ export function ThreadView(props: {
     removeNote.reset();
     seenDraftIds.current.clear();
     attemptIds.current.clear();
+    insertedGreeting.current = undefined;
   }, [props.threadId]);
 
   // Edited recipients are saved on the Conversation, so they follow the user
@@ -246,6 +257,7 @@ export function ThreadView(props: {
       // Recipients stay as sent, so the next reply goes to the same people.
       if (result.status === "sent") {
         setReplyText("");
+        insertedGreeting.current = undefined;
         setPendingFiles([]);
         setAddingCc(false);
         setAddingBcc(false);
@@ -268,7 +280,11 @@ export function ThreadView(props: {
     mutationFn: (args: { text: string; html: string }) =>
       addThreadNote(props.threadId, args.text, args.html),
     onSuccess: (_note, args) => {
-      setReplyText((current) => (sanitizeRichText(current) === args.html ? "" : current));
+      setReplyText((current) => {
+        if (sanitizeRichText(current) !== args.html) return current;
+        insertedGreeting.current = undefined;
+        return "";
+      });
       setUsedDraftId(null);
       queryClient.invalidateQueries({ queryKey: ["thread", props.threadId] });
     },
@@ -284,6 +300,7 @@ export function ThreadView(props: {
     onSuccess: (_result, draftId) => {
       seenDraftIds.current.add(draftId);
       setReplyText("");
+      insertedGreeting.current = undefined;
       setUsedDraftId(null);
       invalidateAll();
     },
@@ -321,15 +338,51 @@ export function ThreadView(props: {
 
   const draft = detail.data?.drafts.at(-1) ?? null;
 
+  // undefined while the settings or Conversation are loading; null for no greeting.
+  const greeting =
+    generalSettings.data && detail.data
+      ? generalSettings.data.reply_greeting_enabled
+        ? replyGreetingLine(
+            generalSettings.data.reply_greeting_template,
+            recipientFirstName(detail.data, replyToEdit ?? defaultReplyTargets(detail.data.messages)),
+          )
+        : null
+      : undefined;
+  const replyPlainText = richTextToPlainText(replyText);
+  // True while the reply box holds nothing the user wrote: empty, or only the greeting.
+  const replyUntouched =
+    replyPlainText === "" ||
+    (typeof insertedGreeting.current === "string" && replyPlainText === insertedGreeting.current);
+  const replyEmpty = isBlankRichText(replyText) || (Boolean(greeting) && replyPlainText === greeting);
+
+  // Starts the reply box with the Reply greeting, and keeps it matching the To
+  // recipient until the user edits it. Text the user wrote is never replaced.
+  useEffect(() => {
+    if (greeting === undefined || reply.isPending) return;
+    const inserted = insertedGreeting.current;
+    const current = richTextToPlainText(replyText);
+    if (inserted === null) return;
+    if (inserted === undefined) {
+      if (!greeting || current !== "") return;
+    } else if (current !== inserted || greeting === inserted) {
+      if (current !== inserted) insertedGreeting.current = null;
+      return;
+    }
+    insertedGreeting.current = greeting ?? undefined;
+    setReplyText(greeting ? replyGreetingHtml(greeting) : "");
+  }, [greeting, replyText, reply.isPending]);
+
   useEffect(() => {
     if (!draft || seenDraftIds.current.has(draft.id)) return;
     // Consider each draft once: polling must not restore text the user cleared
-    // or replace a reply they were already writing when the draft arrived.
+    // or replace a reply they were already writing when the draft arrived. A
+    // reply holding only the greeting is replaced, as the draft has its own.
     seenDraftIds.current.add(draft.id);
-    if (!isBlankRichText(replyText) || reply.isPending || discard.isPending) return;
+    if (!replyUntouched || reply.isPending || discard.isPending) return;
+    insertedGreeting.current = null;
     setReplyText(plainTextToHtml(draft.text_body));
     setUsedDraftId(draft.id);
-  }, [draft, replyText, reply.isPending, discard.isPending]);
+  }, [draft, replyUntouched, reply.isPending, discard.isPending]);
 
   if (detail.isLoading) return <ThreadViewSkeleton onBack={props.onBack} />;
 
@@ -400,19 +453,9 @@ export function ThreadView(props: {
       ? startDraft.error.message
       : detail.data.draft_run?.error ?? null;
 
-  // To starts as the latest inbound Message's reply target (see sendReplyAttempt) and can be edited.
-  // A Conversation started from Mailroom has no inbound Message yet, so it follows up with the
-  // latest sent Message's To.
+  // To starts as defaultReplyTargets and can be edited.
   const latestInbound = messages.filter((message) => message.direction === "inbound").at(-1);
-  const latestOutbound = messages.filter((message) => message.direction === "outbound").at(-1);
-  const inboundReplyTarget = latestInbound
-    ? (() => {
-        const replyTo = parseAddressList(latestInbound.reply_to_addresses);
-        return replyTo.length ? replyTo : [latestInbound.from_address];
-      })()
-    : latestOutbound
-      ? parseAddressList(latestOutbound.to_addresses)
-      : [];
+  const inboundReplyTarget = defaultReplyTargets(messages);
   const replyTargets = replyToEdit ?? inboundReplyTarget;
   const copyCapacity =
     MAX_RECIPIENTS_PER_MESSAGE - replyTargets.length - replyCc.length - replyBcc.length;
@@ -460,7 +503,7 @@ export function ThreadView(props: {
   const submitReply = () => {
     const html = isBlankRichText(replyText) ? "" : sanitizeRichText(replyText);
     const text = html ? richTextToPlainText(html) : "";
-    if ((text || pendingFiles.length > 0) && !reply.isPending && !discard.isPending) {
+    if ((!replyEmpty || pendingFiles.length > 0) && !reply.isPending && !discard.isPending) {
       // Add any address still being typed; stop if one of them is invalid.
       const to = toField.current ? toField.current.commit() : replyTargets;
       const cc = ccField.current ? ccField.current.commit() : replyCc;
@@ -487,13 +530,14 @@ export function ThreadView(props: {
   };
 
   const submitNote = () => {
-    if (isBlankRichText(replyText) || addNote.isPending || reply.isPending) return;
+    if (replyEmpty || addNote.isPending || reply.isPending) return;
     const html = sanitizeRichText(replyText);
     addNote.mutate({ text: richTextToPlainText(html), html });
   };
 
   const applyDraft = (next: Draft) => {
     seenDraftIds.current.add(next.id);
+    insertedGreeting.current = null;
     setReplyText(plainTextToHtml(next.text_body));
     setUsedDraftId(next.id);
   };
@@ -828,8 +872,11 @@ export function ThreadView(props: {
               disabled={reply.isPending || discard.isPending || addNote.isPending}
               onChange={(html) => {
                 setReplyText(html);
+                // Writing before the greeting was added keeps it out.
+                if (insertedGreeting.current === undefined) insertedGreeting.current = null;
                 if (isBlankRichText(html)) setUsedDraftId(null);
               }}
+              caretToEndOnFocus={Boolean(greeting) && replyPlainText === greeting}
               onSubmitShortcut={submitReply}
               placeholder="Write a reply…"
               ariaLabel="Reply"
@@ -925,7 +972,7 @@ export function ThreadView(props: {
                   <Button
                     onClick={submitReply}
                     disabled={
-                      (isBlankRichText(replyText) && pendingFiles.length === 0) ||
+                      (replyEmpty && pendingFiles.length === 0) ||
                       reply.isPending ||
                       discard.isPending ||
                       addNote.isPending
@@ -943,7 +990,7 @@ export function ThreadView(props: {
                         aria-label="More send options"
                         title="More send options"
                         disabled={
-                          isBlankRichText(replyText) ||
+                          replyEmpty ||
                           reply.isPending ||
                           discard.isPending ||
                           addNote.isPending
@@ -954,7 +1001,7 @@ export function ThreadView(props: {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="top" align="end" className="min-w-56">
                       <DropdownMenuItem
-                        disabled={isBlankRichText(replyText)}
+                        disabled={replyEmpty}
                         onSelect={submitNote}
                         className="items-start"
                       >
@@ -1138,6 +1185,36 @@ function blockCandidatesFor(message: Message, ownAddresses: Set<string>): BlockC
   for (const address of parseAddressList(message.to_addresses)) add(address, "To");
   for (const address of parseAddressList(message.cc_addresses)) add(address, "Cc");
   return candidates;
+}
+
+/**
+ * Where a reply goes unless To is edited: the latest inbound Message's reply
+ * target (see sendReplyAttempt). A Conversation started from Mailroom has no
+ * inbound Message yet, so it follows up with the latest sent Message's To.
+ */
+function defaultReplyTargets(messages: Message[]): string[] {
+  const latestInbound = messages.filter((message) => message.direction === "inbound").at(-1);
+  if (latestInbound) {
+    const replyTo = parseAddressList(latestInbound.reply_to_addresses);
+    return replyTo.length ? replyTo : [latestInbound.from_address];
+  }
+  const latestOutbound = messages.filter((message) => message.direction === "outbound").at(-1);
+  return latestOutbound ? parseAddressList(latestOutbound.to_addresses) : [];
+}
+
+/**
+ * First name of the first To recipient for the Reply greeting: from their
+ * Contact, else from the display name on their latest email here.
+ */
+function recipientFirstName(detail: ThreadDetail, to: string[]): string | null {
+  const address = to[0]?.toLowerCase();
+  if (!address) return null;
+  const contactName = firstNameFrom(detail.contact_names?.[address]);
+  if (contactName) return contactName;
+  const sent = detail.messages
+    .filter((message) => message.from_address.toLowerCase() === address && message.from_name)
+    .at(-1);
+  return firstNameFrom(sent?.from_name);
 }
 
 function parseAddressList(raw: string | null | undefined): string[] {

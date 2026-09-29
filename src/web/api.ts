@@ -176,6 +176,13 @@ export const updateDefaultSignature = (html: string | null) =>
     body: JSON.stringify({ html }),
   });
 
+export const updateReplyGreeting = (enabled: boolean, template: string | null) =>
+  request<{ ok: true; enabled: boolean; template: string | null }>("/settings/reply-greeting", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled, template }),
+  });
+
 export const fetchDomains = () => request<Domain[]>("/domains");
 
 export const createDomain = (input: { name: string }) =>

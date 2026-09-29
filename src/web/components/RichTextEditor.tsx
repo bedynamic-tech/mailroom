@@ -67,6 +67,8 @@ export function RichTextEditor(props: {
   toolbarEnd?: ReactNode;
   /** Shown between the toolbar and the editable area. */
   belowToolbar?: ReactNode;
+  /** Put the caret on the last line when the editor gains focus, e.g. below a greeting. */
+  caretToEndOnFocus?: boolean;
 }) {
   const variant = props.variant ?? "boxed";
   const editorRef = useRef<HTMLDivElement>(null);
@@ -310,7 +312,24 @@ export function RichTextEditor(props: {
           }}
           onKeyUp={refreshActive}
           onMouseUp={refreshActive}
-          onFocus={refreshActive}
+          onFocus={() => {
+            refreshActive();
+            if (!props.caretToEndOnFocus) return;
+            // After the click that focused the editor has placed its own caret.
+            requestAnimationFrame(() => {
+              const editor = editorRef.current;
+              const selection = document.getSelection();
+              if (!editor || !selection || document.activeElement !== editor) return;
+              const range = document.createRange();
+              const last = editor.lastElementChild;
+              const emptyLastLine = Boolean(last && !last.textContent);
+              if (last && emptyLastLine) range.setStart(last, 0);
+              else range.selectNodeContents(editor);
+              range.collapse(emptyLastLine);
+              selection.removeAllRanges();
+              selection.addRange(range);
+            });
+          }}
           onBlur={emit}
           onKeyDown={(event) => {
             if (!(event.metaKey || event.ctrlKey) || event.altKey) return;

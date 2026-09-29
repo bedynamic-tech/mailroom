@@ -50,6 +50,10 @@ export interface GeneralSettings {
   browser_replies: boolean;
   /** Email Notifications, while on, carry replies in existing Conversations. */
   email_replies: boolean;
+  /** Start each reply with a greeting line such as "Jane,". */
+  reply_greeting_enabled: boolean;
+  /** Plain-text greeting with {first_name}; null uses "{first_name},". */
+  reply_greeting_template: string | null;
 }
 
 export interface EmailNotificationTemplate {
@@ -203,6 +207,8 @@ export interface ThreadDetail {
   draft_run: DraftRun | null;
   /** Internal Notes on this Conversation, oldest first. Never sent to anyone. */
   notes: ThreadNote[];
+  /** Names of Contacts matching the Conversation's addresses, keyed by lowercase address. */
+  contact_names: Record<string, string>;
 }
 
 /** An Internal Note: rich text left on a Conversation for the team only. */
