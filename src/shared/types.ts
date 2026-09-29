@@ -170,6 +170,16 @@ export interface Message {
   is_auto_submitted: number;
   created_at: string;
   attachments: Attachment[];
+  /** Recipients of an outbound Message that a returned bounce notice reported as failed. */
+  bounces: MessageBounce[];
+}
+
+export interface MessageBounce {
+  message_id: number;
+  recipient: string;
+  status: string | null;
+  diagnostic: string;
+  created_at: string;
 }
 
 export interface Draft {

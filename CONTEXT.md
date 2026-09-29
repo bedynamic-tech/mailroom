@@ -76,6 +76,10 @@ _Avoid_: Alarm, alert, due notification
 Rich text a person leaves on a Conversation for the rest of the team, added from the reply box with "Add internal note" or by a Mail Rule's "Add a note" action (plain text, marked with the rule's name), and shown tinted yellow among the Messages in the order it was written. It is never a Message: it is not sent, quoted, forwarded by a Mail Rule, given to Agent Drafts or the MCP Server, or included in Notifications, and it does not change the Conversation's order, snippet or read state. Deleting the Conversation deletes its Internal Notes.
 _Avoid_: Comment, private message, annotation
 
+**Bounce**:
+A recipient of an outbound Message that a returned bounce notice reported as permanently undeliverable, with the receiving server's status and message. Mailroom reads standard delivery status notifications (one entry per recipient, so a bounced Cc is told apart from a delivered To) and, on a best-effort basis, plain-text notices from MAILER-DAEMON. A notice counts only for mail sent from the Inbox it came back to, matched by the returned Message-ID or else by the latest email to that address in the last two weeks. Delay and success notices are not Bounces. The notice is still stored as an inbound Message. Deleting either Conversation removes the Bounce.
+_Avoid_: Failure, undelivered, NDR
+
 **Agent Draft**:
 A proposed reply authored by the agent and held for human review before sending.
 _Avoid_: Auto-reply, suggestion

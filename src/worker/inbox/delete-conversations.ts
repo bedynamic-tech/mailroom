@@ -114,6 +114,9 @@ export async function deleteArchivedConversations(
       `DELETE FROM thread_notes WHERE thread_id IN (${deletable})`,
       `DELETE FROM attachments WHERE message_id IN (
          SELECT id FROM messages WHERE thread_id IN (${deletable}))`,
+      `DELETE FROM message_bounces WHERE message_id IN (
+         SELECT id FROM messages WHERE thread_id IN (${deletable}))
+         OR bounce_message_id IN (SELECT id FROM messages WHERE thread_id IN (${deletable}))`,
       `DELETE FROM messages WHERE thread_id IN (${deletable})`,
       `DELETE FROM threads WHERE id IN (${deletable})`,
     ].map((sql) => env.DB.prepare(sql).bind(...targets)),

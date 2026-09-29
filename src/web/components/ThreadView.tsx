@@ -1435,7 +1435,7 @@ function MessageCard({
       )}
       {isOutbound && (
         <div className="-mr-1.5 -mb-1 mt-3 flex justify-end">
-          <DeliveryStatus />
+          <DeliveryStatus bounces={message.bounces ?? []} />
         </div>
       )}
     </Card>

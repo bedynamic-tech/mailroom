@@ -11,6 +11,7 @@ import { applyMailRules, matchingMailRules, NO_MAIL_RULES } from "./mail-rules";
 import type { MailRuleAddress, MailRuleSubject } from "../../shared/mail-rules";
 import { sendRuleForward, type ForwardedOriginal } from "./rule-forward";
 import { FORWARD_HEADER } from "./send";
+import { matchBounce, parseBounce, recordBounces, type MatchedBounce } from "./bounce";
 import {
   addressOf,
   addressesOf,
@@ -56,7 +57,7 @@ export async function receiveEmail(
     .bind(messageId)
     .first<{ id: number; thread_id: number; is_auto_submitted: number }>();
   if (duplicate) {
-    if (mailbox.agent_mode !== "off" && !duplicate.is_auto_submitted) {
+    if (mailbox.agent_mode !== "off" && !duplicate.is_auto_submitted && !parseBounce(parsed)) {
       // Rules were applied on first delivery; only honour their draft skip here.
       const rules = await matchingMailRules(env, mailbox.id, ruleSubject(parsed));
       if (!rules.some((rule) => rule.skip_draft)) {
@@ -75,6 +76,9 @@ export async function receiveEmail(
   const textBody = parsed.text ?? htmlToText(parsed.html ?? "");
   const referencesIds = extractMessageIds(parsed);
   const sender = addressOf(parsed.from);
+  // A bounce notice marks the recipients that failed on the sent Message. It
+  // is still stored as mail, threaded like any other email.
+  const bounce = await findBounce(env, mailbox.id, parsed);
   const existingThreadId = await resolveThread(
     env,
     mailbox.id,
@@ -110,6 +114,15 @@ export async function receiveEmail(
       });
 
   await storeAttachments(env, mailbox.id, stored.messageId, parsed.attachments);
+
+  if (bounce) {
+    await recordBounces(env, bounce, stored.messageId).catch((error) =>
+      console.error("Recording bounce failed", {
+        messageId: bounce.messageId,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  }
 
   const rules = await applyMailRules(env, {
     mailboxId: mailbox.id,
@@ -149,7 +162,7 @@ export async function receiveEmail(
     }
   }
 
-  if (sender && !isAutoSubmitted(parsed)) {
+  if (sender && !bounce && !isAutoSubmitted(parsed)) {
     ctx.waitUntil(
       recordSender(env, {
         address: sender,
@@ -205,9 +218,21 @@ export async function receiveEmail(
     );
   }
 
-  if (mailbox.agent_mode !== "off" && !rules.skipDraft && !isAutoSubmitted(parsed)) {
+  if (mailbox.agent_mode !== "off" && !rules.skipDraft && !bounce && !isAutoSubmitted(parsed)) {
     await enqueueIfExternal(env, stored.threadId, stored.messageId, parsed);
   }
+}
+
+async function findBounce(env: Env, mailboxId: number, parsed: Email): Promise<MatchedBounce | null> {
+  const report = parseBounce(parsed);
+  if (!report) return null;
+  // Bounce detection must never lose the notice itself.
+  return matchBounce(env, mailboxId, report).catch((error) => {
+    console.error("Bounce matching failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  });
 }
 
 function ruleSubject(parsed: Email): MailRuleSubject {
