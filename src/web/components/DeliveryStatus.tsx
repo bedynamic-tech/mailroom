@@ -4,17 +4,16 @@ import { Popover as PopoverPrimitive } from "radix-ui";
 import type { MessageBounce } from "../../shared/types";
 
 /**
- * Shown on an outbound Message. Mailroom only stores an outbound Message once
- * the email provider has accepted it, so it reads as sent until a bounce
- * notice comes back for one of its recipients. Then it shows an exclamation
+ * Shown on an outbound Message as an icon alone. Mailroom only stores an
+ * outbound Message once the email provider has accepted it, so it shows a
+ * check until one of its recipients bounces. Then it shows an exclamation
  * mark; hovering it, or tapping it on a phone, shows each bounce message.
  */
 export function DeliveryStatus({ bounces }: { bounces: MessageBounce[] }) {
   if (bounces.length === 0) {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted-foreground sm:text-xs">
+      <span role="img" aria-label="Sent" title="Sent" className="inline-flex p-1.5 text-muted-foreground">
         <Check aria-hidden="true" className="size-3.5" />
-        Sent
       </span>
     );
   }
@@ -51,10 +50,9 @@ function BouncedStatus({ bounces }: { bounces: MessageBounce[] }) {
           aria-label={label}
           onPointerEnter={hoverOpen}
           onPointerLeave={hoverClose}
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-xs"
+          className="inline-flex rounded-md p-1.5 text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <CircleAlert aria-hidden="true" className="size-3.5" />
-          Bounced
         </button>
       </PopoverPrimitive.Trigger>
       <PopoverPrimitive.Portal>
