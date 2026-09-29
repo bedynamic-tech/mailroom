@@ -11,7 +11,7 @@
 ![MCP](https://img.shields.io/badge/MCP-ready-6E56CF)
 
 </div>
-<img width="2800" height="1800" alt="inbox" src="https://github.com/user-attachments/assets/165cb260-af9b-4f4b-8541-bf391fc5deea" />
+<img width="2800" height="1800" alt="All inboxes in Mailroom +" src="docs/images/screenshot.png" />
 
 Mailroom + is a fork of the original Mailroom with a large set of features added
 for everyday use. It runs in your own Cloudflare account on Workers, Email
