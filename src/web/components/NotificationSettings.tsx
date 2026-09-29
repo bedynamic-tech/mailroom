@@ -10,6 +10,9 @@ import {
   fetchGeneralSettings,
   sendTestEmailNotification,
   setEmailNotificationsEnabled,
+  syncBrowserNotifications,
+  testBrowserNotifications,
+  type BrowserPushTestResult,
   updateEmailNotifications,
   updateNotificationTypes,
   type NotificationType,
@@ -18,6 +21,7 @@ import type { EmailNotificationTemplate, GeneralSettings as GeneralSettingsData 
 import {
   BrowserPushError,
   createBrowserPushSubscription,
+  currentBrowserPushSubscription,
   getBrowserPushState,
   unsubscribeCurrentBrowser,
 } from "../push-notifications";
@@ -70,6 +74,15 @@ export function NotificationSettings(props: {
       await unsubscribeCurrentBrowser();
     },
     onSettled: refreshState,
+  });
+
+  const sendTest = useMutation({
+    mutationFn: async () => {
+      // Make sure this browser is on the server's list before testing it.
+      const subscription = await currentBrowserPushSubscription();
+      if (subscription) await syncBrowserNotifications(subscription);
+      return testBrowserNotifications();
+    },
   });
 
   const globalEnabled = Boolean(settings.data?.browser_notifications_enabled);
@@ -142,6 +155,36 @@ export function NotificationSettings(props: {
 
                 {globalEnabled && settings.data && (
                   <NotificationTypeChecks channel="browser" settings={settings.data} disabled={busy} />
+                )}
+
+                {globalEnabled && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 -ml-2"
+                    onClick={() => sendTest.mutate()}
+                    disabled={busy || sendTest.isPending}
+                  >
+                    {sendTest.isPending ? "Sending…" : "Send test"}
+                  </Button>
+                )}
+                {globalEnabled && sendTest.isSuccess && (
+                  <p
+                    className={`mt-1 text-xs leading-5 ${
+                      sendTest.data.delivered === sendTest.data.subscriptions && sendTest.data.delivered > 0
+                        ? "text-muted-foreground"
+                        : "text-destructive"
+                    }`}
+                    role="status"
+                  >
+                    {browserTestMessage(sendTest.data)}
+                  </p>
+                )}
+                {globalEnabled && sendTest.error && (
+                  <p className="mt-1 text-xs leading-5 text-destructive" role="alert">
+                    {sendTest.error.message}
+                  </p>
                 )}
               </div>
               <Switch
@@ -392,6 +435,30 @@ function notificationDescription(state: {
   }
   if (state.globalEnabled) return "Notifications are on, but this browser is not subscribed yet.";
   return "Get notifications in this browser.";
+}
+
+function browserTestMessage(result: BrowserPushTestResult): string {
+  if (result.subscriptions === 0) {
+    return "No browsers are registered for notifications. Turn notifications off and on again in each browser.";
+  }
+  const browsers = (count: number) => `${count} ${count === 1 ? "browser" : "browsers"}`;
+  if (result.failures.length === 0 && result.removed === 0) {
+    return `Sent to ${browsers(result.delivered)}. It should appear in a few seconds.`;
+  }
+  const parts = [`Delivered to ${result.delivered} of ${browsers(result.subscriptions)}.`];
+  if (result.removed > 0) {
+    parts.push(`${browsers(result.removed)} had expired and must be turned on again.`);
+  }
+  for (const failure of result.failures) {
+    const service = failure.service.replace(/^https:\/\//, "");
+    const detail = failure.reason ? `: ${failure.reason}` : "";
+    parts.push(
+      failure.status
+        ? `${service} refused it (${failure.status}${detail}).`
+        : `${service} could not be reached${failure.reason ? ` (${failure.reason})` : ""}.`,
+    );
+  }
+  return parts.join(" ");
 }
 
 function notificationErrorMessage(error: Error): string {

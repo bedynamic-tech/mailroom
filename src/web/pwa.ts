@@ -1,5 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { QueryClient } from "@tanstack/react-query";
+import { syncBrowserNotifications } from "./api";
+import { currentBrowserPushSubscription } from "./push-notifications";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -38,15 +40,30 @@ export function startPwa(queryClient: QueryClient): void {
   });
 
   if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((error) => {
-    console.warn("Service worker registration failed", error);
-  });
+  navigator.serviceWorker
+    .register("/sw.js", { scope: "/" })
+    .then(() => resyncPushSubscription())
+    .catch((error) => {
+      console.warn("Service worker registration failed", error);
+    });
   // A push arrived while the app is open: refresh lists without waiting for polling.
   navigator.serviceWorker.addEventListener("message", (event) => {
     if ((event.data as { type?: string } | null)?.type !== "mailroom:new-email") return;
     queryClient.invalidateQueries({ queryKey: ["threads"] });
     queryClient.invalidateQueries({ queryKey: ["mailboxes"] });
   });
+}
+
+// The server can forget a subscription this browser still holds, for example
+// after notifications were turned off and on from another device. Re-sending
+// it is harmless; the server only keeps it while notifications are on.
+async function resyncPushSubscription(): Promise<void> {
+  try {
+    const subscription = await currentBrowserPushSubscription();
+    if (subscription) await syncBrowserNotifications(subscription);
+  } catch (error) {
+    console.warn("Could not re-register this browser for notifications", error);
+  }
 }
 
 export function isStandalone(): boolean {

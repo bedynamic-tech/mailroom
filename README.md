@@ -136,7 +136,9 @@ Routing, D1, R2 and Web Push.
   **Replies** (a new message in an existing conversation), both checked
   by default. Browser push works in Chrome, Edge, Firefox and Safari. On
   iPhone and iPad, add Mailroom + to the Home Screen and turn notifications
-  on from the app opened there.
+  on from the app opened there. **Send test** under Browser notifications
+  pushes a test to every registered browser and shows which ones received it
+  and why any push service refused it.
 - **Private by default.** Everything runs in your own account, with Cloudflare
   Access protecting the web app.
 

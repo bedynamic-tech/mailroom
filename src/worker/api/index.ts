@@ -46,7 +46,7 @@ import {
   emptyArchive,
   purgeConversationObjects,
 } from "../inbox/delete-conversations";
-import { validatePushSubscription } from "../notifications/push";
+import { pushToSubscribedBrowsers, validatePushSubscription } from "../notifications/push";
 import { BlockRuleError } from "../spam/blocklist";
 import { blockThreadSender, BlockThreadSenderError } from "../spam/block-thread-sender";
 import {
@@ -182,6 +182,56 @@ api.post("/settings/browser-notifications", async (c) => {
     ),
   ]);
   return c.json({ ok: true });
+});
+
+// Browsers keep their Push Subscription after the server forgets it (turning
+// notifications off anywhere clears every subscription, and push services
+// rotate endpoints). The app re-sends its subscription on load so a browser
+// that still believes it is subscribed actually receives notifications.
+api.post("/settings/browser-notifications/sync", async (c) => {
+  if (!c.env.VAPID_PUBLIC_KEY || !c.env.VAPID_PRIVATE_JWK || !c.env.VAPID_SUBJECT) {
+    return c.json({ registered: false });
+  }
+  const subscription = await c.req.json<BrowserPushSubscription>().catch(() => null);
+  if (!validatePushSubscription(subscription)) {
+    return c.json({ error: "The browser returned an invalid Push Subscription" }, 400);
+  }
+  const userAgent = c.req.header("User-Agent")?.slice(0, 512) ?? null;
+  const result = await c.env.DB.prepare(
+    `INSERT INTO push_subscriptions
+       (endpoint, expiration_time, p256dh, auth, user_agent)
+     SELECT ?, ?, ?, ?, ?
+     WHERE EXISTS (SELECT 1 FROM global_settings WHERE id = 1 AND browser_notifications_enabled = 1)
+     ON CONFLICT(endpoint) DO UPDATE SET
+       expiration_time = excluded.expiration_time,
+       p256dh = excluded.p256dh,
+       auth = excluded.auth,
+       user_agent = excluded.user_agent,
+       updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+  )
+    .bind(
+      subscription.endpoint,
+      subscription.expirationTime ?? null,
+      subscription.keys.p256dh,
+      subscription.keys.auth,
+      userAgent,
+    )
+    .run();
+  return c.json({ registered: (result.meta.changes ?? 0) > 0 });
+});
+
+api.post("/settings/browser-notifications/test", async (c) => {
+  if (!c.env.VAPID_PUBLIC_KEY || !c.env.VAPID_PRIVATE_JWK || !c.env.VAPID_SUBJECT) {
+    return c.json({ error: "Browser notifications are not configured on this server" }, 503);
+  }
+  const result = await pushToSubscribedBrowsers(c.env, {
+    title: "Test notification",
+    body: "Browser notifications from Mailroom + are working.",
+    tag: "mailroom-test",
+    data: { url: "/inbox" },
+    topic: "mailroom-test",
+  });
+  return c.json(result);
 });
 
 api.delete("/settings/browser-notifications", async (c) => {

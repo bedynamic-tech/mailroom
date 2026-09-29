@@ -120,6 +120,23 @@ export const enableBrowserNotifications = (subscription: BrowserPushSubscription
     body: JSON.stringify(subscription),
   });
 
+export const syncBrowserNotifications = (subscription: BrowserPushSubscription) =>
+  request<{ registered: boolean }>("/settings/browser-notifications/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(subscription),
+  });
+
+export interface BrowserPushTestResult {
+  subscriptions: number;
+  delivered: number;
+  removed: number;
+  failures: { service: string; status: number; reason: string }[];
+}
+
+export const testBrowserNotifications = () =>
+  request<BrowserPushTestResult>("/settings/browser-notifications/test", { method: "POST" });
+
 export type NotificationType =
   | "browser_new_email"
   | "email_new_email"

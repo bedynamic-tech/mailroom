@@ -93,6 +93,19 @@ export async function createBrowserPushSubscription(
   }
 }
 
+/** This browser's existing Push Subscription, without prompting for anything. */
+export async function currentBrowserPushSubscription(): Promise<BrowserPushSubscription | null> {
+  if (!supportsBrowserPush() || Notification.permission !== "granted") return null;
+  const registration = await navigator.serviceWorker.getRegistration("/");
+  const value = (await registration?.pushManager.getSubscription())?.toJSON();
+  if (!value?.endpoint || !value.keys?.p256dh || !value.keys.auth) return null;
+  return {
+    endpoint: value.endpoint,
+    expirationTime: value.expirationTime ?? null,
+    keys: { p256dh: value.keys.p256dh, auth: value.keys.auth },
+  };
+}
+
 export async function unsubscribeCurrentBrowser(): Promise<void> {
   if (!supportsBrowserPush()) return;
   const registration = await navigator.serviceWorker.getRegistration("/");
