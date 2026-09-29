@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { Attachment } from "../../shared/types";
-import { fixLowContrastText } from "../email-contrast";
+import { fixLowContrastText, neutralizeDarkSurfaces } from "../email-contrast";
 import { buildEmailHtmlDocument, type EmailAppearance } from "../email-html";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,10 @@ export function EmailHtmlBody({
     const frame = frameRef.current;
     const document = frame?.contentDocument;
     if (!frame || !document) return;
-    if (appearance === "dark") fixLowContrastText(document);
+    if (appearance === "dark") {
+      neutralizeDarkSurfaces(document);
+      fixLowContrastText(document);
+    }
 
     const resize = () => {
       const measuredHeight = Math.max(

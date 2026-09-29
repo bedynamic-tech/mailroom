@@ -8,6 +8,7 @@ import {
   cssBackgrounds,
   DARK_EMAIL_BACKGROUND,
   isBrightColor,
+  neutralDarkBackground,
   isPaperBackground,
   parseColor,
 } from "../src/web/email-colors.ts";
@@ -78,4 +79,14 @@ test("measures contrast between text and background", () => {
   assert.equal(contrastRatio("#123456", "#123456"), 1);
   assert.ok(contrastRatio("rgb(0, 0, 0)", "#111827") < 3);
   assert.equal(contrastRatio("var(--x)", "#fff"), null);
+});
+
+test("dark surfaces use the theme gray instead of a tint", () => {
+  const pale = parseColor(adaptBackgroundColor("#e8f0fe"));
+  assert.ok(Math.abs(pale.b - pale.r) <= 8, "a pale blue box does not turn navy");
+  const navy = parseColor(neutralDarkBackground("#111827"));
+  assert.ok(Math.abs(navy.b - navy.r) <= 8);
+  assert.equal(neutralDarkBackground("#16171a"), null);
+  assert.equal(neutralDarkBackground("#4f46e5"), null);
+  assert.equal(neutralDarkBackground("#ffffff"), null);
 });
