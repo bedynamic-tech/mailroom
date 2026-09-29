@@ -11,8 +11,9 @@ import { Popover as PopoverPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits";
 import { isEmailAddress, normalizeEmailAddress, splitAddressInput } from "../../shared/recipients";
-import type { Contact } from "../../shared/types";
-import { fetchContacts } from "../api";
+import { CircleAlert } from "lucide-react";
+import type { BouncedRecipient, Contact } from "../../shared/types";
+import { fetchBouncedRecipients, fetchContacts } from "../api";
 import { EmailAvatar } from "./EmailAvatar";
 import { XIcon } from "./Icons";
 
@@ -78,6 +79,17 @@ export function RecipientInput(props: {
     enabled: lookup,
     staleTime: 30_000,
   });
+  // Addresses that bounced before are flagged, since sending to them again
+  // hurts the sending domain's reputation.
+  const bouncedList = useQuery({
+    queryKey: ["bounced-recipients"],
+    queryFn: fetchBouncedRecipients,
+    staleTime: 60_000,
+  });
+  const bounced = new Map<string, BouncedRecipient>(
+    (bouncedList.data ?? []).map((entry) => [entry.recipient, entry]),
+  );
+  const bouncedValues = props.values.filter((value) => bounced.has(value.toLowerCase()));
   const excluded = new Set([
     ...(props.taken ?? []),
     ...props.values.map((value) => value.toLowerCase()),
@@ -164,12 +176,25 @@ export function RecipientInput(props: {
               if (event.target === event.currentTarget) inputRef.current?.focus();
             }}
           >
-            {props.values.map((address, index) => (
+            {props.values.map((address, index) => {
+              const bounce = bounced.get(address.toLowerCase());
+              return (
               <span
                 key={address}
-                className="inline-flex max-w-full items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-0.5 pl-2 text-xs text-foreground"
+                className={cn(
+                  "inline-flex max-w-full items-center gap-1 rounded-md border py-0.5 pr-0.5 pl-2 text-xs",
+                  bounce
+                    ? "border-destructive/50 bg-destructive/10 text-destructive"
+                    : "bg-muted/40 text-foreground",
+                )}
               >
-                <span className="min-w-0 truncate" title={address}>{address}</span>
+                {bounce && <CircleAlert aria-label="Bounced before" className="size-3.5 shrink-0" />}
+                <span
+                  className="min-w-0 truncate"
+                  title={bounce ? `${address} bounced: ${bounce.diagnostic || bounce.status || "undeliverable"}` : address}
+                >
+                  {address}
+                </span>
                 <button
                   type="button"
                   disabled={props.disabled}
@@ -180,7 +205,8 @@ export function RecipientInput(props: {
                   <XIcon className="h-3 w-3" />
                 </button>
               </span>
-            ))}
+              );
+            })}
             {!full && (
               <input
                 ref={inputRef}
@@ -318,7 +344,14 @@ export function RecipientInput(props: {
           {error}
         </p>
       )}
-      {!error && notice && (
+      {!error && bouncedValues.length > 0 && (
+        <p role="status" className="pb-1.5 text-xs text-destructive">
+          {bouncedValues.length === 1
+            ? `${bouncedValues[0]} bounced before. Sending to it again can hurt your sender reputation.`
+            : `${bouncedValues.join(", ")} bounced before. Sending to them again can hurt your sender reputation.`}
+        </p>
+      )}
+      {!error && !bouncedValues.length && notice && (
         <p role="status" className="pb-1.5 text-xs text-muted-foreground">
           {notice}
         </p>

@@ -70,6 +70,7 @@ import type {
   Mailbox,
   Message,
   MessageBounce,
+  BouncedRecipient,
   PlaybookInput,
   ThreadLabel,
 } from "../../shared/types";
@@ -955,6 +956,20 @@ api.get("/threads/:id", async (c) => {
     draft_run: draftRun ?? null,
     notes,
   });
+});
+
+// Every address that has bounced, with its latest reason, so recipient fields
+// can warn before mail is sent to it again.
+api.get("/bounced-recipients", async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT recipient, status, diagnostic, created_at FROM (
+       SELECT lower(recipient) AS recipient, status, diagnostic, created_at,
+              row_number() OVER (PARTITION BY lower(recipient) ORDER BY created_at DESC, id DESC) AS n
+       FROM message_bounces
+     ) WHERE n = 1
+     ORDER BY created_at DESC LIMIT 2000`,
+  ).all<BouncedRecipient>();
+  return c.json(results);
 });
 
 api.get("/attachments/:id", async (c) => {

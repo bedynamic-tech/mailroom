@@ -1,5 +1,6 @@
 import type { ReplyRecipients } from "../shared/reply-recipients";
 import type {
+  BouncedRecipient,
   BlockedRecipient,
   BlockedSender,
   BlockRecipientResult,
@@ -375,6 +376,9 @@ export const fetchContacts = (q: string, limit?: number) => {
   const search = params.toString();
   return request<Contact[]>(`/contacts${search ? `?${search}` : ""}`);
 };
+
+/** Addresses that have bounced, each with its latest reason. */
+export const fetchBouncedRecipients = () => request<BouncedRecipient[]>("/bounced-recipients");
 
 /** Contacts sorted A-Z by name, or by address when unnamed. */
 export const fetchContactsByName = (q: string, cursor: ContactCursor | null = null) => {
