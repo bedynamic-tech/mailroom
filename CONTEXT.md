@@ -65,7 +65,7 @@ Rich text a person leaves on a Conversation for the rest of the team, added from
 _Avoid_: Comment, private message, annotation
 
 **Bounce**:
-A recipient of an outbound Message that a returned bounce notice reported as permanently undeliverable, with the receiving server's status and message. Mailroom reads standard delivery status notifications (one entry per recipient, so a bounced Cc is told apart from a delivered To) and, on a best-effort basis, plain-text notices from MAILER-DAEMON. A notice counts only for mail sent from the Inbox it came back to, matched by the returned Message-ID or else by the latest email to that address in the last two weeks. Delay and success notices are not Bounces. The notice is still stored as an inbound Message. Deleting either Conversation removes the Bounce.
+A recipient of an outbound Message that could not be delivered, with the receiving server's status and message. Cloudflare Email Sending keeps receiving servers' bounce notices for itself and reports each recipient's outcome as Email Sending events; its bounced, rejected and failed events become Bounces, matched to the sent Message by its Message-ID or else by the latest email from that sender to that recipient in the last three days. A bounce notice that does arrive at an Inbox is also read: standard delivery status notifications (one entry per recipient, so a bounced Cc is told apart from a delivered To) and, on a best-effort basis, plain-text notices from MAILER-DAEMON, counted only for mail sent from the Inbox it came back to. Delay and success reports are not Bounces. Deleting the Conversation removes its Bounces.
 _Avoid_: Failure, undelivered, NDR
 
 **Agent Draft**:

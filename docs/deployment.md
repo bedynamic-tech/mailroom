@@ -138,6 +138,30 @@ Do not deploy `wrangler.dev.jsonc` or expose the local dev server publicly.
 
 Repeat for additional addresses or domains; they can share the same Worker.
 
+### Track bounces
+
+Email Sending sends with a Cloudflare bounce address (`cf-bounce.` on your
+domain), so bounce notices from receiving servers go to Cloudflare and never
+reach the Inbox. To mark bounced emails in Mailroom, subscribe each sending
+domain's Email Sending events to the Worker's existing draft queue
+(`mailroom-drafts`, or the name you gave `DRAFT_QUEUE`). Mailroom reads the
+bounced, rejected and failed events from it and ignores the rest.
+
+In the dashboard, open **Storage & databases, Queues**, select the draft
+queue, open **Subscriptions** and select **Subscribe to events**. Choose the
+**Email Sending** source and your sending domain, select the **Bounced**,
+**Rejected** and **Failed** events, then **Subscribe**. Or with Wrangler,
+using the zone ID shown on the domain's overview page:
+
+```sh
+npx wrangler queues subscription create mailroom-drafts \
+  --source email.sending --zone-id <ZONE_ID> --domain example.com \
+  --events message.bounced,message.rejected,message.failed
+```
+
+Repeat for each sending domain. Only mail sent after the subscription exists
+is tracked.
+
 ## Optional: connect an AI agent over MCP
 
 The MCP server is built into the same Worker at `/mcp` and is deployed with
@@ -304,6 +328,10 @@ deploy automatically. Continue with Access and domain setup above.
 - **R2 binding fails:** enable R2 in the destination account first.
 - **App loads but replies fail:** check Email Sending access, the paid plan,
   sender-domain verification, and the Inbox's sending address.
+- **A bounced email still shows Sent:** check the sending domain has an Email
+  Sending event subscription on the draft queue (see
+  [Track bounces](#track-bounces)) and that Email Sending's activity log shows
+  the bounce.
 - **Inbound mail does not appear:** check Email Routing targets this Worker and
   the recipient has already been added as an Inbox.
 - **The setup screen keeps showing after adding variables:** saving variables
