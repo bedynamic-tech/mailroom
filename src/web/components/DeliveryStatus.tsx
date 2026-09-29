@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCheck } from "lucide-react";
+import { Check } from "lucide-react";
 import { Popover as PopoverPrimitive } from "radix-ui";
 
 /**
  * Shown on an outbound Message. Mailroom only stores an outbound Message once
- * the email provider has accepted it, so every stored one reads as delivered.
- * Hovering (or tapping, on touch screens) lists every address it went to.
+ * the email provider has accepted it, so every stored one reads as sent.
+ * Bounces are not tracked yet. Hovering (or tapping, on touch screens) lists
+ * every address it went to.
  */
 export function DeliveryStatus(props: { to: string[]; cc: string[]; bcc: string[] }) {
   const [open, setOpen] = useState(false);
@@ -46,11 +47,11 @@ export function DeliveryStatus(props: { to: string[]; cc: string[]; bcc: string[
           type="button"
           onPointerEnter={hoverOpen}
           onPointerLeave={hoverClose}
-          aria-label={`Delivered to ${count} ${count === 1 ? "address" : "addresses"}`}
+          aria-label={`Sent to ${count} ${count === 1 ? "address" : "addresses"}`}
           className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:text-xs touch:py-1"
         >
-          <CheckCheck aria-hidden="true" className="size-3.5" />
-          Delivered
+          <Check aria-hidden="true" className="size-3.5" />
+          Sent
         </button>
       </PopoverPrimitive.Trigger>
       <PopoverPrimitive.Portal>
@@ -64,7 +65,7 @@ export function DeliveryStatus(props: { to: string[]; cc: string[]; bcc: string[
           onOpenAutoFocus={(event) => event.preventDefault()}
           className="z-50 w-max max-w-[min(22rem,calc(100vw-2rem))] rounded-lg bg-popover px-3 py-2.5 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10"
         >
-          <div className="mb-1.5 font-medium text-foreground">Delivered to</div>
+          <div className="mb-1.5 font-medium text-foreground">Sent to</div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             {groups.map((group) => (
               <div key={group.label} className="contents">
