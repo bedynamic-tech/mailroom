@@ -592,6 +592,9 @@ function ThreadRow(props: {
                   unread ? "font-semibold text-foreground" : "font-medium text-foreground/75"
                 }`}
               >
+                {thread.last_from_is_recipient ? (
+                  <span className="font-normal text-muted-foreground">To </span>
+                ) : null}
                 {sender}
               </span>
               {thread.catch_all_recipient && <CatchAllBadge address={thread.catch_all_recipient} />}

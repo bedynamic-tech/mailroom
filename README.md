@@ -19,6 +19,10 @@ Routing, D1, R2 and Web Push.
 ### Mail
 
 - **Unified inbox.** Manage multiple addresses and domains in one workspace.
+- **Who each conversation is with.** The conversation list shows the name of
+  the latest sender. In a conversation you started that nobody has answered
+  yet, it shows **To** and the recipient's name, taken from their Contact, else
+  from the name on mail they sent you before, else their address.
 - **Compose and reply.** Send new mail or reply to conversations, with attachments.
 - **Choose who a reply goes to.** The reply box opens with an editable **To**
   field, filled with the sender of the latest email (or its Reply-To). In a

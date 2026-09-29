@@ -99,7 +99,17 @@ export async function searchConversations(env: InboxDataEnv, input: SearchConver
        latest_message.direction AS last_direction,
        CASE
          WHEN latest_message.direction = 'outbound'
-           THEN 'To: ' || COALESCE(json_extract(latest_message.to_addresses, '$[0]'), '')
+           THEN 'To: ' || COALESCE(
+             (SELECT c.name FROM contact_addresses ca JOIN contacts c ON c.id = ca.contact_id
+              WHERE ca.address = json_extract(latest_message.to_addresses, '$[0]')
+                AND trim(COALESCE(c.name, '')) <> ''),
+             (SELECT trim(nm.from_name) FROM messages nm
+              WHERE nm.direction = 'inbound'
+                AND nm.from_address = json_extract(latest_message.to_addresses, '$[0]') COLLATE NOCASE
+                AND trim(COALESCE(nm.from_name, '')) <> ''
+              ORDER BY nm.created_at DESC, nm.id DESC LIMIT 1),
+             json_extract(latest_message.to_addresses, '$[0]'),
+             '')
          ELSE COALESCE(latest_message.from_name, latest_message.from_address)
        END AS correspondent,
        (SELECT COUNT(*) FROM drafts d
