@@ -67,6 +67,7 @@ import { BlockSenderDialog } from "./BlockSenderDialog";
 import { AddToBoardCardDialog, BoardCardDialog, type CardDialogTarget } from "./BoardDialogs";
 import { cardTitleFromSubject } from "../../shared/board";
 import { CatchAllBadge } from "./CatchAllBadge";
+import { DeliveryStatus } from "./DeliveryStatus";
 import { BlockAddressDialog, CreateInboxFromAddressDialog } from "./CatchAllDialogs";
 import { LinkifiedText } from "./LinkifiedText";
 import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
@@ -1430,6 +1431,11 @@ function MessageCard({
               <LinkifiedText text={quoted} />
             </div>
           )}
+        </div>
+      )}
+      {isOutbound && (
+        <div className="-mr-1.5 -mb-1 mt-3 flex justify-end">
+          <DeliveryStatus to={to} cc={cc} bcc={bcc} />
         </div>
       )}
     </Card>

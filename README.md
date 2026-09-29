@@ -37,6 +37,10 @@ Routing, D1, R2 and Web Push.
   conversation folds the reply box into a round **Reply** button, keeping
   anything already written. Tap it, or scroll back down to the latest
   message, to open the reply box again.
+- **Delivery status.** Every email sent from Mailroom shows **Delivered** at
+  the bottom right of its card once the email provider has accepted it.
+  Hover over it (or tap it on a phone) to see every To, Cc and Bcc address
+  it was delivered to. Bounces that arrive later come in as new emails.
 - **Opens at the latest message.** A conversation opens scrolled to the bottom
   and stays there while emails and images finish loading, until you scroll up.
 - **Internal notes.** Leave notes for your team on any conversation. Write in
