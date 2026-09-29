@@ -72,6 +72,20 @@ const EMPTY_RULE: MailRuleInput = {
   forward_cc: [],
   forward_bcc: [],
   note: null,
+  permanent_delete: false,
+};
+
+/** A rule that permanently deletes takes no other action. */
+const NO_OTHER_ACTIONS: Partial<MailRuleInput> = {
+  label_id: null,
+  mark_read: false,
+  archive: false,
+  skip_draft: false,
+  skip_notifications: false,
+  forward_to: [],
+  forward_cc: [],
+  forward_bcc: [],
+  note: null,
 };
 
 function toInput(rule: MailRule): MailRuleInput {
@@ -232,6 +246,7 @@ export function MailRulesSettings(props: {
 }
 
 function describeActions(rule: MailRule): string {
+  if (rule.permanent_delete) return "permanently delete";
   const parts: string[] = [];
   if (rule.label_id !== null) parts.push(`label “${rule.label_name ?? "deleted label"}”`);
   if (rule.mark_read) parts.push("mark as read");
@@ -270,6 +285,8 @@ function MailRuleDialog(props: {
         forward_to: forwarding ? splitAddressInput(forward.to) : [],
         forward_cc: forwarding ? splitAddressInput(forward.cc) : [],
         forward_bcc: forwarding ? splitAddressInput(forward.bcc) : [],
+        // The other actions stay in the draft, so unticking delete brings them back.
+        ...(draft.permanent_delete ? NO_OTHER_ACTIONS : {}),
         id: props.rule && props.rule !== "new" ? props.rule.id : undefined,
       }),
     onSuccess: props.onSaved,
@@ -361,114 +378,137 @@ function MailRuleDialog(props: {
 
           <section aria-label="Actions" className="space-y-3">
             <StepLabel>Then</StepLabel>
-            <Field
-              label="Apply label"
-              htmlFor="rule-label"
-              hint={draft.mailbox_id === null ? "Labels belong to one inbox. Choose an inbox above to apply one." : undefined}
-            >
-              <Select
-                value={draft.label_id === null ? NO_LABEL : String(draft.label_id)}
-                onValueChange={(value) => update({ label_id: value === NO_LABEL ? null : Number(value) })}
-                disabled={draft.mailbox_id === null}
-              >
-                <SelectTrigger id="rule-label" className="w-full sm:w-72">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_LABEL}>No label</SelectItem>
-                  {(labels.data ?? []).map((label) => (
-                    <SelectItem key={label.id} value={String(label.id)}>
-                      {label.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              <CheckboxRow
-                id="rule-mark-read"
-                label="Mark as read"
-                checked={draft.mark_read}
-                onChange={(mark_read) => update({ mark_read })}
-              />
-              <CheckboxRow
-                id="rule-archive"
-                label="Archive"
-                checked={draft.archive}
-                onChange={(archive) => update({ archive })}
-              />
-              <CheckboxRow
-                id="rule-skip-draft"
-                label="Don’t draft an AI reply"
-                checked={draft.skip_draft}
-                onChange={(skip_draft) => update({ skip_draft })}
-              />
-              <CheckboxRow
-                id="rule-skip-notifications"
-                label="Don’t send notifications"
-                checked={draft.skip_notifications}
-                onChange={(skip_notifications) => update({ skip_notifications })}
-              />
-            </div>
-            <div className="space-y-3 rounded-lg border px-3 py-3">
-              <CheckboxRow
-                id="rule-forward"
-                label="Forward it"
-                checked={forwarding}
-                onChange={(checked) => {
-                  setForwarding(checked);
-                  if (save.isError) save.reset();
-                }}
-              />
-              {forwarding && (
-                <div className="space-y-2.5">
-                  {(["to", "cc", "bcc"] as const).map((key) => (
-                    <div key={key} className="flex items-center gap-2">
-                      <label
-                        htmlFor={`rule-forward-${key}`}
-                        className="w-9 shrink-0 text-sm text-muted-foreground"
-                      >
-                        {key === "to" ? "To" : key === "cc" ? "Cc" : "Bcc"}
-                      </label>
-                      <Input
-                        id={`rule-forward-${key}`}
-                        value={forward[key]}
-                        onChange={(event) => updateForward({ [key]: event.target.value })}
-                        placeholder={key === "to" ? "accounting@example.com" : "Optional"}
-                        autoComplete="off"
-                        spellCheck={false}
-                      />
-                    </div>
-                  ))}
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    Separate addresses with commas. The forward is sent from the inbox that
-                    received the email, with replies going to the original sender.
-                  </p>
-                </div>
-              )}
-            </div>
-            <div className="space-y-3 rounded-lg border px-3 py-3">
-              <CheckboxRow
-                id="rule-note"
-                label="Add a note"
-                checked={draft.note !== null}
-                onChange={(checked) => update({ note: checked ? "" : null })}
-              />
-              {draft.note !== null && (
+            {!draft.permanent_delete && (
+              <>
                 <Field
-                  label="Note"
-                  htmlFor="rule-note-text"
-                  hint="Added to the conversation as an internal note each time an email matches. Only your team sees it; it is never sent or forwarded."
+                  label="Apply label"
+                  htmlFor="rule-label"
+                  hint={draft.mailbox_id === null ? "Labels belong to one inbox. Choose an inbox above to apply one." : undefined}
                 >
-                  <Textarea
-                    id="rule-note-text"
-                    value={draft.note}
-                    onChange={(event) => update({ note: event.target.value })}
-                    placeholder="e.g. VIP customer. Reply within 2 hours."
-                    maxLength={MAX_MAIL_RULE_NOTE_LENGTH}
-                    className="max-h-48 min-h-20"
-                  />
+                  <Select
+                    value={draft.label_id === null ? NO_LABEL : String(draft.label_id)}
+                    onValueChange={(value) => update({ label_id: value === NO_LABEL ? null : Number(value) })}
+                    disabled={draft.mailbox_id === null}
+                  >
+                    <SelectTrigger id="rule-label" className="w-full sm:w-72">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_LABEL}>No label</SelectItem>
+                      {(labels.data ?? []).map((label) => (
+                        <SelectItem key={label.id} value={String(label.id)}>
+                          {label.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Field>
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  <CheckboxRow
+                    id="rule-mark-read"
+                    label="Mark as read"
+                    checked={draft.mark_read}
+                    onChange={(mark_read) => update({ mark_read })}
+                  />
+                  <CheckboxRow
+                    id="rule-archive"
+                    label="Archive"
+                    checked={draft.archive}
+                    onChange={(archive) => update({ archive })}
+                  />
+                  <CheckboxRow
+                    id="rule-skip-draft"
+                    label="Don’t draft an AI reply"
+                    checked={draft.skip_draft}
+                    onChange={(skip_draft) => update({ skip_draft })}
+                  />
+                  <CheckboxRow
+                    id="rule-skip-notifications"
+                    label="Don’t send notifications"
+                    checked={draft.skip_notifications}
+                    onChange={(skip_notifications) => update({ skip_notifications })}
+                  />
+                </div>
+                <div className="space-y-3 rounded-lg border px-3 py-3">
+                  <CheckboxRow
+                    id="rule-forward"
+                    label="Forward it"
+                    checked={forwarding}
+                    onChange={(checked) => {
+                      setForwarding(checked);
+                      if (save.isError) save.reset();
+                    }}
+                  />
+                  {forwarding && (
+                    <div className="space-y-2.5">
+                      {(["to", "cc", "bcc"] as const).map((key) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <label
+                            htmlFor={`rule-forward-${key}`}
+                            className="w-9 shrink-0 text-sm text-muted-foreground"
+                          >
+                            {key === "to" ? "To" : key === "cc" ? "Cc" : "Bcc"}
+                          </label>
+                          <Input
+                            id={`rule-forward-${key}`}
+                            value={forward[key]}
+                            onChange={(event) => updateForward({ [key]: event.target.value })}
+                            placeholder={key === "to" ? "accounting@example.com" : "Optional"}
+                            autoComplete="off"
+                            spellCheck={false}
+                          />
+                        </div>
+                      ))}
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        Separate addresses with commas. The forward is sent from the inbox that
+                        received the email, with replies going to the original sender.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3 rounded-lg border px-3 py-3">
+                  <CheckboxRow
+                    id="rule-note"
+                    label="Add a note"
+                    checked={draft.note !== null}
+                    onChange={(checked) => update({ note: checked ? "" : null })}
+                  />
+                  {draft.note !== null && (
+                    <Field
+                      label="Note"
+                      htmlFor="rule-note-text"
+                      hint="Added to the conversation as an internal note each time an email matches. Only your team sees it; it is never sent or forwarded."
+                    >
+                      <Textarea
+                        id="rule-note-text"
+                        value={draft.note}
+                        onChange={(event) => update({ note: event.target.value })}
+                        placeholder="e.g. VIP customer. Reply within 2 hours."
+                        maxLength={MAX_MAIL_RULE_NOTE_LENGTH}
+                        className="max-h-48 min-h-20"
+                      />
+                    </Field>
+                  )}
+                </div>
+              </>
+            )}
+            <div
+              className={cn(
+                "space-y-2 rounded-lg border px-3 py-3",
+                draft.permanent_delete && "border-destructive/50 bg-destructive/5",
+              )}
+            >
+              <CheckboxRow
+                id="rule-permanent-delete"
+                label="Permanently delete it"
+                checked={draft.permanent_delete}
+                onChange={(permanent_delete) => update({ permanent_delete })}
+              />
+              {draft.permanent_delete && (
+                <p className="text-xs leading-5 text-destructive">
+                  Matching emails are deleted as they arrive and never appear in Mailroom. They
+                  can&rsquo;t be recovered, and no other action runs. The sender is not told.
+                </p>
               )}
             </div>
           </section>

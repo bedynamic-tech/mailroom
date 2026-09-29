@@ -11,7 +11,7 @@ import {
   mailRuleMatches,
   parseMailRuleInput,
 } from "../src/shared/mail-rules.ts";
-import { applyMailRules, createMailRule, matchingMailRules } from "../src/worker/email/mail-rules.ts";
+import { applyMailRules, createMailRule, deletingMailRules, matchingMailRules } from "../src/worker/email/mail-rules.ts";
 import { buildForward, sendRuleForward } from "../src/worker/email/rule-forward.ts";
 
 function fixture(t) {
@@ -217,6 +217,33 @@ test("a note rule adds its text as an internal note each time an email matches",
     { thread_id: 10, text_body: "VIP customer.\nReply fast.", html_body: null, mail_rule_id: vip.id, created_at: "2026-09-28T11:00:00.000Z" },
   ]);
   assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM messages WHERE thread_id = 10").get().n, 2);
+});
+
+test("a permanent delete rule stands alone and reports the rules that drop an email", async (t) => {
+  const f = fixture(t);
+  const conditions = all(c("subject", "contains", "invoice"));
+  const mixed = await f.call("POST", "", { name: "x", conditions, permanent_delete: true, archive: true });
+  assert.equal(mixed.status, 400);
+  assert.match(mixed.body.error, /can't take other actions/);
+  assert.match(parseMailRuleInput({ name: "x", conditions, permanent_delete: "yes" }).error, /permanent_delete/);
+
+  const drop = await createMailRule(f.env, { name: "Drop invoices", mailbox_id: 1, conditions, permanent_delete: true });
+  assert.equal(drop.permanent_delete, true);
+  const keep = await createMailRule(f.env, { name: "Keep", conditions, archive: true });
+  assert.equal(keep.permanent_delete, false);
+  await createMailRule(f.env, { name: "Off", conditions, permanent_delete: true, enabled: false });
+
+  assert.deepEqual(await deletingMailRules(f.env, 1, message(), "2026-09-29T10:00:00.000Z"), [drop.id]);
+  assert.deepEqual(await deletingMailRules(f.env, 2, message()), []);
+  assert.deepEqual(await deletingMailRules(f.env, 1, message({ subject: "Hello" })), []);
+  const counts = f.db.prepare("SELECT name, match_count, last_matched_at FROM mail_rules ORDER BY id").all();
+  assert.deepEqual(counts.map((row) => [row.name, row.match_count, row.last_matched_at]), [
+    ["Drop invoices", 1, "2026-09-29T10:00:00.000Z"], ["Keep", 0, null], ["Off", 0, null],
+  ]);
+
+  const updated = await f.call("PUT", `/${drop.id}`, { name: "Drop invoices", mailbox_id: 1, conditions, mark_read: true });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.permanent_delete, false);
 });
 
 const original = (overrides = {}) => ({
