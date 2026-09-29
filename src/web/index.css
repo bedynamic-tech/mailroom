@@ -78,7 +78,7 @@
 @supports (-webkit-touch-callout: none) {
   @media (display-mode: standalone) and (orientation: portrait) {
     :root {
-      --app-inset-top: calc(env(safe-area-inset-top, 0px) + 1rem);
+      --app-inset-top: calc(env(safe-area-inset-top, 0px) + 12px);
     }
   }
 }
