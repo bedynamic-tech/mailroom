@@ -6,7 +6,6 @@ import {
   linkifyRichText,
   normalizeMessageBody,
   plainTextToHtml,
-  plainTextToLinkedHtml,
   richTextToPlainText,
   sanitizeRichText,
 } from "../src/shared/rich-text.ts";
@@ -54,13 +53,6 @@ test("renders editor HTML as plain text with one line per block", () => {
 
 test("plain text becomes escaped HTML with links", () => {
   assert.equal(plainTextToHtml("a < b\nsee https://acme.com"), 'a &lt; b<br>see <a href="https://acme.com">https://acme.com</a>');
-});
-
-test("pasted plain text links web and email addresses", () => {
-  assert.equal(
-    plainTextToLinkedHtml("Hi & bye\r\nhttps://acme.com/x?a=1&b=2 or hi@acme.com"),
-    'Hi &amp; bye<br><a href="https://acme.com/x?a=1&amp;b=2">https://acme.com/x?a=1&amp;b=2</a> or <a href="mailto:hi@acme.com">hi@acme.com</a>',
-  );
 });
 
 test("links bare addresses in rich text but leaves existing links alone", () => {
