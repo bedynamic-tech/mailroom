@@ -632,7 +632,7 @@ export function ThreadView(props: {
               }}
             >
               <TrashIcon />
-              Permanently delete
+              Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
