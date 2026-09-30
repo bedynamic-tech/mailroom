@@ -10,6 +10,7 @@ import { RecipientInput, type RecipientInputHandle } from "./RecipientInput";
 import { PaperclipIcon, SendIcon, XIcon } from "./Icons";
 import { RichTextEditor, RichTextPreview } from "./RichTextEditor";
 import { isBlankRichText, richTextToPlainText, sanitizeRichText } from "../../shared/rich-text";
+import { pastedImagesIn } from "../pasted-images";
 
 type OpenCompose = (mailboxId: number | null, options?: { to?: string }) => void;
 
@@ -126,6 +127,15 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
         setNotice("Write a message or attach a file before sending.");
         return;
       }
+      const images = pastedImagesIn(sanitizeRichText(html)).map((image) => image.file);
+      if (files.length + images.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+        setNotice("Send up to 10 attachments and pasted images per message.");
+        return;
+      }
+      if ([...files, ...images].reduce((size, file) => size + file.size, 0) > MAX_ATTACHMENT_TOTAL_BYTES) {
+        setNotice("Attachments and pasted images must total 3 MB or less.");
+        return;
+      }
       if (richTextToPlainText(html).length > MAX_MESSAGE_CHARS) {
         setNotice(`Keep the message under ${MAX_MESSAGE_CHARS.toLocaleString("en-US")} characters.`);
         return;
@@ -133,7 +143,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
     }
     if (!attempt.current) {
       const body = isBlankRichText(html) ? "" : sanitizeRichText(html);
-      attempt.current = { mailboxId: Number(mailboxId), to: recipients.to[0]!, cc: recipients.cc, bcc: recipients.bcc, subject: subject.trim(), text: body ? richTextToPlainText(body) : "", html: body || undefined, files: [...files], attemptId: crypto.randomUUID() };
+      attempt.current = { mailboxId: Number(mailboxId), to: recipients.to[0]!, cc: recipients.cc, bcc: recipients.bcc, subject: subject.trim(), text: body ? richTextToPlainText(body) : "", html: body || undefined, files: [...files], inlineImages: pastedImagesIn(body), attemptId: crypto.randomUUID() };
     }
     inFlight.current = true;
     setSending(true); setNotice(null); setFailed(false);
@@ -251,7 +261,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                   <label htmlFor="compose-subject" className="shrink-0 text-sm text-muted-foreground max-sm:sr-only">Subject</label>
                   <Input id="compose-subject" required maxLength={MAX_SUBJECT_CHARS} placeholder={phone ? "Subject" : "Add a subject"} value={subject} onChange={(event) => setSubject(event.target.value)} className="min-w-0 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent" />
                 </div>
-                <RichTextEditor id="compose-body" ariaLabel="Message" value={html} onChange={setHtml} variant="bare" placeholder="Write your message…" className="mt-1" contentClassName="min-h-44 px-0 sm:min-h-64 sm:px-2" />
+                <RichTextEditor id="compose-body" ariaLabel="Message" value={html} onChange={setHtml} inlineImages variant="bare" placeholder="Write your message…" className="mt-1" contentClassName="min-h-44 px-0 sm:min-h-64 sm:px-2" />
                 {sender?.effective_signature_html && (
                   <div className="mb-4 text-muted-foreground sm:px-2">
                     <p className="mb-1 text-xs">Signature added when sent</p>

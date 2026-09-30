@@ -1,6 +1,7 @@
 /**
  * Rich text for outgoing email: message bodies and signatures written in the
- * web editor (bold, italic, links, lists, simple tables, remote images).
+ * web editor (bold, italic, links, lists, simple tables, remote images and
+ * images sent inline with the message through `cid:` links).
  * Everything is stored and sent as HTML that has passed `sanitizeRichText`,
  * so one allowlist guards the editor, the API and outgoing mail. Plain-text
  * recipients get the `richTextToPlainText` rendering.
@@ -360,6 +361,12 @@ export function linkifyRichText(html: string): string {
   return output;
 }
 
+/** Content IDs of the images the HTML shows through `cid:` links. */
+export function inlineImageContentIds(html: string): string[] {
+  const ids = [...html.matchAll(/<img\b[^>]*\bsrc="cid:([^"]+)"/gi)].map((match) => decodeEntities(match[1]!));
+  return [...new Set(ids)];
+}
+
 function linkedSegmentsHtml(text: string): string {
   return linkifyText(text)
     .map((segment) =>
@@ -421,7 +428,8 @@ function sanitizeAttributeValue(tag: string, name: string, value: string): strin
     case "href":
       return safeUrl(trimmed, ["http:", "https:", "mailto:", "tel:"]);
     case "src":
-      return tag === "img" ? safeUrl(trimmed, ["http:", "https:"]) : null;
+      // cid: points at an image sent inline with the message.
+      return tag === "img" ? safeUrl(trimmed, ["http:", "https:", "cid:"]) : null;
     case "width":
     case "height":
     case "border":

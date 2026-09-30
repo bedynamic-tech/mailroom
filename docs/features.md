@@ -17,6 +17,12 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   address over selected words turns those words into a link. Content pasted or
   dropped from a web page or another email keeps its links, formatting and
   web-hosted images.
+- **Inline images.** Paste a screenshot or copied image into a reply or new
+  email, or drop an image file on it, and it appears in the body where the
+  cursor is. It is sent as an inline image inside the email rather than as a
+  separate attachment. Large images are resized to at most 1600 pixels and
+  saved as JPEG. Pasted images count toward the 10 file and 3 MB attachment
+  limits. Notes and signatures do not take pasted images.
 - **Choose who a reply goes to.** The reply box opens with an editable **To**
   field, filled with the sender of the latest email (or its Reply-To). In a
   conversation you started, it is filled with the address you sent to, so you

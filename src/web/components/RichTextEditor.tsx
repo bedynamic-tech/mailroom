@@ -23,6 +23,13 @@ import {
   sanitizeRichText,
 } from "../../shared/rich-text";
 import { linkifyText } from "../../shared/linkify";
+import {
+  addPastedImage,
+  isImageFile,
+  withPastedImageContentIds,
+  withPastedImageUrls,
+  withoutUnknownInlineImages,
+} from "../pasted-images";
 
 /** Shared look for rich text in the editor and in previews. */
 const RICH_TEXT_CONTENT_CLASS =
@@ -74,6 +81,11 @@ export function RichTextEditor(props: {
   belowToolbar?: ReactNode;
   /** Put the caret on the last line when the editor gains focus, e.g. below a greeting. */
   caretToEndOnFocus?: boolean;
+  /**
+   * Show pasted or dropped image files in the body. The HTML refers to them
+   * through `cid:` links; send them with `pastedImagesIn`.
+   */
+  inlineImages?: boolean;
 }) {
   const variant = props.variant ?? "boxed";
   const editorRef = useRef<HTMLDivElement>(null);
@@ -89,7 +101,7 @@ export function RichTextEditor(props: {
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor || props.value === lastEmitted.current) return;
-    editor.innerHTML = props.value;
+    editor.innerHTML = withPastedImageUrls(props.value);
     lastEmitted.current = props.value;
     setEmpty(isBlankRichText(props.value));
   }, [props.value]);
@@ -121,7 +133,7 @@ export function RichTextEditor(props: {
   const emit = () => {
     const editor = editorRef.current;
     if (!editor) return;
-    const html = sanitizeRichText(editor.innerHTML);
+    const html = sanitizeRichText(withPastedImageContentIds(editor.innerHTML));
     setEmpty(isBlankRichText(html));
     if (html === lastEmitted.current) return;
     lastEmitted.current = html;
@@ -141,6 +153,18 @@ export function RichTextEditor(props: {
   const insertTransfer = (data: DataTransfer) => {
     const html = data.getData("text/html");
     const text = data.getData("text/plain");
+    const images = props.inlineImages ? [...data.files].filter(isImageFile) : [];
+    const pastedHtml = html
+      ? withoutUnknownInlineImages(
+          sanitizeRichText(withPastedImageContentIds(html)),
+          Boolean(props.inlineImages),
+        )
+      : "";
+    // A copied image often comes with HTML that only points at a local file.
+    if (images.length > 0 && isBlankRichText(pastedHtml)) {
+      insertImages(images);
+      return;
+    }
     const selection = document.getSelection();
     const pastedLink = linkifyText(text.trim());
     // An address pasted over selected words links those words.
@@ -152,13 +176,27 @@ export function RichTextEditor(props: {
       selection.toString().trim() !== text.trim()
     ) {
       run("createLink", pastedLink[0]!.href);
-    } else if (html) {
-      run("insertHTML", linkifyRichText(sanitizeRichText(html)));
+    } else if (pastedHtml) {
+      run("insertHTML", withPastedImageUrls(linkifyRichText(pastedHtml)));
     } else if (linkifyText(text).some((segment) => segment.type === "link")) {
       run("insertHTML", plainTextToLinkedHtml(text));
     } else if (text) {
       run("insertText", text);
     }
+  };
+
+  /** Put image files in the body where the caret is. */
+  const insertImages = async (files: File[]) => {
+    const editor = editorRef.current;
+    const selection = document.getSelection();
+    const range =
+      editor && selection?.rangeCount && editor.contains(selection.anchorNode)
+        ? selection.getRangeAt(0).cloneRange()
+        : null;
+    const added = await Promise.all(files.map((file) => addPastedImage(file)));
+    savedRange.current = range;
+    restoreSelection();
+    run("insertHTML", added.map((image) => `<img src="${escapeAttribute(image.url)}" alt="">`).join(""));
   };
 
   /** Link addresses the person has finished typing, then report the change. */

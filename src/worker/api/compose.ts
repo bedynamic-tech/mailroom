@@ -5,6 +5,7 @@ import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_TOTAL_BYTES, MAX_MESSAGE_CH
 import { MAX_RICH_TEXT_HTML_LENGTH, normalizeMessageBody } from "../../shared/rich-text.ts";
 import { AttachmentInputError } from "../email/attachments.ts";
 import { ComposeIntentError, sendNewEmailAttempt, type ComposeEnv } from "../email/compose.ts";
+import { inlineImagesFromForm } from "./inline-images.ts";
 
 const input = z.object({
   mailbox_id: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),
@@ -57,9 +58,15 @@ composeApi.post("/", bodyLimit({ maxSize: 4 * 1024 * 1024 }), async (c) => {
     return c.json({ error: "Attachments must be non-empty files" }, 400);
   }
   const attachments = files as File[];
-  if (attachments.length > MAX_ATTACHMENTS_PER_MESSAGE ||
-      attachments.reduce((size, file) => size + file.size, 0) > MAX_ATTACHMENT_TOTAL_BYTES) {
-    return c.json({ error: "Attach up to 10 files, totaling no more than 3 MB" }, 400);
+  const inlineImages = await inlineImagesFromForm(form, parsed.data.html);
+  if ("error" in inlineImages) return c.json({ error: inlineImages.error }, 400);
+  const inlineBytes = inlineImages.reduce(
+    (size, image) => size + (image.content as ArrayBuffer).byteLength,
+    0,
+  );
+  if (attachments.length + inlineImages.length > MAX_ATTACHMENTS_PER_MESSAGE ||
+      attachments.reduce((size, file) => size + file.size, 0) + inlineBytes > MAX_ATTACHMENT_TOTAL_BYTES) {
+    return c.json({ error: "Attach up to 10 files and images, totaling no more than 3 MB" }, 400);
   }
   try {
     const result = await sendNewEmailAttempt(c.env, {
@@ -72,9 +79,12 @@ composeApi.post("/", bodyLimit({ maxSize: 4 * 1024 * 1024 }), async (c) => {
       text: parsed.data.text,
       html: parsed.data.html,
       sentBy: "human",
-      attachments: await Promise.all(attachments.map(async (file) => ({
-        filename: file.name, contentType: file.type, content: await file.arrayBuffer(),
-      }))),
+      attachments: [
+        ...await Promise.all(attachments.map(async (file) => ({
+          filename: file.name, contentType: file.type, content: await file.arrayBuffer(),
+        }))),
+        ...inlineImages,
+      ],
     });
     return c.json(result, result.status === "failed" ? 502 : result.status === "sent" ? 200 : 202);
   } catch (error) {

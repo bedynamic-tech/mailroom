@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  inlineImageContentIds,
   isBlankRichText,
   linkifyRichText,
   normalizeMessageBody,
@@ -99,4 +100,10 @@ test("outgoing email appends the signature to both parts", () => {
   const rich = composeOutgoingBodies({ text: "Hi", html: "<b>Hi</b>" }, null);
   assert.equal(rich.text, "Hi");
   assert.match(rich.html, /<div><b>Hi<\/b><\/div>/);
+});
+
+test("keeps images sent inline through cid links and lists their ids", () => {
+  const html = '<p>Look</p><img src="cid:a1@mailroom" alt=""><img src="cid:a1@mailroom"><img src="blob:https://x/1">';
+  assert.equal(sanitizeRichText(html), '<p>Look</p><img src="cid:a1@mailroom" alt=""><img src="cid:a1@mailroom">');
+  assert.deepEqual(inlineImageContentIds(sanitizeRichText(html)), ["a1@mailroom"]);
 });
