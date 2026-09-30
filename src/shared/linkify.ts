@@ -53,6 +53,34 @@ export function linkifyPlainText(input: string): PlainTextSegment[] {
   return segments.length > 0 ? segments : [{ type: "text", value: input }];
 }
 
+const EMAIL_PATTERN =
+  /[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}/g;
+
+/**
+ * Like `linkifyPlainText`, and also turns email addresses into `mailto:`
+ * links. Used where a person writes, such as the reply editor.
+ */
+export function linkifyText(input: string): PlainTextSegment[] {
+  return linkifyPlainText(input).flatMap((segment) =>
+    segment.type === "link" ? [segment] : linkifyEmails(segment.value),
+  );
+}
+
+function linkifyEmails(input: string): PlainTextSegment[] {
+  const segments: PlainTextSegment[] = [];
+  let cursor = 0;
+  for (const match of input.matchAll(EMAIL_PATTERN)) {
+    const start = match.index ?? 0;
+    // Part of a longer token, such as a path or another address.
+    if (start > 0 && /[\p{L}\p{N}_@/:.-]/u.test(input[start - 1]!)) continue;
+    if (start > cursor) segments.push({ type: "text", value: input.slice(cursor, start) });
+    segments.push({ type: "link", value: match[0], href: `mailto:${match[0]}` });
+    cursor = start + match[0].length;
+  }
+  if (cursor < input.length) segments.push({ type: "text", value: input.slice(cursor) });
+  return segments.length > 0 ? segments : [{ type: "text", value: input }];
+}
+
 export function removeRedundantGoogleRedirects(input: string): string {
   const lines = input.split("\n");
   const visibleLines: string[] = [];

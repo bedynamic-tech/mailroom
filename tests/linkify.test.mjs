@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   linkifyPlainText,
+  linkifyText,
   removeRedundantGoogleRedirects,
 } from "../src/shared/linkify.ts";
 
@@ -47,4 +48,15 @@ test("removes a Gmail redirect only when it repeats the preceding URL", () => {
 test("preserves a Google redirect when it is not a duplicate", () => {
   const redirect = "<https://www.google.com/url?q=https://example.com&source=gmail>";
   assert.equal(removeRedundantGoogleRedirects(`Open this:\n${redirect}`), `Open this:\n${redirect}`);
+});
+
+test("linkifyText also links email addresses", () => {
+  assert.deepEqual(linkifyText("Mail jane.doe@acme.co.uk or see https://acme.com/a@b."), [
+    { type: "text", value: "Mail " },
+    { type: "link", value: "jane.doe@acme.co.uk", href: "mailto:jane.doe@acme.co.uk" },
+    { type: "text", value: " or see " },
+    { type: "link", value: "https://acme.com/a@b", href: "https://acme.com/a@b" },
+    { type: "text", value: "." },
+  ]);
+  assert.deepEqual(linkifyText("no address @here or a@b"), [{ type: "text", value: "no address @here or a@b" }]);
 });

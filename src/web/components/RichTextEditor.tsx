@@ -17,9 +17,12 @@ import {
   escapeAttribute,
   escapeHtml,
   isBlankRichText,
+  linkifyRichText,
+  plainTextToLinkedHtml,
   richTextToPlainText,
   sanitizeRichText,
 } from "../../shared/rich-text";
+import { linkifyText } from "../../shared/linkify";
 
 /** Shared look for rich text in the editor and in previews. */
 const RICH_TEXT_CONTENT_CLASS =
@@ -45,7 +48,9 @@ const FORMAT_BUTTONS: Array<{ command: FormatCommand; label: string; shortcut?: 
 /**
  * A small rich-text editor for email bodies and signatures: bold, italic,
  * underline, strikethrough, links and lists. Its output always passes through
- * `sanitizeRichText`, and pasted content is sanitized before insertion.
+ * `sanitizeRichText`, and pasted content is sanitized before insertion. Web
+ * and email addresses become links when pasted, and when typed once a space
+ * or new line ends them.
  */
 export function RichTextEditor(props: {
   id: string;
@@ -74,6 +79,7 @@ export function RichTextEditor(props: {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastEmitted = useRef<string | null>(null);
   const savedRange = useRef<Range | null>(null);
+  const draggingFromEditor = useRef(false);
   const [empty, setEmpty] = useState(isBlankRichText(props.value));
   const [active, setActive] = useState<Set<FormatCommand>>(new Set());
   const [linkEditor, setLinkEditor] = useState<{ url: string; error: string | null } | null>(null);
@@ -129,6 +135,37 @@ export function RichTextEditor(props: {
     document.execCommand(command, false, value);
     emit();
     refreshActive();
+  };
+
+  /** Insert pasted or dropped content at the selection, linking any addresses in it. */
+  const insertTransfer = (data: DataTransfer) => {
+    const html = data.getData("text/html");
+    const text = data.getData("text/plain");
+    const selection = document.getSelection();
+    const pastedLink = linkifyText(text.trim());
+    // An address pasted over selected words links those words.
+    if (
+      selection &&
+      !selection.isCollapsed &&
+      pastedLink.length === 1 &&
+      pastedLink[0]!.type === "link" &&
+      selection.toString().trim() !== text.trim()
+    ) {
+      run("createLink", pastedLink[0]!.href);
+    } else if (html) {
+      run("insertHTML", linkifyRichText(sanitizeRichText(html)));
+    } else if (linkifyText(text).some((segment) => segment.type === "link")) {
+      run("insertHTML", plainTextToLinkedHtml(text));
+    } else if (text) {
+      run("insertText", text);
+    }
+  };
+
+  /** Link addresses the person has finished typing, then report the change. */
+  const autolinkAndEmit = (skipAtCaret: boolean) => {
+    const editor = editorRef.current;
+    if (editor && !props.disabled) autolinkEditor(editor, skipAtCaret);
+    emit();
   };
 
   const openLinkEditor = () => {
@@ -307,7 +344,13 @@ export function RichTextEditor(props: {
             const editor = editorRef.current;
             const inputType = (event.nativeEvent as InputEvent).inputType ?? "";
             if (editor && inputType.startsWith("delete")) discardPendingStyles(editor);
-            emit();
+            const data = (event.nativeEvent as InputEvent).data ?? "";
+            const endsWord =
+              inputType === "insertParagraph" ||
+              inputType === "insertLineBreak" ||
+              (inputType === "insertText" && /\s$/.test(data));
+            if (endsWord) autolinkAndEmit(true);
+            else emit();
             refreshActive();
           }}
           onKeyUp={refreshActive}
@@ -330,12 +373,12 @@ export function RichTextEditor(props: {
               selection.addRange(range);
             });
           }}
-          onBlur={emit}
+          onBlur={() => autolinkAndEmit(false)}
           onKeyDown={(event) => {
             if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
             if (event.key === "Enter" && props.onSubmitShortcut) {
               event.preventDefault();
-              emit();
+              autolinkAndEmit(false);
               props.onSubmitShortcut();
               return;
             }
@@ -347,14 +390,28 @@ export function RichTextEditor(props: {
           }}
           onPaste={(event) => {
             event.preventDefault();
-            const html = event.clipboardData.getData("text/html");
-            if (html) {
-              run("insertHTML", sanitizeRichText(html));
-            } else {
-              run("insertText", event.clipboardData.getData("text/plain"));
-            }
+            insertTransfer(event.clipboardData);
           }}
-          onDrop={(event) => event.preventDefault()}
+          onDragStart={() => {
+            draggingFromEditor.current = true;
+          }}
+          onDragEnd={() => {
+            draggingFromEditor.current = false;
+          }}
+          onDrop={(event) => {
+            // Moving text within the editor keeps the browser's own handling.
+            if (draggingFromEditor.current) return;
+            event.preventDefault();
+            if (props.disabled) return;
+            const range = rangeAtPoint(event.clientX, event.clientY);
+            const selection = document.getSelection();
+            if (range && selection && editorRef.current?.contains(range.startContainer)) {
+              editorRef.current.focus();
+              selection.removeAllRanges();
+              selection.addRange(range);
+            }
+            insertTransfer(event.dataTransfer);
+          }}
           className={cn(
             RICH_TEXT_CONTENT_CLASS,
             "overflow-y-auto overscroll-contain px-4 py-3 text-foreground outline-none",
@@ -419,6 +476,84 @@ function discardPendingStyles(editor: HTMLDivElement) {
   }
   selection.removeAllRanges();
   selection.addRange(range);
+}
+
+type CaretTarget = { after: Node } | { node: Node; offset: number };
+
+/**
+ * Turn bare web and email addresses in the editor into links. While typing,
+ * `skipAtCaret` leaves the address the caret touches alone, since it may not
+ * be finished yet; the caret keeps its place in the text.
+ */
+function autolinkEditor(editor: HTMLElement, skipAtCaret: boolean) {
+  const selection = document.getSelection();
+  const caret =
+    selection?.rangeCount && selection.isCollapsed && editor.contains(selection.anchorNode)
+      ? { node: selection.anchorNode, offset: selection.anchorOffset }
+      : null;
+  // Where the caret goes once the new nodes are in place.
+  let caretTarget: CaretTarget | null = null;
+
+  const nodes: Text[] = [];
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const link = node.parentElement?.closest("a");
+    if (!link || !editor.contains(link)) nodes.push(node as Text);
+  }
+
+  for (const node of nodes) {
+    const segments = linkifyText(node.data);
+    if (!segments.some((segment) => segment.type === "link")) continue;
+    const parts: Node[] = [];
+    let linked = false;
+    let nodeCaret: CaretTarget | null = null;
+    let position = 0;
+    for (const segment of segments) {
+      const start = position;
+      const end = start + segment.value.length;
+      position = end;
+      const text = document.createTextNode(segment.value);
+      const holdsCaret = caret?.node === node && caret.offset >= start && caret.offset <= end;
+      if (segment.type === "link" && !(skipAtCaret && holdsCaret)) {
+        const link = document.createElement("a");
+        link.setAttribute("href", segment.href);
+        link.append(text);
+        parts.push(link);
+        linked = true;
+        if (holdsCaret && !nodeCaret) {
+          nodeCaret = caret.offset === end ? { after: link } : { node: text, offset: caret.offset - start };
+        }
+      } else {
+        parts.push(text);
+        if (holdsCaret && !nodeCaret) nodeCaret = { node: text, offset: caret.offset - start };
+      }
+    }
+    if (!linked) continue;
+    node.replaceWith(...parts);
+    if (nodeCaret) caretTarget = nodeCaret;
+  }
+
+  if (caretTarget && selection && document.activeElement === editor) {
+    const range = document.createRange();
+    if ("after" in caretTarget) range.setStartAfter(caretTarget.after);
+    else range.setStart(caretTarget.node, caretTarget.offset);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+}
+
+/** The caret position under a point, e.g. where something was dropped. */
+function rangeAtPoint(x: number, y: number): Range | null {
+  if (typeof document.caretPositionFromPoint === "function") {
+    const position = document.caretPositionFromPoint(x, y);
+    if (!position) return null;
+    const range = document.createRange();
+    range.setStart(position.offsetNode, position.offset);
+    range.collapse(true);
+    return range;
+  }
+  return document.caretRangeFromPoint?.(x, y) ?? null;
 }
 
 function ToolbarButton(props: {
