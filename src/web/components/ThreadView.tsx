@@ -598,58 +598,54 @@ export function ThreadView(props: {
             )}
           </div>
         </div>
-        {thread.status === "archived" ? (
-          <>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
-              onClick={() => moveThread.mutate("unarchive")}
+              size="icon"
               disabled={moveThread.isPending || removeThread.isPending}
-              aria-label="Move conversation to inbox"
+              aria-label="Conversation options"
+              title="More"
               className="shrink-0"
             >
-              <InboxIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">
-                {moveThread.isPending ? "Moving…" : "Move to inbox"}
-              </span>
+              <MoreIcon className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-48">
+            {thread.status === "archived" ? (
+              <DropdownMenuItem onSelect={() => moveThread.mutate("unarchive")}>
+                <InboxIcon />
+                Move to inbox
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onSelect={() => moveThread.mutate("archive")}>
+                <ArchiveIcon />
+                Archive
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => {
                 removeThread.reset();
                 setConfirmDelete(true);
               }}
-              disabled={moveThread.isPending || removeThread.isPending}
-              aria-label="Delete conversation permanently"
-              className="shrink-0 text-destructive hover:text-destructive"
             >
-              <TrashIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Delete</span>
-            </Button>
-            <DeleteConversationsDialog
-              open={confirmDelete}
-              title="Delete this conversation?"
-              description="This permanently deletes its messages, attachments, and drafts. This can’t be undone."
-              confirmLabel="Delete conversation"
-              pending={removeThread.isPending}
-              error={removeThread.error}
-              onConfirm={() => removeThread.mutate()}
-              onOpenChange={setConfirmDelete}
-            />
-          </>
-        ) : (
-          <Button
-            variant="outline"
-            onClick={() => moveThread.mutate("archive")}
-            disabled={moveThread.isPending}
-            aria-label="Archive conversation"
-            className="shrink-0"
-          >
-            <ArchiveIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">
-              {moveThread.isPending ? "Archiving…" : "Archive"}
-            </span>
-          </Button>
-        )}
+              <TrashIcon />
+              Permanently delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <DeleteConversationsDialog
+          open={confirmDelete}
+          title="Permanently delete this conversation?"
+          description="This permanently deletes its messages, attachments, drafts, and notes. This can’t be undone."
+          confirmLabel="Delete permanently"
+          pending={removeThread.isPending}
+          error={removeThread.error}
+          onConfirm={() => removeThread.mutate()}
+          onOpenChange={setConfirmDelete}
+        />
       </header>
 
       {thread.catch_all_recipient && (

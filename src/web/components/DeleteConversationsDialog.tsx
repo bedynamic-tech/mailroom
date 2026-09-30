@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-/** Confirms permanent deletion of archived Conversations. */
+/** Confirms permanent deletion of Conversations. */
 export function DeleteConversationsDialog(props: {
   open: boolean;
   title: string;

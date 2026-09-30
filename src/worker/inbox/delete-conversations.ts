@@ -25,16 +25,20 @@ const MAX_BOUND_PARAMETERS = 100;
 /**
  * Permanently deletes archived Conversations with their Messages, Attachments,
  * drafts, Draft Runs, Reply and Send Attempts, Label assignments and
- * Internal Notes. Only archived Conversations can be deleted; Contacts are
- * left untouched.
+ * Internal Notes. Only archived Conversations can be deleted unless
+ * `includeOpen` is set; Contacts are left untouched.
  */
 export async function deleteArchivedConversations(
   env: ConversationDeletionEnv,
-  input: { ids: number[] },
+  input: { ids: number[]; includeOpen?: boolean },
 ): Promise<DeletedConversations> {
   const ids = [...new Set(input.ids)];
-  if (ids.length === 0 || ids.length > MAX_BOUND_PARAMETERS) {
-    throw new Error("Conversation deletion needs 1-100 ids");
+  const includeOpen = input.includeOpen === true;
+  // One bound parameter is kept for the latest Message id when open
+  // Conversations may be deleted.
+  const maxIds = includeOpen ? MAX_BOUND_PARAMETERS - 1 : MAX_BOUND_PARAMETERS;
+  if (ids.length === 0 || ids.length > maxIds) {
+    throw new Error(`Conversation deletion needs 1-${maxIds} ids`);
   }
   const idList = numberedPlaceholders(ids.length);
 
@@ -45,7 +49,7 @@ export async function deleteArchivedConversations(
     .all<{ id: number; status: string }>();
 
   if (found.length === 0) throw new ConversationDeletionError("Conversation not found", 404);
-  if (found.some((thread) => thread.status !== "archived")) {
+  if (!includeOpen && found.some((thread) => thread.status !== "archived")) {
     throw new ConversationDeletionError(
       "Only archived conversations can be deleted",
       409,
@@ -93,10 +97,26 @@ export async function deleteArchivedConversations(
     .map((row) => row.key)
     .filter((key): key is string => typeof key === "string" && key.length > 0);
 
+  // An open Conversation is kept if new mail arrives while it is deleted.
+  const latest = includeOpen
+    ? await env.DB.prepare(
+        `SELECT COALESCE(MAX(id), 0) AS id FROM messages WHERE thread_id IN (${targetList})`,
+      )
+        .bind(...targets)
+        .first<{ id: number }>()
+    : null;
+  const latestParam = `?${targets.length + 1}`;
+  const unchanged = includeOpen
+    ? `NOT EXISTS (
+        SELECT 1 FROM messages newer
+        WHERE newer.thread_id = threads.id AND newer.id > ${latestParam})`
+    : "status = 'archived'";
+  const bindings = includeOpen ? [...targets, latest?.id ?? 0] : targets;
+
   // Re-check every condition inside the batch so a Conversation that was
   // reopened by new mail or started sending in the meantime is kept.
   const deletable = `SELECT id FROM threads
-    WHERE id IN (${targetList}) AND status = 'archived'
+    WHERE id IN (${targetList}) AND ${unchanged}
       AND NOT EXISTS (
         SELECT 1 FROM reply_attempts active
         WHERE active.thread_id = threads.id AND active.status IN ('pending', 'sending'))
@@ -118,7 +138,7 @@ export async function deleteArchivedConversations(
          OR bounce_message_id IN (SELECT id FROM messages WHERE thread_id IN (${deletable}))`,
       `DELETE FROM messages WHERE thread_id IN (${deletable})`,
       `DELETE FROM threads WHERE id IN (${deletable})`,
-    ].map((sql) => env.DB.prepare(sql).bind(...targets)),
+    ].map((sql) => env.DB.prepare(sql).bind(...bindings)),
   );
 
   const { results: kept } = await env.DB.prepare(

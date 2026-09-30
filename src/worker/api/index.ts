@@ -1188,12 +1188,18 @@ api.post("/archive/empty", async (c) => {
 api.delete("/threads/:id", async (c) => {
   const threadId = parsePositiveId(c.req.param("id"));
   if (threadId === null) return c.json({ error: "Invalid conversation" }, 400);
-  return removeArchivedConversations(c, [threadId]);
+  // A single Conversation is deleted from its own menu after confirmation,
+  // so it does not need to be archived first.
+  return removeArchivedConversations(c, [threadId], { includeOpen: true });
 });
 
-async function removeArchivedConversations(c: Context<{ Bindings: Env }>, ids: number[]) {
+async function removeArchivedConversations(
+  c: Context<{ Bindings: Env }>,
+  ids: number[],
+  options: { includeOpen?: boolean } = {},
+) {
   try {
-    const deleted = await deleteArchivedConversations(c.env, { ids });
+    const deleted = await deleteArchivedConversations(c.env, { ids, ...options });
     c.executionCtx.waitUntil(
       purgeConversationObjects(c.env.RAW, deleted.objectKeys).catch((error) => {
         console.error("Conversation object cleanup failed", {
