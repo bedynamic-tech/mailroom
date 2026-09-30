@@ -18,7 +18,6 @@ import {
   escapeHtml,
   isBlankRichText,
   linkifyRichText,
-  plainTextToLinkedHtml,
   richTextToPlainText,
   sanitizeRichText,
 } from "../../shared/rich-text";
@@ -120,6 +119,11 @@ export function RichTextEditor(props: {
         // queryCommandState is unsupported for some commands in some browsers.
       }
     }
+    // Links are drawn underlined, which browsers report as underline.
+    const anchor = selection.anchorNode;
+    const element = anchor instanceof Element ? anchor : anchor?.parentElement;
+    const link = element?.closest("a");
+    if (link && editor.contains(link) && !element?.closest("u")) next.delete("underline");
     setActive((current) =>
       current.size === next.size && [...next].every((command) => current.has(command)) ? current : next,
     );
@@ -176,12 +180,14 @@ export function RichTextEditor(props: {
       selection.toString().trim() !== text.trim()
     ) {
       run("createLink", pastedLink[0]!.href);
-    } else if (pastedHtml) {
+    } else if (pastedHtml && !isBareAddress(pastedLink, text)) {
       run("insertHTML", withPastedImageUrls(linkifyRichText(pastedHtml)));
-    } else if (linkifyText(text).some((segment) => segment.type === "link")) {
-      run("insertHTML", plainTextToLinkedHtml(text));
     } else if (text) {
+      // Pasted as text, so the caret never ends up inside a new link: an
+      // address that ends the paste becomes a link on the next space or new
+      // line, like a typed one, and new text after it stays plain.
       run("insertText", text);
+      autolinkAndEmit(true);
     }
   };
 
@@ -579,6 +585,11 @@ function autolinkEditor(editor: HTMLElement, skipAtCaret: boolean) {
     selection.removeAllRanges();
     selection.addRange(range);
   }
+}
+
+/** True when pasted text is one web or email address and nothing else. */
+function isBareAddress(segments: ReturnType<typeof linkifyText>, text: string): boolean {
+  return segments.length === 1 && segments[0]!.type === "link" && segments[0]!.value === text.trim();
 }
 
 /** The caret position under a point, e.g. where something was dropped. */

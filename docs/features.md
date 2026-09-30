@@ -13,8 +13,10 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
 - **Automatic links.** In the reply, compose, note and signature editors, web
   addresses (`https://...` or `www....`) and email addresses become links as
   soon as you type a space or start a new line after them, and when you leave
-  the editor or send. Pasted addresses become links right away, and pasting an
-  address over selected words turns those words into a link. Content pasted or
+  the editor or send. A pasted address works the same way, and addresses in
+  the middle of pasted text become links right away. Text typed after a link
+  stays plain. Pasting an address over selected words turns those words into
+  a link. Content pasted or
   dropped from a web page or another email keeps its links, formatting and
   web-hosted images.
 - **Inline images.** Paste a screenshot or copied image into a reply or new

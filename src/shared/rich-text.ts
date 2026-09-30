@@ -324,18 +324,6 @@ export function plainTextToHtml(text: string): string {
 }
 
 /**
- * Plain text as editor HTML: escaped, with line breaks kept and web and email
- * addresses turned into links. Used for text pasted into the editor.
- */
-export function plainTextToLinkedHtml(text: string): string {
-  return text
-    .replace(/\r\n?/g, "\n")
-    .split("\n")
-    .map((line) => linkedSegmentsHtml(line))
-    .join("<br>");
-}
-
-/**
  * Turn bare web and email addresses in sanitized HTML into links, leaving
  * existing links and markup untouched.
  */
