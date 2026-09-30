@@ -196,6 +196,48 @@ test("an open conversation cannot be deleted", async () => {
   assert.equal(count(fixture.database, "threads"), 3);
 });
 
+test("an open conversation can be deleted when open ones are allowed", async () => {
+  const fixture = makeFixture();
+  const deleted = await deleteArchivedConversations(fixture, { ids: [20], includeOpen: true });
+  await purgeConversationObjects(fixture.RAW, deleted.objectKeys);
+
+  assert.deepEqual(deleted.ids, [20]);
+  assert.equal(count(fixture.database, "threads", "id = 20"), 0);
+  assert.equal(count(fixture.database, "messages", "thread_id = 20"), 0);
+  assert.equal(count(fixture.database, "thread_labels", "thread_id = 20"), 0);
+  assert.equal(count(fixture.database, "threads"), 2);
+  assert.equal(searchHits(fixture.database, "Open"), 0);
+  assert.deepEqual(fixture.RAW.deleted, ["raw/1/open.eml"]);
+});
+
+test("an active send still blocks deleting an open conversation", async () => {
+  const fixture = makeFixture();
+  fixture.database.prepare("UPDATE outbound_attempts SET thread_id = 20, status = 'pending'").run();
+
+  await assert.rejects(
+    deleteArchivedConversations(fixture, { ids: [20], includeOpen: true }),
+    (error) => error instanceof ConversationDeletionError && error.status === 409,
+  );
+  assert.equal(count(fixture.database, "threads", "id = 20"), 1);
+});
+
+test("an open conversation that gets new mail while deleting is kept", async () => {
+  const fixture = makeFixture();
+  const batch = fixture.DB.batch.bind(fixture.DB);
+  fixture.DB.batch = async (statements) => {
+    fixture.database.exec(`
+      INSERT INTO messages (id, thread_id, message_id, direction, from_address, subject, text_body)
+      VALUES (201, 20, '<late@example.com>', 'inbound', 'customer@example.net', 'Open', 'Late body')`);
+    return batch(statements);
+  };
+
+  await assert.rejects(
+    deleteArchivedConversations(fixture, { ids: [20], includeOpen: true }),
+    (error) => error instanceof ConversationDeletionError && error.status === 409,
+  );
+  assert.equal(count(fixture.database, "messages", "thread_id = 20"), 2);
+});
+
 test("an unknown conversation returns 404", async () => {
   const fixture = makeFixture();
 

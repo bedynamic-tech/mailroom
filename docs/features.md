@@ -64,6 +64,10 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   Attachments and Cc or Bcc recipients stay with the reply.
 - **Search and triage.** Search message content, filter conversations, mark read
   or archive in bulk, and restore or permanently delete archived conversations.
+- **Conversation menu.** The three dot menu at the top of a conversation
+  has **Archive** (or **Move to inbox**) and **Delete**. Delete works whether
+  the conversation is archived or not, asks for confirmation first, and
+  permanently removes its messages, attachments, drafts and notes.
 - **Universal search.** The search box in the top right (or Ctrl K / Cmd K,
   and the search icon on phones) finds conversations by subject, message text,
   sender or recipient, along with internal notes, rules (name, note,
