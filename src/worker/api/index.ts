@@ -25,6 +25,7 @@ import {
   type OutboundAttachmentInput,
 } from "../email/attachments";
 import { ReplyIntentError, sendReplyAttempt } from "../email/reply";
+import { inlineImagesFromForm } from "./inline-images.ts";
 import {
   blockRecipient,
   CatchAllError,
@@ -1262,6 +1263,9 @@ api.post("/threads/:id/reply", async (c) => {
         });
       }
     }
+    const inlineImages = await inlineImagesFromForm(form, html);
+    if ("error" in inlineImages) return c.json({ error: inlineImages.error }, 400);
+    attachments.push(...inlineImages);
   } else {
     const body = await c.req.json<{
       text?: string;

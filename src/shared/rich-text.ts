@@ -1,6 +1,7 @@
 /**
  * Rich text for outgoing email: message bodies and signatures written in the
- * web editor (bold, italic, links, lists, simple tables, remote images).
+ * web editor (bold, italic, links, lists, simple tables, remote images and
+ * images sent inline with the message through `cid:` links).
  * Everything is stored and sent as HTML that has passed `sanitizeRichText`,
  * so one allowlist guards the editor, the API and outgoing mail. Plain-text
  * recipients get the `richTextToPlainText` rendering.
@@ -8,7 +9,7 @@
  * This module is pure string handling so it runs in the browser, the Worker
  * and Node tests alike.
  */
-import { linkifyPlainText } from "./linkify.ts";
+import { linkifyPlainText, linkifyText } from "./linkify.ts";
 
 /** Upper bound on the HTML of one message body; the plain-text limit still applies. */
 export const MAX_RICH_TEXT_HTML_LENGTH = 400_000;
@@ -322,6 +323,60 @@ export function plainTextToHtml(text: string): string {
     .join("<br>");
 }
 
+/**
+ * Plain text as editor HTML: escaped, with line breaks kept and web and email
+ * addresses turned into links. Used for text pasted into the editor.
+ */
+export function plainTextToLinkedHtml(text: string): string {
+  return text
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => linkedSegmentsHtml(line))
+    .join("<br>");
+}
+
+/**
+ * Turn bare web and email addresses in sanitized HTML into links, leaving
+ * existing links and markup untouched.
+ */
+export function linkifyRichText(html: string): string {
+  let insideLink = 0;
+  let output = "";
+  for (const token of html.matchAll(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*>|[^<]+/g)) {
+    const value = token[0];
+    if (token[2]) {
+      if (token[2].toLowerCase() === "a") insideLink = Math.max(0, insideLink + (token[1] ? -1 : 1));
+      output += value;
+      continue;
+    }
+    if (insideLink) {
+      output += value;
+      continue;
+    }
+    const decoded = decodeEntities(value);
+    output += linkifyText(decoded).some((segment) => segment.type === "link")
+      ? linkedSegmentsHtml(decoded)
+      : value;
+  }
+  return output;
+}
+
+/** Content IDs of the images the HTML shows through `cid:` links. */
+export function inlineImageContentIds(html: string): string[] {
+  const ids = [...html.matchAll(/<img\b[^>]*\bsrc="cid:([^"]+)"/gi)].map((match) => decodeEntities(match[1]!));
+  return [...new Set(ids)];
+}
+
+function linkedSegmentsHtml(text: string): string {
+  return linkifyText(text)
+    .map((segment) =>
+      segment.type === "link"
+        ? `<a href="${escapeAttribute(segment.href)}">${escapeHtml(segment.value)}</a>`
+        : escapeHtml(segment.value),
+    )
+    .join("");
+}
+
 export interface MessageBody {
   /** Plain-text version, always present. */
   text: string;
@@ -373,7 +428,8 @@ function sanitizeAttributeValue(tag: string, name: string, value: string): strin
     case "href":
       return safeUrl(trimmed, ["http:", "https:", "mailto:", "tel:"]);
     case "src":
-      return tag === "img" ? safeUrl(trimmed, ["http:", "https:"]) : null;
+      // cid: points at an image sent inline with the message.
+      return tag === "img" ? safeUrl(trimmed, ["http:", "https:", "cid:"]) : null;
     case "width":
     case "height":
     case "border":

@@ -217,3 +217,26 @@ test("Web compose sends a rich-text body with a derived plain-text part", async 
   assert.equal((await f.post(message({ text: "", html: "<div><br></div>" }))).status, 400);
   assert.equal(f.sent.length, 1);
 });
+
+test("sends pasted images inline under the cid the body shows, and drops ones it does not", async (t) => {
+  const f = fixture(t);
+  const form = message({ text: "", html: '<p>See this</p><img src="cid:shot1@mailroom" alt="">' });
+  const png = () => new File([new Uint8Array([137, 80, 78, 71])], "image.png", { type: "image/png" });
+  form.append("inline_images", png());
+  form.append("inline_content_ids", "shot1@mailroom");
+  form.append("inline_images", png());
+  form.append("inline_content_ids", "unused@mailroom");
+  assert.equal((await f.post(form)).status, 200);
+  assert.equal(f.sent.length, 1);
+  assert.equal(f.sent[0].attachments.length, 1);
+  assert.equal(f.sent[0].attachments[0].disposition, "inline");
+  assert.equal(f.sent[0].attachments[0].contentId, "shot1@mailroom");
+  assert.match(f.sent[0].html, /src="cid:shot1@mailroom"/);
+  const stored = f.db.prepare("SELECT disposition, content_id FROM attachments").all();
+  assert.deepEqual(stored.map((row) => ({ ...row })), [{ disposition: "inline", content_id: "shot1@mailroom" }]);
+
+  const bad = message({ html: '<img src="cid:x@mailroom">' });
+  bad.append("inline_images", new File(["x"], "a.txt", { type: "text/plain" }));
+  bad.append("inline_content_ids", "x@mailroom");
+  assert.equal((await f.post(bad)).status, 400);
+});

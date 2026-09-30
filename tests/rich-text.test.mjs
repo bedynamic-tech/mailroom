@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  inlineImageContentIds,
   isBlankRichText,
+  linkifyRichText,
   normalizeMessageBody,
   plainTextToHtml,
+  plainTextToLinkedHtml,
   richTextToPlainText,
   sanitizeRichText,
 } from "../src/shared/rich-text.ts";
@@ -53,6 +56,20 @@ test("plain text becomes escaped HTML with links", () => {
   assert.equal(plainTextToHtml("a < b\nsee https://acme.com"), 'a &lt; b<br>see <a href="https://acme.com">https://acme.com</a>');
 });
 
+test("pasted plain text links web and email addresses", () => {
+  assert.equal(
+    plainTextToLinkedHtml("Hi & bye\r\nhttps://acme.com/x?a=1&b=2 or hi@acme.com"),
+    'Hi &amp; bye<br><a href="https://acme.com/x?a=1&amp;b=2">https://acme.com/x?a=1&amp;b=2</a> or <a href="mailto:hi@acme.com">hi@acme.com</a>',
+  );
+});
+
+test("links bare addresses in rich text but leaves existing links alone", () => {
+  assert.equal(
+    linkifyRichText('<p>See https://acme.com &amp; <a href="https://x.com">https://y.com</a></p><p><b>hi@acme.com</b> &nbsp;</p>'),
+    '<p>See <a href="https://acme.com">https://acme.com</a> &amp; <a href="https://x.com">https://y.com</a></p><p><b><a href="mailto:hi@acme.com">hi@acme.com</a></b> &nbsp;</p>',
+  );
+});
+
 test("a rich-text body derives its text part; blank HTML is empty", () => {
   assert.deepEqual(normalizeMessageBody("ignored", "<div><b>Hi</b></div><div>there</div>"), {
     text: "Hi\nthere",
@@ -83,4 +100,10 @@ test("outgoing email appends the signature to both parts", () => {
   const rich = composeOutgoingBodies({ text: "Hi", html: "<b>Hi</b>" }, null);
   assert.equal(rich.text, "Hi");
   assert.match(rich.html, /<div><b>Hi<\/b><\/div>/);
+});
+
+test("keeps images sent inline through cid links and lists their ids", () => {
+  const html = '<p>Look</p><img src="cid:a1@mailroom" alt=""><img src="cid:a1@mailroom"><img src="blob:https://x/1">';
+  assert.equal(sanitizeRichText(html), '<p>Look</p><img src="cid:a1@mailroom" alt=""><img src="cid:a1@mailroom">');
+  assert.deepEqual(inlineImageContentIds(sanitizeRichText(html)), ["a1@mailroom"]);
 });

@@ -21,7 +21,11 @@ import {
   unarchiveThread,
 } from "../api";
 import type { Draft, Message, ThreadDetail, ThreadNote } from "../../shared/types";
-import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits";
+import {
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MAX_ATTACHMENT_TOTAL_BYTES,
+  MAX_RECIPIENTS_PER_MESSAGE,
+} from "../../shared/email-limits";
 import { replyAllRecipients } from "../../shared/recipients";
 import {
   deriveAgentDraftStatus,
@@ -74,7 +78,9 @@ import {
 } from "../../shared/reply-recipients";
 import { RichTextEditor, RichTextPreview } from "./RichTextEditor";
 import { firstNameFrom, replyGreetingHtml, replyGreetingLine } from "../../shared/reply-greeting";
+import { pastedImagesIn } from "../pasted-images";
 import {
+  inlineImageContentIds,
   isBlankRichText,
   plainTextToHtml,
   richTextToPlainText,
@@ -252,6 +258,7 @@ export function ThreadView(props: {
         args.files ?? [],
         { to: args.to, cc: args.cc, bcc: args.bcc },
         args.html,
+        pastedImagesIn(args.html),
       ),
     onSuccess: (result, args) => {
       // Recipients stay as sent, so the next reply goes to the same people.
@@ -513,6 +520,16 @@ export function ThreadView(props: {
         setSendNotice("Add at least one To recipient.");
         return;
       }
+      const images = pastedImagesIn(html);
+      const files = [...pendingFiles, ...images.map((image) => image.file)];
+      if (files.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+        setSendNotice("Send up to 10 attachments and pasted images per message.");
+        return;
+      }
+      if (files.reduce((size, file) => size + file.size, 0) > MAX_ATTACHMENT_TOTAL_BYTES) {
+        setSendNotice("Attachments and pasted images must total 3 MB or less.");
+        return;
+      }
       const fingerprint = `${html} ${pendingFiles.map((file) => `${file.name}:${file.size}`).join(",")} to:${to.join(",")} cc:${cc.join(",")} bcc:${bcc.join(",")}`;
       const attemptKey = usedDraftId === null ? "manual" : `draft-${usedDraftId}`;
       reply.mutate({
@@ -532,6 +549,10 @@ export function ThreadView(props: {
   const submitNote = () => {
     if (replyEmpty || addNote.isPending || reply.isPending) return;
     const html = sanitizeRichText(replyText);
+    if (inlineImageContentIds(html).length > 0) {
+      setSendNotice("Pasted images can be sent in a reply but not saved in a note. Remove them to add a note.");
+      return;
+    }
     addNote.mutate({ text: richTextToPlainText(html), html });
   };
 
@@ -875,6 +896,7 @@ export function ThreadView(props: {
               }}
               caretToEndOnFocus={Boolean(greeting) && replyPlainText === greeting}
               onSubmitShortcut={submitReply}
+              inlineImages
               placeholder="Write a reply…"
               ariaLabel="Reply"
               variant="bare"

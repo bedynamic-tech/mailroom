@@ -10,6 +10,19 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   yet, it shows **To** and the recipient's name, taken from their Contact, else
   from the name on mail they sent you before, else their address.
 - **Compose and reply.** Send new mail or reply to conversations, with attachments.
+- **Automatic links.** In the reply, compose, note and signature editors, web
+  addresses (`https://...` or `www....`) and email addresses become links as
+  soon as you type a space or start a new line after them, and when you leave
+  the editor or send. Pasted addresses become links right away, and pasting an
+  address over selected words turns those words into a link. Content pasted or
+  dropped from a web page or another email keeps its links, formatting and
+  web-hosted images.
+- **Inline images.** Paste a screenshot or copied image into a reply or new
+  email, or drop an image file on it, and it appears in the body where the
+  cursor is. It is sent as an inline image inside the email rather than as a
+  separate attachment. Large images are resized to at most 1600 pixels and
+  saved as JPEG. Pasted images count toward the 10 file and 3 MB attachment
+  limits. Notes and signatures do not take pasted images.
 - **Choose who a reply goes to.** The reply box opens with an editable **To**
   field, filled with the sender of the latest email (or its Reply-To). In a
   conversation you started, it is filled with the address you sent to, so you

@@ -80,6 +80,18 @@ export class ComposeRequestError extends Error {
   }
 }
 
+export interface InlineImageUpload {
+  contentId: string;
+  file: File;
+}
+
+function appendInlineImages(form: FormData, images: InlineImageUpload[]) {
+  for (const image of images) {
+    form.append("inline_images", image.file, image.file.name);
+    form.append("inline_content_ids", image.contentId);
+  }
+}
+
 export async function composeEmail(input: {
   mailboxId: number;
   to: string;
@@ -90,6 +102,8 @@ export async function composeEmail(input: {
   /** Rich-text body; the server derives the plain-text part from it. */
   html?: string;
   files: File[];
+  /** Images pasted into the body, sent inline under the `cid:` ids the HTML uses. */
+  inlineImages?: InlineImageUpload[];
   attemptId: string;
 }): Promise<ComposeAttemptResult> {
   const form = new FormData();
@@ -102,6 +116,7 @@ export async function composeEmail(input: {
   if (input.html) form.set("html", input.html);
   form.set("attempt_id", input.attemptId);
   for (const file of input.files) form.append("attachments", file, file.name);
+  appendInlineImages(form, input.inlineImages ?? []);
   const response = await fetch("/api/compose", { method: "POST", body: form });
   const body = await response.json() as ComposeAttemptResult & { error?: string };
   // Provider failures are terminal send results, distinct from an uncertain
@@ -356,6 +371,7 @@ export const sendReply = (
   attachments: File[] = [],
   copies: { to?: string[]; cc: string[]; bcc: string[] } = { cc: [], bcc: [] },
   html?: string,
+  inlineImages: InlineImageUpload[] = [],
 ) => {
   const form = new FormData();
   form.set("text", text);
@@ -369,6 +385,7 @@ export const sendReply = (
   for (const address of copies.bcc) form.append("bcc", address);
   if (draftId !== undefined) form.set("draft_id", String(draftId));
   for (const file of attachments) form.append("attachments", file, file.name);
+  appendInlineImages(form, inlineImages);
   return request<ReplyAttemptResult>(`/threads/${id}/reply`, {
     method: "POST",
     body: form,
