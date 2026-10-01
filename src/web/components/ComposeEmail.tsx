@@ -11,8 +11,9 @@ import { PaperclipIcon, SendIcon, XIcon } from "./Icons";
 import { RichTextEditor, RichTextPreview } from "./RichTextEditor";
 import { isBlankRichText, richTextToPlainText, sanitizeRichText } from "../../shared/rich-text";
 import { pastedImagesIn } from "../pasted-images";
+import type { ForwardDraft } from "../forward";
 
-type OpenCompose = (mailboxId: number | null, options?: { to?: string }) => void;
+type OpenCompose = (mailboxId: number | null, options?: { to?: string; forward?: ForwardDraft }) => void;
 
 const ComposeContext = createContext<OpenCompose>(() => {});
 export const useCompose = () => useContext(ComposeContext);
@@ -194,6 +195,14 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
       // Prefill the recipient only when it would not disturb a draft in progress.
       const address = options?.to;
       if (address && !locked && to.length === 0 && !takenBy(cc, bcc).has(address.toLowerCase())) setTo([address]);
+      // A forward starts a fresh message, so it never replaces a draft in progress.
+      const forward = options?.forward;
+      if (forward && (hasDraft || locked)) {
+        setNotice("Send or discard the message you are writing, then forward again.");
+      } else if (forward) {
+        reset();
+        setSubject(forward.subject); setHtml(forward.html); setFiles(forward.files); setNotice(forward.notice);
+      }
       setOpen(true);
     }}>
       {children}

@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
-import { Reply } from "lucide-react";
+import { Forward, Reply } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   addThreadNote,
@@ -79,6 +79,8 @@ import {
 import { RichTextEditor, RichTextPreview } from "./RichTextEditor";
 import { firstNameFrom, replyGreetingHtml, replyGreetingLine } from "../../shared/reply-greeting";
 import { pastedImagesIn } from "../pasted-images";
+import { prepareForward } from "../forward";
+import { useCompose } from "./ComposeEmail";
 import {
   inlineImageContentIds,
   isBlankRichText,
@@ -434,6 +436,11 @@ export function ThreadView(props: {
       .filter((address): address is string => Boolean(address))
       .map((address) => address.toLowerCase()),
   );
+  const openCompose = useCompose();
+  const forwardMessage = async (message: Message, senderName: string) => {
+    const forward = await prepareForward(message, senderName);
+    openCompose(thread.mailbox_id, { forward });
+  };
   const openBlockSender = (message: Message) => {
     const options = blockCandidatesFor(message, ownAddresses);
     if (options.length > 0) setBlocking({ sender: options[0].address, options });
@@ -720,6 +727,7 @@ export function ThreadView(props: {
                   message={entry.item}
                   contactNames={detail.data.contact_names}
                   catchAllRecipient={thread.catch_all_recipient}
+                  onForward={(senderName) => forwardMessage(entry.item, senderName)}
                   onBlockSender={
                     blockCandidatesFor(entry.item, ownAddresses).length > 0
                       ? () => openBlockSender(entry.item)
@@ -1270,13 +1278,16 @@ function MessageCard({
   message,
   contactNames,
   catchAllRecipient,
+  onForward,
   onBlockSender,
 }: {
   message: Message;
   contactNames?: Record<string, string>;
   catchAllRecipient: string | null;
+  onForward: (senderName: string) => Promise<void>;
   onBlockSender?: () => void;
 }) {
+  const [forwarding, setForwarding] = useState(false);
   const [showQuoted, setShowQuoted] = useState(false);
   const dark = useResolvedTheme() === "dark";
   const [chosenAppearance, setChosenAppearance] = useState<EmailAppearance | null>(null);
@@ -1299,7 +1310,11 @@ function MessageCard({
   const to = parseAddressList(message.to_addresses);
   const cc = parseAddressList(message.cc_addresses);
   const bcc = isOutbound ? parseAddressList(message.bcc_addresses) : [];
-  const hasMenu = Boolean((dark && message.html_body) || onBlockSender);
+  const forward = () => {
+    if (forwarding) return;
+    setForwarding(true);
+    void onForward(senderName).finally(() => setForwarding(false));
+  };
 
   return (
     <Card className="gap-0 p-4 sm:p-5">
@@ -1343,40 +1358,43 @@ function MessageCard({
         >
           {formatTime(message.created_at)}
         </time>
-        {hasMenu && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="-mt-0.5 -mr-1.5 text-muted-foreground"
-                aria-label="Message options"
-                title="More"
-              >
-                <MoreIcon className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {dark && message.html_body && (
-                <>
-                  <DropdownMenuItem
-                    onSelect={() => setChosenAppearance(appearance === "dark" ? "original" : "dark")}
-                  >
-                    <ContrastIcon />
-                    {appearance === "dark" ? "Show original colors" : "Show in dark colors"}
-                  </DropdownMenuItem>
-                  {onBlockSender && <DropdownMenuSeparator />}
-                </>
-              )}
-              {onBlockSender && (
-                <DropdownMenuItem variant="destructive" onSelect={onBlockSender}>
-                  <ShieldBanIcon />
-                  Block sender…
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="-mt-0.5 -mr-1.5 text-muted-foreground"
+              aria-label="Message options"
+              title="More"
+            >
+              <MoreIcon className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onSelect={forward} disabled={forwarding}>
+              <Forward />
+              Forward
+            </DropdownMenuItem>
+            {(dark && message.html_body) || onBlockSender ? <DropdownMenuSeparator /> : null}
+            {dark && message.html_body && (
+              <>
+                <DropdownMenuItem
+                  onSelect={() => setChosenAppearance(appearance === "dark" ? "original" : "dark")}
+                >
+                  <ContrastIcon />
+                  {appearance === "dark" ? "Show original colors" : "Show in dark colors"}
                 </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+                {onBlockSender && <DropdownMenuSeparator />}
+              </>
+            )}
+            {onBlockSender && (
+              <DropdownMenuItem variant="destructive" onSelect={onBlockSender}>
+                <ShieldBanIcon />
+                Block sender…
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {message.html_body ? (

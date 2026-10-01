@@ -4,6 +4,7 @@ import {
   MAX_MESSAGE_CHARS,
   MAX_SUBJECT_CHARS,
 } from "../../shared/email-limits.ts";
+import { forwardSubject } from "../../shared/forward.ts";
 import { senderFrom } from "../../shared/sender-name.ts";
 import type { MailRuleAddress } from "../../shared/mail-rules.ts";
 import type { RuleForward } from "./mail-rules.ts";
@@ -129,9 +130,7 @@ export function buildForward(original: ForwardedOriginal): {
   text: string;
   attachments: OutgoingAttachment[];
 } {
-  const subject = /^\s*fwd?\s*:/i.test(original.subject)
-    ? original.subject
-    : `Fwd: ${original.subject || "(no subject)"}`;
+  const subject = forwardSubject(original.subject);
 
   const attachments: OutgoingAttachment[] = [];
   const omitted: string[] = [];
