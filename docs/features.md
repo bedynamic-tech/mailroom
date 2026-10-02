@@ -40,8 +40,11 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
 - **Choose who a reply goes to.** The reply box opens with an editable **To**
   field, filled with the sender of the latest email (or its Reply-To). In a
   conversation you started, it is filled with the address you sent to, so you
-  can follow up before anyone answers. Remove or add To recipients before
-  sending. **Cc**, **Bcc** and **Reply all** sit at
+  can follow up before anyone answers. Replies go to everyone by default:
+  the other people on the latest email's To and Cc (not your own Inbox
+  addresses) start in **Cc**, while Bcc is never carried over. Remove or add
+  recipients before sending. **Cc**, **Bcc** and **Reply all** (to bring back
+  anyone you removed) sit at
   the right of the To line and open their rows when tapped. Recipients you
   edit are saved with that conversation, so they stay after leaving, reloading
   or sending and on your other devices, and the next reply goes to the same

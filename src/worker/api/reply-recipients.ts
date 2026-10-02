@@ -7,9 +7,9 @@ type RecipientsEnv = { Bindings: { DB: D1Database } };
 
 const addresses = z.array(z.email().max(254)).max(MAX_RECIPIENTS_PER_MESSAGE);
 const replyRecipients = z
-  .object({ to: addresses.nullable(), cc: addresses, bcc: addresses })
+  .object({ to: addresses.nullable(), cc: addresses.nullable(), bcc: addresses })
   .refine(
-    (value) => (value.to?.length ?? 0) + value.cc.length + value.bcc.length <= MAX_RECIPIENTS_PER_MESSAGE,
+    (value) => (value.to?.length ?? 0) + (value.cc?.length ?? 0) + value.bcc.length <= MAX_RECIPIENTS_PER_MESSAGE,
   );
 
 /**

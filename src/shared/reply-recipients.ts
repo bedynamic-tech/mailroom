@@ -4,11 +4,12 @@
 export type ReplyRecipients = {
   // null means To was never edited and follows the latest inbound reply target.
   to: string[] | null;
-  cc: string[];
+  // null means Cc was never edited and follows Reply all: everyone else on the latest email.
+  cc: string[] | null;
   bcc: string[];
 };
 
-export const EMPTY_REPLY_RECIPIENTS: ReplyRecipients = { to: null, cc: [], bcc: [] };
+export const EMPTY_REPLY_RECIPIENTS: ReplyRecipients = { to: null, cc: null, bcc: [] };
 
 const isAddressList = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === "string");
@@ -20,7 +21,7 @@ export function parseReplyRecipients(raw: string | null | undefined): ReplyRecip
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     return {
       to: isAddressList(parsed.to) ? parsed.to : null,
-      cc: isAddressList(parsed.cc) ? parsed.cc : [],
+      cc: isAddressList(parsed.cc) ? parsed.cc : null,
       bcc: isAddressList(parsed.bcc) ? parsed.bcc : [],
     };
   } catch {
@@ -30,7 +31,7 @@ export function parseReplyRecipients(raw: string | null | undefined): ReplyRecip
 
 /** The stored form: null when nothing was edited, so the defaults apply. */
 export function serializeReplyRecipients(recipients: ReplyRecipients): string | null {
-  if (recipients.to === null && recipients.cc.length === 0 && recipients.bcc.length === 0) {
+  if (recipients.to === null && recipients.cc === null && recipients.bcc.length === 0) {
     return null;
   }
   return JSON.stringify(recipients);
