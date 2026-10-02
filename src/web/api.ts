@@ -301,6 +301,8 @@ export const THREAD_PAGE_SIZE = 50;
 
 export interface ThreadQuery {
   mailboxId: number | null;
+  /** Limits the list to Inboxes on this domain, such as `example.com`. */
+  domain: string | null;
   labelId: number | null;
   status: ThreadSummary["status"];
   unread: boolean;
@@ -314,6 +316,7 @@ export interface ThreadCursor {
 function threadScopeParams(query: Omit<ThreadQuery, "status">) {
   const params = new URLSearchParams();
   if (query.mailboxId !== null) params.set("mailbox_id", String(query.mailboxId));
+  if (query.domain !== null) params.set("domain", query.domain);
   if (query.labelId !== null) params.set("label_id", String(query.labelId));
   if (query.unread) params.set("unread", "1");
   return params;

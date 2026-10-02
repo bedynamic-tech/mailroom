@@ -841,6 +841,7 @@ api.delete("/labels/:id", async (c) => {
 
 api.get("/threads", async (c) => {
   const mailboxId = c.req.query("mailbox_id");
+  const domain = c.req.query("domain")?.trim().toLowerCase() ?? "";
   const labelId = c.req.query("label_id");
   const status = c.req.query("status") ?? "open";
   if (!["open", "archived", "needs_human"].includes(status)) {
@@ -852,6 +853,7 @@ api.get("/threads", async (c) => {
     "t.status = ?2",
     "(?3 = 0 OR EXISTS (SELECT 1 FROM thread_labels tl WHERE tl.thread_id = t.id AND tl.label_id = ?3))",
     "(?4 = '' OR t.last_message_at < ?4 OR (t.last_message_at = ?4 AND t.id < ?5))",
+    `(?6 = '' OR ${MAILBOX_DOMAIN_SQL} = ?6)`,
   ];
   if (mailboxId) conditions.push("t.mailbox_id = ?1");
   if (c.req.query("unread") === "1") conditions.push("t.is_read = 0");
@@ -885,7 +887,7 @@ api.get("/threads", async (c) => {
      WHERE ${conditions.join(" AND ")}
      ORDER BY t.last_message_at DESC, t.id DESC LIMIT ${THREAD_PAGE_SIZE}`,
   )
-    .bind(mailboxId ?? 0, status, labelId ?? 0, beforeAt, beforeId)
+    .bind(mailboxId ?? 0, status, labelId ?? 0, beforeAt, beforeId, domain)
     .all();
   const rows = results as unknown as Array<{ id: number; labels: ThreadLabel[] }>;
   await attachLabels(c.env, rows);
@@ -1367,6 +1369,7 @@ api.post("/drafts/:id/discard", async (c) => {
 api.get("/search", async (c) => {
   const q = c.req.query("q")?.trim();
   const mailboxId = c.req.query("mailbox_id");
+  const domain = c.req.query("domain")?.trim().toLowerCase() ?? "";
   const labelId = c.req.query("label_id");
   if (!q) return c.json([]);
   const { results } = await c.env.DB.prepare(
@@ -1405,9 +1408,10 @@ api.get("/search", async (c) => {
          WHERE tl.thread_id = t.id AND tl.label_id = ?3
        ))
        AND (?4 = 0 OR t.is_read = 0)
+       AND (?5 = '' OR ${MAILBOX_DOMAIN_SQL} = ?5)
      ORDER BY t.last_message_at DESC LIMIT 50`,
   )
-    .bind(q, mailboxId ?? 0, labelId ?? 0, c.req.query("unread") === "1" ? 1 : 0)
+    .bind(q, mailboxId ?? 0, labelId ?? 0, c.req.query("unread") === "1" ? 1 : 0, domain)
     .all();
   const rows = results as unknown as Array<{ id: number; labels: ThreadLabel[] }>;
   await attachLabels(c.env, rows);
@@ -1416,6 +1420,8 @@ api.get("/search", async (c) => {
 
 const MAX_LABELS_PER_MAILBOX = 20;
 const THREAD_PAGE_SIZE = 50;
+// The lowercase domain of the Inbox joined as `m`, matching mailboxDomain().
+const MAILBOX_DOMAIN_SQL = "lower(substr(m.address, instr(m.address, '@') + 1))";
 
 // The first To address of a Conversation's latest message, when that message
 // was sent from the Inbox. Used for Conversations with no inbound mail yet.

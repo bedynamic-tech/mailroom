@@ -5,6 +5,13 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
 ## Mail
 
 - **Unified inbox.** Manage multiple addresses and domains in one workspace.
+- **Inboxes grouped by domain.** Under **All inboxes**, the sidebar lists each
+  domain once, with its unread count. Click a domain to see the conversations
+  of all its inboxes in one list, with search, filters, labels and the
+  selection toolbar working across them. The arrow beside a domain shows or
+  hides its inboxes, listed by the part before the `@`, and clicking one
+  narrows the list to that inbox as before. Opening an inbox reveals it under
+  its domain, and the sidebar remembers which domains are open.
 - **Who each conversation is with.** The conversation list shows the name of
   the latest sender. In a conversation you started that nobody has answered
   yet, it shows **To** and the recipient's name, taken from their Contact, else

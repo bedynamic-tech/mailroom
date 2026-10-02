@@ -34,6 +34,7 @@ import { ThreadList, type ThreadFilter } from "./components/ThreadList";
 import { ThreadView } from "./components/ThreadView";
 import { UniversalSearchProvider, UniversalSearchTrigger } from "./components/UniversalSearch";
 import { useUnreadBadge } from "./pwa";
+import { mailboxDomain } from "../shared/mailbox-domains";
 
 type WorkspaceView = "inbox" | "archive" | "contacts" | "settings";
 type SettingsSection = "general" | "notifications" | "inboxes" | "contacts" | "rules" | "spam" | "ai";
@@ -52,6 +53,11 @@ export function App() {
       <Route
         path="/mailboxes/:mailboxId/threads/:threadId"
         element={<Workspace view="inbox" mailboxScoped />}
+      />
+      <Route path="/domains/:domain" element={<Workspace view="inbox" domainScoped />} />
+      <Route
+        path="/domains/:domain/threads/:threadId"
+        element={<Workspace view="inbox" domainScoped />}
       />
       <Route path="/contacts" element={<Workspace view="contacts" />} />
       <Route path="/contacts/new" element={<Workspace view="contacts" creatingContact />} />
@@ -94,6 +100,7 @@ export function App() {
 function Workspace(props: {
   view: WorkspaceView;
   mailboxScoped?: boolean;
+  domainScoped?: boolean;
   settingsSection?: SettingsSection;
   creatingContact?: boolean;
 }) {
@@ -102,6 +109,7 @@ function Workspace(props: {
   const location = useLocation();
   const params = useParams<{
     mailboxId?: string;
+    domain?: string;
     threadId?: string;
     contactId?: string;
     ruleId?: string;
@@ -116,6 +124,8 @@ function Workspace(props: {
     (props.view === "settings" && props.settingsSection === "inboxes")
       ? routeMailboxId
       : null;
+  const selectedDomain =
+    props.domainScoped && params.domain ? params.domain.trim().toLowerCase() : null;
   const selectedThread = parseId(params.threadId);
   const search = searchParams.get("q") ?? "";
   const filter = parseFilter(searchParams.get("filter"));
@@ -134,13 +144,18 @@ function Workspace(props: {
   useUnreadBadge(
     mailboxes.data ? mailboxes.data.reduce((sum, mailbox) => sum + mailbox.unread_count, 0) : null,
   );
+  const domainMailboxes =
+    selectedDomain === null
+      ? null
+      : (mailboxes.data ?? []).filter((mailbox) => mailboxDomain(mailbox.address) === selectedDomain);
   const threadQuery = {
     mailboxId: selectedMailbox,
+    domain: selectedDomain,
     labelId: activeLabel,
     unread: filter === "unread",
   };
   const threads = useInfiniteQuery({
-    queryKey: ["threads", props.view, selectedMailbox, deferredSearch, activeLabel, filter],
+    queryKey: ["threads", props.view, selectedMailbox, selectedDomain, deferredSearch, activeLabel, filter],
     queryFn: ({ pageParam }) =>
       deferredSearch
         ? searchThreads(deferredSearch, threadQuery)
@@ -168,9 +183,11 @@ function Workspace(props: {
 
   const listPath = isArchive
     ? "/archive"
-    : selectedMailbox === null
-      ? "/inbox"
-      : `/mailboxes/${selectedMailbox}`;
+    : selectedMailbox !== null
+      ? `/mailboxes/${selectedMailbox}`
+      : selectedDomain !== null
+        ? `/domains/${encodeURIComponent(selectedDomain)}`
+        : "/inbox";
 
   useEffect(() => {
     if (selectedThread !== null) autoSelectedScope.current = listPath;
@@ -224,8 +241,10 @@ function Workspace(props: {
   const sidebarNav = {
     mailboxes: mailboxes.data ?? [],
     selected: selectedMailbox,
+    selectedDomain,
     activeView: props.view,
     onSelect: selectMailbox,
+    onSelectDomain: (domain: string) => navigate(`/domains/${encodeURIComponent(domain)}`),
     onOpenArchive: () => navigate("/archive"),
     onOpenContacts: () => navigate("/contacts"),
     onOpenSettings: openSettings,
@@ -253,12 +272,14 @@ function Workspace(props: {
 
   const selectedMailboxName = isArchive
     ? "Archive"
-    : selectedMailbox === null
-      ? "All inboxes"
-      : (mailboxes.data?.find((mailbox) => mailbox.id === selectedMailbox)?.address ??
-        "Inbox");
-  const scopeUnread = (mailboxes.data ?? [])
-    .filter((mailbox) => selectedMailbox === null || mailbox.id === selectedMailbox)
+    : selectedMailbox !== null
+      ? (mailboxes.data?.find((mailbox) => mailbox.id === selectedMailbox)?.address ?? "Inbox")
+      : (selectedDomain ?? "All inboxes");
+  const scopeMailboxes =
+    selectedMailbox !== null
+      ? (mailboxes.data ?? []).filter((mailbox) => mailbox.id === selectedMailbox)
+      : (domainMailboxes ?? mailboxes.data ?? []);
+  const scopeUnread = scopeMailboxes
     .reduce((sum, mailbox) => sum + mailbox.unread_count, 0);
   const inboxIsEmpty =
     props.view === "inbox" &&
@@ -404,9 +425,14 @@ function Workspace(props: {
             title={selectedMailboxName}
             selected={selectedThread}
             selectedMailbox={selectedMailbox}
+            scopeMailboxIds={
+              selectedMailbox === null && domainMailboxes === null
+                ? null
+                : scopeMailboxes.map((mailbox) => mailbox.id)
+            }
             archive={isArchive}
             unreadCount={!isArchive && !deferredSearch && activeLabel === null ? scopeUnread : null}
-            showMailboxChip={selectedMailbox === null}
+            showMailboxChip={selectedMailbox === null && (domainMailboxes?.length ?? 2) > 1}
             search={search}
             filter={filter}
             activeLabel={activeLabel}
@@ -422,7 +448,7 @@ function Workspace(props: {
             onFilter={(nextFilter) => updateQuery("filter", nextFilter, "all")}
             onSelectLabel={(id) => updateQuery("label", id === null ? "" : String(id))}
             onOpenMenu={() => setMenuOpen(true)}
-            onCompose={() => openCompose(selectedMailbox)}
+            onCompose={() => openCompose(selectedMailbox ?? domainMailboxes?.[0]?.id ?? null)}
             onOpenMailboxSettings={(id) => navigate(`/settings/inboxes/${id}`)}
             onSelect={(id) =>
               navigate({ pathname: `${threadListBase(listPath)}/${id}`, search: location.search })
@@ -489,5 +515,7 @@ function parseFilter(value: string | null): ThreadFilter {
 }
 
 function threadListBase(listPath: string): string {
-  return listPath.startsWith("/mailboxes/") ? `${listPath}/threads` : listPath;
+  return listPath.startsWith("/mailboxes/") || listPath.startsWith("/domains/")
+    ? `${listPath}/threads`
+    : listPath;
 }
