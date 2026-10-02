@@ -105,7 +105,10 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   has no inbox of its own, such as a different address for each service you
   sign up to. Caught mail is badged and shows the address it was sent to,
   replies go out from that address, and any address can become its own inbox
-  or be blocked if spammers find it.
+  or be blocked if spammers find it. Choose **Archive in** instead of
+  **Deliver to** to file caught mail straight into the Archive, read and
+  without notifications or drafts, so it stays searchable without filling
+  the inbox.
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.

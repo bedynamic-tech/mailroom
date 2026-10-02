@@ -26,6 +26,8 @@ export interface Domain {
   inbox_count: number;
   /** The Inbox receiving mail for unregistered addresses on this Domain, if any. */
   catch_all_mailbox_id: number | null;
+  /** Whether the catch-all files the mail it catches into the Archive, read. */
+  catch_all_archive: boolean;
   created_at: string;
   activated_at: string | null;
 }

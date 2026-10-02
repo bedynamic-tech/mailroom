@@ -24,6 +24,17 @@ import { SettingsBlock, SettingsPanel } from "./SettingsNavigation";
 
 const OFF = "off";
 
+type CatchAllChoice = { mailboxId: number | null; archive: boolean };
+
+const choiceValue = (choice: CatchAllChoice) =>
+  choice.mailboxId === null ? OFF : `${choice.archive ? "archive" : "deliver"}:${choice.mailboxId}`;
+
+function parseChoice(value: string): CatchAllChoice {
+  if (value === OFF) return { mailboxId: null, archive: false };
+  const [mode, id] = value.split(":");
+  return { mailboxId: Number(id), archive: mode === "archive" };
+}
+
 /** Chooses, for each Domain, the Inbox that receives mail for addresses without their own Inbox. */
 export function CatchAllSettings(props: { onOpenInbox: (id: number) => void }) {
   // The row a dialog acts on stays set while the dialog animates closed.
@@ -100,7 +111,7 @@ function DomainCatchAll(props: {
   const [listOpen, setListOpen] = useState(false);
 
   const choose = useMutation({
-    mutationFn: (mailboxId: number | null) => setDomainCatchAll(domain.id, mailboxId),
+    mutationFn: (choice: CatchAllChoice) => setDomainCatchAll(domain.id, choice.mailboxId, choice.archive),
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ["domains"] }),
@@ -108,7 +119,10 @@ function DomainCatchAll(props: {
       ]),
   });
 
-  const catchAllId = choose.isPending ? choose.variables : domain.catch_all_mailbox_id;
+  const current: CatchAllChoice = choose.isPending
+    ? choose.variables
+    : { mailboxId: domain.catch_all_mailbox_id, archive: domain.catch_all_archive };
+  const catchAllId = current.mailboxId;
 
   const addresses = useQuery({
     queryKey: ["catch-all-addresses", catchAllId],
@@ -139,7 +153,9 @@ function DomainCatchAll(props: {
               "Mail to addresses without an inbox is rejected."
             ) : (
               <>
-                Mail to any other address on this domain goes to the chosen inbox.{" "}
+                {current.archive
+                  ? "Mail to any other address on this domain is archived in the chosen inbox, read and without notifications."
+                  : "Mail to any other address on this domain goes to the chosen inbox."}{" "}
                 <button
                   type="button"
                   onClick={() => setListOpen(true)}
@@ -159,8 +175,8 @@ function DomainCatchAll(props: {
           )}
         </div>
         <Select
-          value={catchAllId === null ? OFF : String(catchAllId)}
-          onValueChange={(value) => choose.mutate(value === OFF ? null : Number(value))}
+          value={choiceValue(current)}
+          onValueChange={(value) => choose.mutate(parseChoice(value))}
           disabled={choose.isPending}
         >
           <SelectTrigger id={selectId} className="w-full shrink-0 sm:w-72">
@@ -169,8 +185,13 @@ function DomainCatchAll(props: {
           <SelectContent>
             <SelectItem value={OFF}>Off</SelectItem>
             {props.inboxes.map((inbox) => (
-              <SelectItem key={inbox.id} value={String(inbox.id)}>
+              <SelectItem key={inbox.id} value={choiceValue({ mailboxId: inbox.id, archive: false })}>
                 Deliver to {inbox.address}
+              </SelectItem>
+            ))}
+            {props.inboxes.map((inbox) => (
+              <SelectItem key={`archive-${inbox.id}`} value={choiceValue({ mailboxId: inbox.id, archive: true })}>
+                Archive in {inbox.address}
               </SelectItem>
             ))}
           </SelectContent>

@@ -39,6 +39,7 @@ export async function receiveEmail(
     return;
   }
   const { mailbox, catchAllRecipient } = target;
+  const archiveCaught = target.kind === "caught" && target.archive;
 
   // Blocked Senders are rejected before anything is stored, whether the rule
   // matches the envelope sender or the From header people see in the app.
@@ -71,7 +72,7 @@ export async function receiveEmail(
     .bind(messageId)
     .first<{ id: number; thread_id: number; is_auto_submitted: number }>();
   if (duplicate) {
-    if (mailbox.agent_mode !== "off" && !duplicate.is_auto_submitted && !parseBounce(parsed)) {
+    if (mailbox.agent_mode !== "off" && !archiveCaught && !duplicate.is_auto_submitted && !parseBounce(parsed)) {
       // Rules were applied on first delivery; only honour their draft skip here.
       const rules = await matchingMailRules(env, mailbox.id, ruleSubject(parsed));
       if (!rules.some((rule) => rule.skip_draft)) {
@@ -151,6 +152,14 @@ export async function receiveEmail(
     return NO_MAIL_RULES;
   });
 
+  // A catch-all set to archive files what it catches straight into the
+  // Archive, read, with no notification or draft.
+  if (archiveCaught) {
+    await env.DB.prepare("UPDATE threads SET status = 'archived', is_read = 1 WHERE id = ?")
+      .bind(stored.threadId)
+      .run();
+  }
+
   if (rules.forwards.length > 0) {
     // A copy of one of our own forwards is never forwarded again, so two
     // rules (or a rule and an outside auto-forward) can't loop.
@@ -203,7 +212,7 @@ export async function receiveEmail(
     );
   }
 
-  if (!rules.skipNotifications) {
+  if (!rules.skipNotifications && !archiveCaught) {
     ctx.waitUntil(
       notifyNewEmail(env, {
         threadId: stored.threadId,
@@ -232,7 +241,13 @@ export async function receiveEmail(
     );
   }
 
-  if (mailbox.agent_mode !== "off" && !rules.skipDraft && !bounce && !isAutoSubmitted(parsed)) {
+  if (
+    mailbox.agent_mode !== "off" &&
+    !rules.skipDraft &&
+    !archiveCaught &&
+    !bounce &&
+    !isAutoSubmitted(parsed)
+  ) {
     await enqueueIfExternal(env, stored.threadId, stored.messageId, parsed);
   }
 }

@@ -440,8 +440,8 @@ api.get("/domains", async (c) => {
        (SELECT COUNT(*) FROM mailboxes m WHERE m.domain_id = d.id) AS inbox_count
      FROM domains d
      ORDER BY d.name`,
-  ).all<Domain>();
-  return c.json(results);
+  ).all<Omit<Domain, "catch_all_archive"> & { catch_all_archive: number }>();
+  return c.json(results.map((domain) => ({ ...domain, catch_all_archive: Boolean(domain.catch_all_archive) })));
 });
 
 api.post("/domains", async (c) => {
@@ -516,13 +516,13 @@ async function newMailboxResponse(env: Env, mailbox: StoredMailbox): Promise<Mai
 api.put("/domains/:id/catch-all", async (c) => {
   const id = parsePositiveId(c.req.param("id"));
   if (id === null) return c.json({ error: "Invalid domain" }, 400);
-  const body = await c.req.json<{ mailbox_id?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ mailbox_id?: unknown; archive?: unknown }>().catch(() => null);
   const mailboxId = body?.mailbox_id ?? null;
   if (mailboxId !== null && (typeof mailboxId !== "number" || !Number.isSafeInteger(mailboxId))) {
     return c.json({ error: "Choose an inbox, or turn the catch-all off" }, 400);
   }
   try {
-    await setDomainCatchAll(c.env, id, mailboxId);
+    await setDomainCatchAll(c.env, id, mailboxId, body?.archive === true);
     return c.json({ ok: true });
   } catch (error) {
     if (error instanceof CatchAllError) return c.json({ error: error.message }, error.status);

@@ -82,6 +82,21 @@ test("each domain has at most one catch-all inbox, which must be on that domain"
   await assert.rejects(setDomainCatchAll(env, 99, null), (error) => error instanceof CatchAllError && error.status === 404);
 });
 
+test("a catch-all can archive what it catches, and turning it off clears that", async (t) => {
+  const { env, db } = fixture(t);
+  await setDomainCatchAll(env, 1, 2);
+  assert.equal((await resolveInboundTarget(env, "news@acme.com")).archive, false);
+
+  await setDomainCatchAll(env, 1, 2, true);
+  const target = await resolveInboundTarget(env, "news@acme.com");
+  assert.equal(target.kind, "caught");
+  assert.equal(target.archive, true);
+  assert.deepEqual(Object.keys(target.mailbox).sort(), ["address", "agent_mode", "id"]);
+
+  await setDomainCatchAll(env, 1, null, true);
+  assert.equal(db.prepare("SELECT catch_all_archive AS a FROM domains WHERE id = 1").get().a, 0);
+});
+
 test("blocking an address rejects its mail, counts it and archives its open conversations", async (t) => {
   const { env, db } = fixture(t);
   await setDomainCatchAll(env, 1, 2);

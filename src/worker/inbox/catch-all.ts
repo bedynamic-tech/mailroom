@@ -16,7 +16,7 @@ export interface InboundMailbox {
 
 export type InboundTarget =
   | { kind: "inbox"; mailbox: InboundMailbox; catchAllRecipient: null }
-  | { kind: "caught"; mailbox: InboundMailbox; catchAllRecipient: string }
+  | { kind: "caught"; mailbox: InboundMailbox; catchAllRecipient: string; archive: boolean }
   | { kind: "blocked"; ruleId: number }
   | { kind: "unknown" };
 
@@ -34,6 +34,7 @@ export class CatchAllError extends Error {
  * Decides where mail for `recipient` goes. An Inbox with that exact address
  * always wins; otherwise the Domain's catch-all Inbox takes it, unless the
  * address is a Blocked Address, whose rejection is counted on the rule.
+ * `archive` says whether the Domain files caught mail into the Archive.
  */
 export async function resolveInboundTarget(
   env: Db,
@@ -49,12 +50,12 @@ export async function resolveInboundTarget(
   const at = address.lastIndexOf("@");
   if (at <= 0) return { kind: "unknown" };
   const catchAll = await env.DB.prepare(
-    `SELECT m.id, m.address, m.agent_mode
+    `SELECT m.id, m.address, m.agent_mode, d.catch_all_archive
      FROM domains d JOIN mailboxes m ON m.id = d.catch_all_mailbox_id
      WHERE d.name = ?`,
   )
     .bind(address.slice(at + 1))
-    .first<InboundMailbox>();
+    .first<InboundMailbox & { catch_all_archive: number }>();
   if (!catchAll) return { kind: "unknown" };
 
   const blocked = await env.DB.prepare(
@@ -66,18 +67,20 @@ export async function resolveInboundTarget(
     .first<{ id: number }>();
   if (blocked) return { kind: "blocked", ruleId: blocked.id };
 
-  return { kind: "caught", mailbox: catchAll, catchAllRecipient: address };
+  const { catch_all_archive, ...mailbox } = catchAll;
+  return { kind: "caught", mailbox, catchAllRecipient: address, archive: Boolean(catch_all_archive) };
 }
 
 /**
  * Sets which Inbox receives a Domain's mail for addresses that have no Inbox
  * of their own, or turns the Domain's catch-all off with null. The Inbox must
- * be on that Domain.
+ * be on that Domain. With `archive`, caught mail lands in the Archive, read.
  */
 export async function setDomainCatchAll(
   env: Db,
   domainId: number,
   mailboxId: number | null,
+  archive = false,
 ): Promise<void> {
   const domain = await env.DB.prepare("SELECT id FROM domains WHERE id = ?").bind(domainId).first();
   if (!domain) throw new CatchAllError("Domain not found", 404);
@@ -87,8 +90,8 @@ export async function setDomainCatchAll(
       .first();
     if (!inbox) throw new CatchAllError("Choose an inbox on this domain", 400);
   }
-  await env.DB.prepare("UPDATE domains SET catch_all_mailbox_id = ? WHERE id = ?")
-    .bind(mailboxId, domainId)
+  await env.DB.prepare("UPDATE domains SET catch_all_mailbox_id = ?, catch_all_archive = ? WHERE id = ?")
+    .bind(mailboxId, mailboxId !== null && archive ? 1 : 0, domainId)
     .run();
 }
 
