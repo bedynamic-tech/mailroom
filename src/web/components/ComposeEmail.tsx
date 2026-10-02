@@ -88,7 +88,9 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!open || hasDraft || locked) return;
-    const preferred = available.find((mailbox) => mailbox.id === preferredMailbox) ?? available[0];
+    // A new message starts with no sender so the user always picks one;
+    // only a forward names the inbox of the conversation it came from.
+    const preferred = available.find((mailbox) => mailbox.id === preferredMailbox);
     setMailboxId(preferred ? String(preferred.id) : "");
     // Only choose the initial sender when opening or receiving inbox data.
     // A user's selection while the editor is open must not reset itself.
@@ -112,7 +114,12 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
     if (inFlight.current || confirmDiscard) return;
     let recipients = { to, cc, bcc };
     if (!uncertain) {
-      if (!ready) return;
+      if (loading || loadError || available.length === 0) return;
+      if (!ready) {
+        setNotice("Choose an inbox to send from.");
+        document.getElementById("compose-from")?.focus();
+        return;
+      }
       // Add any address still being typed; stop if one of them is invalid.
       const committed = [toField.current?.commit() ?? to, ccField.current?.commit() ?? cc, bccField.current?.commit() ?? bcc];
       if (committed.some((list) => list === null)) return;
@@ -234,7 +241,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
               <fieldset disabled={locked || loading || loadError || available.length === 0} className="min-w-0 disabled:opacity-60">
                 <div className="flex min-h-12 items-center gap-2 border-b sm:gap-3">
                   <label htmlFor="compose-from" className="shrink-0 text-sm text-muted-foreground">From</label>
-                  <select id="compose-from" value={mailboxId} onChange={(event) => setMailboxId(event.target.value)} required className="min-w-0 flex-1 rounded-md bg-transparent py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <select id="compose-from" value={mailboxId} onChange={(event) => { setMailboxId(event.target.value); if (notice === "Choose an inbox to send from.") setNotice(null); }} required className="min-w-0 flex-1 rounded-md bg-transparent py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <option value="" disabled>Choose an inbox</option>
                     {available.map((mailbox) => <option key={mailbox.id} value={mailbox.id}>{mailbox.address}</option>)}
                   </select>
@@ -293,7 +300,7 @@ export function ComposeEmailProvider({ children }: { children: ReactNode }) {
                 <div role="alert" className="flex flex-wrap items-center gap-2"><p className="mr-auto text-sm">Discard this unsent message?</p><Button type="button" variant="outline" onClick={() => setConfirmDiscard(false)}>Keep writing</Button><Button type="button" variant="destructive" onClick={() => { reset(); setOpen(false); }}>Discard message</Button></div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <Button type="submit" disabled={sending || (!uncertain && (!ready || loading || loadError))}><SendIcon className="h-4 w-4" />{sending ? (uncertain ? "Checking…" : "Sending…") : uncertain ? "Check send status" : failed ? "Send again" : "Send"}</Button>
+                  <Button type="submit" disabled={sending || (!uncertain && (loading || loadError || available.length === 0))}><SendIcon className="h-4 w-4" />{sending ? (uncertain ? "Checking…" : "Sending…") : uncertain ? "Check send status" : failed ? "Send again" : "Send"}</Button>
                   <input ref={fileInput} type="file" multiple className="hidden" onChange={(event) => addFiles(event.target.files)} tabIndex={-1} />
                   <Button type="button" variant="ghost" size="icon" disabled={locked} aria-label="Attach files" title="Attach files (up to 10 files, 3 MB total)" onClick={() => fileInput.current?.click()}><PaperclipIcon className="h-4 w-4" /></Button>
                   <span className="hidden text-xs text-muted-foreground sm:inline">3 MB attachment limit</span>

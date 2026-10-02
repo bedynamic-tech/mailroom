@@ -17,6 +17,8 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   yet, it shows **To** and the recipient's name, taken from their Contact, else
   from the name on mail they sent you before, else their address.
 - **Compose and reply.** Send new mail or reply to conversations, with attachments.
+  A new message starts with **From** empty, so you always choose the sending
+  inbox before it can go out.
 - **Forward.** **Forward** in a message's menu opens a new email from the
   conversation's inbox with an empty To field, a "Fwd:" subject and the
   original quoted below a forwarded-message header (From, Date, Subject, To,
