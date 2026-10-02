@@ -1,5 +1,11 @@
 import type { Mailbox } from "../../shared/types";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  groupMailboxesByDomain,
+  mailboxDomain,
+  mailboxLocalPart,
+  type MailboxDomainGroup,
+} from "../../shared/mailbox-domains";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 import {
@@ -14,6 +20,7 @@ import {
 
 const COLLAPSED_KEY = "mailroom.sidebarCollapsed";
 const INBOXES_COLLAPSED_KEY = "mailroom.sidebarInboxesCollapsed";
+const EXPANDED_DOMAINS_KEY = "mailroom.sidebarExpandedDomains";
 
 function readFlag(key: string) {
   try {
@@ -31,14 +38,33 @@ function writeFlag(key: string, value: boolean) {
   }
 }
 
+function readExpandedDomains(): Set<string> {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(EXPANDED_DOMAINS_KEY) ?? "[]");
+    return new Set(Array.isArray(stored) ? stored.filter((value) => typeof value === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeExpandedDomains(domains: Set<string>) {
+  try {
+    window.localStorage.setItem(EXPANDED_DOMAINS_KEY, JSON.stringify([...domains]));
+  } catch {
+    // Storage can be unavailable (private mode, blocked site data).
+  }
+}
+
 const readCollapsed = () => readFlag(COLLAPSED_KEY);
 const writeCollapsed = (collapsed: boolean) => writeFlag(COLLAPSED_KEY, collapsed);
 
 type SidebarNavProps = {
   mailboxes: Mailbox[];
   selected: number | null;
+  selectedDomain: string | null;
   activeView: "inbox" | "archive" | "contacts" | "settings";
   onSelect: (id: number | null) => void;
+  onSelectDomain: (domain: string) => void;
   onOpenArchive: () => void;
   onOpenContacts: () => void;
   onOpenSettings: () => void;
@@ -124,6 +150,7 @@ export function MobileSidebar(
             {...nav}
             compact={false}
             onSelect={(id) => close(() => nav.onSelect(id))()}
+            onSelectDomain={(domain) => close(() => nav.onSelectDomain(domain))()}
             onOpenArchive={close(nav.onOpenArchive)}
             onOpenContacts={close(nav.onOpenContacts)}
             onOpenSettings={close(nav.onOpenSettings)}
@@ -153,6 +180,26 @@ function SidebarContent(
   const { compact, onPeek: peek } = props;
   const [inboxesCollapsed, setInboxesCollapsed] = useState(() => readFlag(INBOXES_COLLAPSED_KEY));
   const showInboxToggle = !compact && props.mailboxes.length > 0;
+  const domains = groupMailboxesByDomain(props.mailboxes);
+  const [expandedDomains, setExpandedDomains] = useState(readExpandedDomains);
+  const selectedAddress = props.mailboxes.find((mailbox) => mailbox.id === props.selected)?.address;
+  const selectedMailboxDomain = selectedAddress ? mailboxDomain(selectedAddress) : null;
+
+  const setDomainExpanded = (domain: string, expanded: boolean) => {
+    setExpandedDomains((current) => {
+      if (current.has(domain) === expanded) return current;
+      const next = new Set(current);
+      if (expanded) next.add(domain);
+      else next.delete(domain);
+      writeExpandedDomains(next);
+      return next;
+    });
+  };
+
+  // Opening an Inbox from elsewhere reveals it under its domain.
+  useEffect(() => {
+    if (selectedMailboxDomain) setDomainExpanded(selectedMailboxDomain, true);
+  }, [selectedMailboxDomain]);
 
   const toggleInboxes = () => {
     const next = !inboxesCollapsed;
@@ -226,14 +273,22 @@ function SidebarContent(
                 inert={inboxesCollapsed}
                 className="ml-[18px] min-h-0 space-y-px overflow-hidden border-l pl-[7px]"
               >
-                {props.mailboxes.map((mailbox) => (
-                  <SidebarItem
-                    key={mailbox.id}
-                    label={mailbox.address}
-                    unread={mailbox.unread_count}
-                    compact={false}
-                    active={props.activeView === "inbox" && props.selected === mailbox.id}
-                    onClick={() => props.onSelect(mailbox.id)}
+                {domains.map((group) => (
+                  <SidebarDomain
+                    key={group.domain}
+                    group={group}
+                    expanded={expandedDomains.has(group.domain)}
+                    onToggle={() =>
+                      setDomainExpanded(group.domain, !expandedDomains.has(group.domain))
+                    }
+                    active={
+                      props.activeView === "inbox" &&
+                      props.selected === null &&
+                      props.selectedDomain === group.domain
+                    }
+                    activeMailbox={props.activeView === "inbox" ? props.selected : null}
+                    onSelectDomain={() => props.onSelectDomain(group.domain)}
+                    onSelectMailbox={props.onSelect}
                   />
                 ))}
               </div>
@@ -275,6 +330,75 @@ function SidebarContent(
   );
 }
 
+/** A domain row that opens all of its Inboxes together, with the Inboxes nested below. */
+function SidebarDomain(props: {
+  group: MailboxDomainGroup<Mailbox>;
+  expanded: boolean;
+  onToggle: () => void;
+  active: boolean;
+  activeMailbox: number | null;
+  onSelectDomain: () => void;
+  onSelectMailbox: (id: number) => void;
+}) {
+  const { group, expanded } = props;
+  const listId = `sidebar-domain-${group.domain.replace(/[^a-z0-9]+/g, "-")}`;
+  const toggleLabel = `${expanded ? "Hide" : "Show"} inboxes on ${group.domain}`;
+
+  return (
+    <div>
+      <div className="relative">
+        <SidebarItem
+          label={group.domain}
+          unread={group.unread_count}
+          compact={false}
+          active={props.active}
+          onClick={props.onSelectDomain}
+          trailingSpace
+        />
+        <button
+          type="button"
+          onClick={props.onToggle}
+          title={toggleLabel}
+          aria-label={toggleLabel}
+          aria-expanded={expanded}
+          aria-controls={listId}
+          className="absolute inset-y-0 right-0 my-auto flex h-7 w-7 touch:h-9 touch:w-9 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <ChevronDownIcon
+            className={cn("h-4 w-4 transition-transform duration-200 ease-out", !expanded && "rotate-90")}
+          />
+        </button>
+      </div>
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200 ease-out",
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div
+          id={listId}
+          role="group"
+          aria-label={`Inboxes on ${group.domain}`}
+          inert={!expanded}
+          className="ml-3 min-h-0 space-y-px overflow-hidden border-l pl-[7px]"
+        >
+          {group.mailboxes.map((mailbox) => (
+            <SidebarItem
+              key={mailbox.id}
+              label={mailboxLocalPart(mailbox.address)}
+              title={mailbox.address}
+              unread={mailbox.unread_count}
+              compact={false}
+              active={props.activeMailbox === mailbox.id}
+              onClick={() => props.onSelectMailbox(mailbox.id)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SidebarToggle(props: { collapsed: boolean; onClick: () => void }) {
   const label = props.collapsed ? "Expand sidebar" : "Collapse sidebar";
   return (
@@ -293,6 +417,8 @@ function SidebarToggle(props: { collapsed: boolean; onClick: () => void }) {
 
 function SidebarItem(props: {
   label: string;
+  /** Tooltip, when it should say more than the label. */
+  title?: string;
   icon?: React.ReactNode;
   unread: number;
   compact: boolean;
@@ -307,8 +433,8 @@ function SidebarItem(props: {
       type="button"
       onClick={props.onClick}
       onFocus={props.onPeek}
-      title={props.label}
-      aria-label={props.compact ? props.label : undefined}
+      title={props.title ?? props.label}
+      aria-label={props.compact ? props.label : props.title}
       aria-current={props.active ? "page" : undefined}
       className={cn(
         "group flex h-8 w-full items-center touch:h-10 gap-2.5 rounded-md px-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",

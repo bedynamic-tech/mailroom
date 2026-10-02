@@ -44,6 +44,8 @@ export function ThreadList(props: {
   title: string;
   selected: number | null;
   selectedMailbox: number | null;
+  /** The Inboxes the list covers, or null for all of them. */
+  scopeMailboxIds: number[] | null;
   archive: boolean;
   unreadCount: number | null;
   showMailboxChip: boolean;
@@ -109,9 +111,9 @@ export function ThreadList(props: {
     () =>
       props.labels.filter(
         (label) =>
-          props.selectedMailbox === null || label.mailbox_id === props.selectedMailbox,
+          props.scopeMailboxIds === null || props.scopeMailboxIds.includes(label.mailbox_id),
       ),
-    [props.labels, props.selectedMailbox],
+    [props.labels, props.scopeMailboxIds],
   );
 
   const mailboxAddress = useMemo(
@@ -410,7 +412,7 @@ export function ThreadList(props: {
                       <SelectItem value="all">All labels</SelectItem>
                       {availableLabels.map((label) => (
                         <SelectItem key={label.id} value={String(label.id)}>
-                          {props.selectedMailbox === null
+                          {props.scopeMailboxIds === null || props.scopeMailboxIds.length > 1
                             ? `${label.name} · ${mailboxAddress.get(label.mailbox_id) ?? ""}`
                             : label.name}
                         </SelectItem>
