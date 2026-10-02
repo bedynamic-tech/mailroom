@@ -448,7 +448,7 @@ function Workspace(props: {
             onFilter={(nextFilter) => updateQuery("filter", nextFilter, "all")}
             onSelectLabel={(id) => updateQuery("label", id === null ? "" : String(id))}
             onOpenMenu={() => setMenuOpen(true)}
-            onCompose={() => openCompose(selectedMailbox ?? domainMailboxes?.[0]?.id ?? null)}
+            onCompose={() => openCompose(null)}
             onOpenMailboxSettings={(id) => navigate(`/settings/inboxes/${id}`)}
             onSelect={(id) =>
               navigate({ pathname: `${threadListBase(listPath)}/${id}`, search: location.search })
