@@ -76,3 +76,11 @@ test("unreadable stored recipients fall back to no edits", () => {
   assert.deepEqual(parseReplyRecipients(JSON.stringify({ to: "x", cc: [1] })), EMPTY_REPLY_RECIPIENTS);
   assert.equal(serializeReplyRecipients(EMPTY_REPLY_RECIPIENTS), null);
 });
+
+test("an unedited Cc stays unedited so it follows Reply all, while a cleared Cc stays cleared", async (t) => {
+  const f = fixture(t);
+  await f.put("/1/reply-recipients", { to: ["a@example.com"], cc: null, bcc: [] });
+  assert.equal(parseReplyRecipients(f.stored()).cc, null);
+  await f.put("/1/reply-recipients", { to: null, cc: [], bcc: [] });
+  assert.deepEqual(parseReplyRecipients(f.stored()).cc, []);
+});

@@ -100,7 +100,8 @@ export function ThreadView(props: {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   // null until the To field is edited, so it keeps following the latest inbound reply target.
   const [replyToEdit, setReplyToEdit] = useState<string[] | null>(null);
-  const [replyCc, setReplyCc] = useState<string[]>([]);
+  // null until the Cc field is edited, so it keeps following Reply all on the latest email.
+  const [replyCcEdit, setReplyCcEdit] = useState<string[] | null>(null);
   const [replyBcc, setReplyBcc] = useState<string[]>([]);
   // The recipients last saved on the Conversation; undefined until they are loaded.
   const savedRecipients = useRef<string | null | undefined>(undefined);
@@ -166,7 +167,7 @@ export function ThreadView(props: {
     setReplyText("");
     setPendingFiles([]);
     setReplyToEdit(null);
-    setReplyCc([]);
+    setReplyCcEdit(null);
     setReplyBcc([]);
     savedRecipients.current = undefined;
     setAddingCc(false);
@@ -186,7 +187,7 @@ export function ThreadView(props: {
   // render that loads them never saves the empty defaults over them.
   useEffect(() => {
     if (savedRecipients.current === undefined) return;
-    const recipients = { to: replyToEdit, cc: replyCc, bcc: replyBcc };
+    const recipients = { to: replyToEdit, cc: replyCcEdit, bcc: replyBcc };
     const serialized = serializeReplyRecipients(recipients);
     if (serialized === savedRecipients.current) return;
     const previous = savedRecipients.current;
@@ -205,7 +206,7 @@ export function ThreadView(props: {
         pendingRecipientSaves.current -= 1;
         queryClient.invalidateQueries({ queryKey: ["thread", props.threadId] });
       });
-  }, [props.threadId, queryClient, replyToEdit, replyCc, replyBcc]);
+  }, [props.threadId, queryClient, replyToEdit, replyCcEdit, replyBcc]);
 
   // Picks up recipients saved on another device, unless a save from here is still in flight.
   const storedRecipients = detail.data?.thread.reply_recipients;
@@ -216,7 +217,7 @@ export function ThreadView(props: {
     if (serialized === savedRecipients.current) return;
     savedRecipients.current = serialized;
     setReplyToEdit(saved.to);
-    setReplyCc(saved.cc);
+    setReplyCcEdit(saved.cc);
     setReplyBcc(saved.bcc);
   }, [storedRecipients]);
 
@@ -467,26 +468,32 @@ export function ThreadView(props: {
       ? startDraft.error.message
       : detail.data.draft_run?.error ?? null;
 
-  // To starts as defaultReplyTargets and can be edited.
-  const latestInbound = messages.filter((message) => message.direction === "inbound").at(-1);
+  // To starts as defaultReplyTargets and Cc as everyone else on that email
+  // (Reply all); both can be edited. Bcc is never carried over.
   const inboundReplyTarget = defaultReplyTargets(messages);
   const replyTargets = replyToEdit ?? inboundReplyTarget;
+  const lowered = (values: string[]) => values.map((value) => value.toLowerCase());
+  const latestCopied = defaultReplyCopies(messages);
+  const otherRecipients = replyAllRecipients({
+    to: latestCopied.to,
+    cc: latestCopied.cc,
+    replyTargets,
+    ownAddresses: [
+      thread.mailbox_address,
+      ...(thread.catch_all_recipient ? [thread.catch_all_recipient] : []),
+      ...(mailboxes.data ?? []).map((mailbox) => mailbox.address),
+    ],
+  });
+  const blindCopied = new Set(lowered(replyBcc));
+  const replyCc =
+    replyCcEdit ??
+    otherRecipients
+      .filter((address) => !blindCopied.has(address.toLowerCase()))
+      .slice(0, Math.max(0, MAX_RECIPIENTS_PER_MESSAGE - replyTargets.length - replyBcc.length));
   const copyCapacity =
     MAX_RECIPIENTS_PER_MESSAGE - replyTargets.length - replyCc.length - replyBcc.length;
-  const lowered = (values: string[]) => values.map((value) => value.toLowerCase());
   const alreadyCopied = new Set(lowered([...replyCc, ...replyBcc]));
-  const replyAllMissing = latestInbound
-    ? replyAllRecipients({
-        to: parseAddressList(latestInbound.to_addresses),
-        cc: parseAddressList(latestInbound.cc_addresses),
-        replyTargets,
-        ownAddresses: [
-          thread.mailbox_address,
-          ...(thread.catch_all_recipient ? [thread.catch_all_recipient] : []),
-          ...(mailboxes.data ?? []).map((mailbox) => mailbox.address),
-        ],
-      }).filter((address) => !alreadyCopied.has(address.toLowerCase()))
-    : [];
+  const replyAllMissing = otherRecipients.filter((address) => !alreadyCopied.has(address.toLowerCase()));
 
   const replyMailbox = mailboxes.data?.find((mailbox) => mailbox.id === thread.mailbox_id);
   const replySignature = replyMailbox?.effective_signature_html
@@ -503,7 +510,7 @@ export function ThreadView(props: {
   };
 
   const replyAll = () => {
-    setReplyCc((current) => [...current, ...replyAllMissing.slice(0, Math.max(0, copyCapacity))]);
+    setReplyCcEdit([...replyCc, ...replyAllMissing.slice(0, Math.max(0, copyCapacity))]);
   };
 
   const attemptFor = (key: string, text: string) => {
@@ -858,7 +865,7 @@ export function ThreadView(props: {
                       id="reply-cc"
                       label="Cc"
                       values={replyCc}
-                      onChange={setReplyCc}
+                      onChange={setReplyCcEdit}
                       capacity={copyCapacity}
                       taken={new Set(lowered([...replyTargets, ...replyBcc]))}
                       disabled={reply.isPending}
@@ -1227,6 +1234,19 @@ function defaultReplyTargets(messages: Message[]): string[] {
   }
   const latestOutbound = messages.filter((message) => message.direction === "outbound").at(-1);
   return latestOutbound ? parseAddressList(latestOutbound.to_addresses) : [];
+}
+
+/**
+ * The To and Cc of the email a reply answers, for Reply all: the latest
+ * inbound Message, or in a Conversation started from Mailroom the latest sent
+ * one (whose To is already the reply target).
+ */
+function defaultReplyCopies(messages: Message[]): { to: string[]; cc: string[] } {
+  const latest =
+    messages.filter((message) => message.direction === "inbound").at(-1) ??
+    messages.filter((message) => message.direction === "outbound").at(-1);
+  if (!latest) return { to: [], cc: [] };
+  return { to: parseAddressList(latest.to_addresses), cc: parseAddressList(latest.cc_addresses) };
 }
 
 /**
