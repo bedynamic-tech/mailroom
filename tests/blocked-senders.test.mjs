@@ -7,7 +7,11 @@ import { blockedSendersApi } from "../src/worker/api/blocked-senders.ts";
 import { requireSameOrigin } from "../src/worker/api/csrf.ts";
 import { blockCandidates, parseBlockPattern } from "../src/shared/blocked-senders.ts";
 import { addBlockedSender, matchBlockedSender } from "../src/worker/spam/blocklist.ts";
-import { blockThreadSender, BlockThreadSenderError } from "../src/worker/spam/block-thread-sender.ts";
+import {
+  blockThreadSender,
+  blockThreadSenders,
+  BlockThreadSenderError,
+} from "../src/worker/spam/block-thread-sender.ts";
 
 function fixture(t) {
   const db = new DatabaseSync(":memory:");
@@ -235,4 +239,31 @@ test("blockThreadSender can block a chosen address on the conversation, such as 
     blockThreadSender(f.env, 1, "address", "inbox", "help@support.acme.com"),
     BlockThreadSenderError,
   );
+});
+
+test("blockThreadSenders marks the senders of several conversations as spam and skips the rest", async (t) => {
+  const f = fixture(t);
+  inbound(f.db, { thread: 1, from: "spam@bad.example" });
+  inbound(f.db, { thread: 2, from: "Spam@Bad.example" });
+  inbound(f.db, { thread: 3, from: "junk@worse.example", mailbox: 2 });
+  inbound(f.db, { thread: 4, from: "junk@worse.example" });
+  inbound(f.db, { thread: 5, from: "friend@bad.example" });
+  inbound(f.db, { thread: 6, from: "sales@support.acme.com" });
+
+  const result = await blockThreadSenders(f.env, [1, 2, 3, 6, 99], "inbox");
+  assert.deepEqual(
+    result.blocked.map((rule) => [rule.kind, rule.pattern, rule.mailbox_id]),
+    [["address", "spam@bad.example", 1], ["address", "junk@worse.example", 2]],
+  );
+  assert.equal(result.skipped, 2, "own inboxes and missing conversations are skipped");
+  assert.equal(statusOf(f.db, 1), "archived");
+  assert.equal(statusOf(f.db, 2), "archived");
+  assert.equal(statusOf(f.db, 3), "archived");
+  assert.equal(statusOf(f.db, 4), "open", "an inbox block leaves other inboxes alone");
+  assert.equal(statusOf(f.db, 5), "open");
+  assert.equal(statusOf(f.db, 6), "open");
+
+  const everywhere = await blockThreadSenders(f.env, [4], "all");
+  assert.equal(everywhere.blocked[0].mailbox_id, null);
+  assert.equal(statusOf(f.db, 4), "archived");
 });

@@ -82,8 +82,9 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   apart from email, so they are never sent, quoted in replies, forwarded by
   rules, read by AI drafts or the MCP server, or included in notifications.
   Attachments and Cc or Bcc recipients stay with the reply.
-- **Search and triage.** Search message content, filter conversations, mark read
-  or archive in bulk, and restore or permanently delete archived conversations.
+- **Search and triage.** Search message content, filter conversations, mark read,
+  archive or mark senders as spam in bulk, and restore or permanently delete
+  archived conversations.
 - **Conversation menu.** The three dot menu at the top of a conversation
   has **Archive** (or **Move to inbox**) and **Delete**. Delete works whether
   the conversation is archived or not, asks for confirmation first, and
@@ -138,8 +139,11 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   wins over any other rule that matches the same email.
 - **Spam blocking.** Block a sender by address or whole domain, on one inbox or
   all of them, from any message's menu. When a message has several people on
-  it, such as Cc'd addresses, you choose which one to block. Blocked mail is
-  rejected before it reaches Mailroom.
+  it, such as Cc'd addresses, you choose which one to block. To clear out
+  several at once, select conversations in the list and choose **Mark sender as
+  spam** (the shield button): each one's sender is blocked by address, on its
+  own inbox or on all inboxes, and their open conversations are archived.
+  Blocked mail is rejected before it reaches Mailroom.
 
 ## Integrations
 

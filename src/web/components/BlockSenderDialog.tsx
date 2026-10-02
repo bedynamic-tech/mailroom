@@ -168,7 +168,7 @@ export function BlockSenderDialog(props: {
   );
 }
 
-function OptionGroup<T extends string>(props: {
+export function OptionGroup<T extends string>(props: {
   legend: string;
   name: string;
   value: T;

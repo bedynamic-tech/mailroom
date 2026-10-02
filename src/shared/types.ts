@@ -350,6 +350,13 @@ export interface BlockSenderResult {
   archived: number;
 }
 
+export interface BulkBlockSenderResult {
+  /** The rules now blocking the selected Conversations' senders, one per sender. */
+  blocked: BlockedSender[];
+  /** Conversations with no sender that could be blocked. */
+  skipped: number;
+}
+
 export type MailRuleField =
   | "from"
   | "to"

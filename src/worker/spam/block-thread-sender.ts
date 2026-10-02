@@ -1,5 +1,5 @@
 import { domainOf } from "../../shared/blocked-senders.ts";
-import type { BlockedSender, BlockSenderResult } from "../../shared/types.ts";
+import type { BlockedSender, BlockSenderResult, BulkBlockSenderResult } from "../../shared/types.ts";
 import {
   addBlockedSender,
   BLOCKED_SENDER_COLUMNS,
@@ -92,4 +92,29 @@ export async function blockThreadSender(
     .bind(address === undefined ? threadId : 0, rule.mailbox_id, rule.mailbox_id, ...match.bindings)
     .run();
   return { blocked: rule, archived: Number(result.meta.changes ?? 0) };
+}
+
+/**
+ * Marks the senders of several Conversations as spam: blocks each one's
+ * latest external sender by address, on its own Inbox or on all Inboxes, and
+ * archives what that block archives. Conversations without a sender that can
+ * be blocked, such as ones only sent from here, are skipped.
+ */
+export async function blockThreadSenders(
+  env: { DB: D1Database },
+  threadIds: number[],
+  scope: BlockScope,
+): Promise<BulkBlockSenderResult> {
+  const blocked = new Map<number, BlockedSender>();
+  let skipped = 0;
+  for (const threadId of threadIds) {
+    try {
+      const result = await blockThreadSender(env, threadId, "address", scope);
+      blocked.set(result.blocked.id, result.blocked);
+    } catch (error) {
+      if (!(error instanceof BlockThreadSenderError || error instanceof BlockRuleError)) throw error;
+      skipped += 1;
+    }
+  }
+  return { blocked: [...blocked.values()], skipped };
 }
