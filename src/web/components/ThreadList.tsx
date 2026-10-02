@@ -24,12 +24,14 @@ import {
   MenuIcon,
   SearchIcon,
   SettingsIcon,
+  ShieldBanIcon,
   SparklesIcon,
   TagIcon,
   TrashIcon,
   XIcon,
 } from "./Icons";
 import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
+import { MarkSendersSpamDialog } from "./MarkSendersSpamDialog";
 import { UniversalSearchButton } from "./UniversalSearch";
 
 export type ThreadFilter = "all" | "unread";
@@ -69,6 +71,7 @@ export function ThreadList(props: {
   const queryClient = useQueryClient();
   const [checked, setChecked] = useState<ReadonlySet<number>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<"selected" | "all" | null>(null);
+  const [markingSpam, setMarkingSpam] = useState(false);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -135,6 +138,19 @@ export function ThreadList(props: {
     queryClient.invalidateQueries({ queryKey: ["mailboxes"] });
     const selected = props.selected;
     if (selected !== null && (ids === null || ids.includes(selected))) props.onDeselect();
+  };
+
+  const onSendersMarkedSpam = () => {
+    const ids = [...checked];
+    setMarkingSpam(false);
+    setChecked(new Set());
+    queryClient.invalidateQueries({ queryKey: ["threads"] });
+    queryClient.invalidateQueries({ queryKey: ["thread"] });
+    queryClient.invalidateQueries({ queryKey: ["mailboxes"] });
+    queryClient.invalidateQueries({ queryKey: ["blocked-senders"] });
+    if (!props.archive && props.selected !== null && ids.includes(props.selected)) {
+      props.onDeselect();
+    }
   };
 
   const deleteChecked = useMutation({
@@ -309,6 +325,17 @@ export function ThreadList(props: {
                   )}
                   <Button
                     variant="ghost"
+                    size="icon-sm"
+                    disabled={bulkUpdate.isPending || markingSpam}
+                    onClick={() => setMarkingSpam(true)}
+                    aria-label="Mark sender as spam"
+                    title="Mark sender as spam"
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <ShieldBanIcon className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
                     size="sm"
                     disabled={bulkUpdate.isPending}
                     onClick={() =>
@@ -318,7 +345,7 @@ export function ThreadList(props: {
                       })
                     }
                     aria-label={checkedAllArchived ? "Move to inbox" : "Archive"}
-                    title={checkedAllArchived ? "Move to inbox" : undefined}
+                    title={checkedAllArchived ? "Move to inbox" : "Archive"}
                   >
                     {checkedAllArchived ? (
                       <>
@@ -330,7 +357,7 @@ export function ThreadList(props: {
                     ) : (
                       <>
                         <ArchiveIcon className="h-3.5 w-3.5" />
-                        Archive
+                        <span className="max-sm:sr-only">Archive</span>
                       </>
                     )}
                   </Button>
@@ -434,6 +461,13 @@ export function ThreadList(props: {
           confirmDelete === "all" ? clearArchive.mutate() : deleteChecked.mutate([...checked])
         }
         onOpenChange={(open) => !open && setConfirmDelete(null)}
+      />
+
+      <MarkSendersSpamDialog
+        open={markingSpam}
+        ids={[...checked]}
+        onOpenChange={setMarkingSpam}
+        onMarked={onSendersMarkedSpam}
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">

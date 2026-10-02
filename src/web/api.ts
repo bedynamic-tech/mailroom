@@ -23,6 +23,7 @@ import type {
   PlaybookInput,
   ReplyAttemptResult,
   BlockSenderResult,
+  BulkBlockSenderResult,
   ThreadSummary,
   ThreadDetail,
   ThreadNote,
@@ -486,6 +487,13 @@ export const blockThreadSender = (
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ kind, scope, address }),
+  });
+
+export const blockThreadSenders = (ids: number[], scope: "inbox" | "all") =>
+  request<BulkBlockSenderResult>("/threads/bulk/block-sender", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids, scope }),
   });
 
 export const fetchMailRules = () => request<MailRule[]>("/mail-rules");

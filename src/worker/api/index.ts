@@ -49,7 +49,11 @@ import {
 } from "../inbox/delete-conversations";
 import { pushToSubscribedBrowsers, validatePushSubscription } from "../notifications/push";
 import { BlockRuleError } from "../spam/blocklist";
-import { blockThreadSender, BlockThreadSenderError } from "../spam/block-thread-sender";
+import {
+  blockThreadSender,
+  blockThreadSenders,
+  BlockThreadSenderError,
+} from "../spam/block-thread-sender";
 import {
   effectiveTemplate,
   normalizeNotificationAddress,
@@ -1127,6 +1131,21 @@ api.post("/threads/bulk", async (c) => {
     .bind(...ids)
     .run();
   return c.json({ ok: true, updated: Number(result.meta.changes ?? 0) });
+});
+
+api.post("/threads/bulk/block-sender", async (c) => {
+  const body = await c.req.json<{ ids?: unknown; scope?: unknown }>().catch(() => null);
+  const ids = Array.isArray(body?.ids)
+    ? [...new Set(body.ids.filter((id) => Number.isInteger(id) && (id as number) > 0))]
+    : [];
+  if (ids.length === 0 || ids.length > 100) {
+    return c.json({ error: "ids must contain 1-100 conversation ids" }, 400);
+  }
+  const scope = body?.scope;
+  if (scope !== "inbox" && scope !== "all") {
+    return c.json({ error: "scope must be inbox or all" }, 400);
+  }
+  return c.json(await blockThreadSenders(c.env, ids as number[], scope));
 });
 
 api.post("/threads/:id/read", async (c) => {
