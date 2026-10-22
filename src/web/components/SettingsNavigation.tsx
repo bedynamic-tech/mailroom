@@ -17,7 +17,7 @@ export function SettingsHeader(props: {
   onOpenAi: () => void;
 }) {
   return (
-    <header className="shrink-0 border-b bg-background px-4 md:px-8">
+    <header className="shrink-0 border-b bg-background px-4 md:px-6">
       <div className="flex h-14 items-center gap-2">
         <Button
           variant="ghost"
@@ -82,7 +82,7 @@ function SettingsTab(props: { active: boolean; onClick: () => void; children: Re
 export function SettingsPage(props: { children: ReactNode }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="w-full max-w-[780px] space-y-10 px-4 py-6 md:px-8 md:py-8">{props.children}</div>
+      <div className="w-full max-w-[780px] space-y-10 px-4 py-6 md:px-6 md:py-8">{props.children}</div>
     </div>
   );
 }
