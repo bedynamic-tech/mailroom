@@ -193,8 +193,8 @@ export function ThreadList(props: {
         props.detailsOpen ? "hidden md:flex" : "flex"
       }`}
     >
-      <header className="border-b px-4 pt-3.5 pb-2.5">
-        <div className="mb-3 flex h-8 items-center justify-between gap-3 touch:h-10">
+      <header className="border-b px-4 pb-2.5">
+        <div className="flex h-14 items-center justify-between gap-3">
           <div className="hidden min-w-0 flex-1 items-baseline gap-2 lg:flex">
             <h1 className="truncate text-base font-semibold tracking-[-0.015em] text-foreground">
               {props.title}
