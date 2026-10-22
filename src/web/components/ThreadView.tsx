@@ -44,7 +44,7 @@ import {
 import { formatTime, splitQuotedTail } from "../lib";
 import { EmailAvatar } from "./EmailAvatar";
 import { EmailHtmlBody } from "./EmailHtmlBody";
-import { defaultDarkAppearance, type EmailAppearance } from "../email-html";
+import type { EmailAppearance } from "../email-html";
 import { inlineAttachmentIds } from "../inline-images";
 import { useResolvedTheme } from "../theme";
 import { useStickToBottom } from "../use-stick-to-bottom";
@@ -1310,12 +1310,9 @@ function MessageCard({
   const [forwarding, setForwarding] = useState(false);
   const [showQuoted, setShowQuoted] = useState(false);
   const dark = useResolvedTheme() === "dark";
-  const [chosenAppearance, setChosenAppearance] = useState<EmailAppearance | null>(null);
-  const defaultAppearance = useMemo(
-    () => (dark && message.html_body ? defaultDarkAppearance(message.html_body) : "original"),
-    [dark, message.html_body],
-  );
-  const appearance: EmailAppearance = dark ? (chosenAppearance ?? defaultAppearance) : "original";
+  // Emails follow the app's theme unless the reader asks for the original.
+  const [showOriginal, setShowOriginal] = useState(false);
+  const appearance: EmailAppearance = showOriginal ? "original" : dark ? "dark" : "light";
   const attachments = useMemo(() => {
     if (!message.html_body) return message.attachments;
     const inline = inlineAttachmentIds(message.html_body, message.attachments);
@@ -1395,14 +1392,16 @@ function MessageCard({
               <Forward />
               Forward
             </DropdownMenuItem>
-            {(dark && message.html_body) || onBlockSender ? <DropdownMenuSeparator /> : null}
-            {dark && message.html_body && (
+            {message.html_body || onBlockSender ? <DropdownMenuSeparator /> : null}
+            {message.html_body && (
               <>
-                <DropdownMenuItem
-                  onSelect={() => setChosenAppearance(appearance === "dark" ? "original" : "dark")}
-                >
+                <DropdownMenuItem onSelect={() => setShowOriginal(!showOriginal)}>
                   <ContrastIcon />
-                  {appearance === "dark" ? "Show original colors" : "Show in dark colors"}
+                  {showOriginal
+                    ? dark
+                      ? "Show in dark colors"
+                      : "Show in light colors"
+                    : "Show original colors"}
                 </DropdownMenuItem>
                 {onBlockSender && <DropdownMenuSeparator />}
               </>
