@@ -125,13 +125,14 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.
-  In dark mode, simple emails are shown in dark colors on the app's own
-  background, and emails that ship
-  their own dark styles use them. Designed emails with their own backgrounds
-  (newsletters, receipts) keep their original colors. Any text that would
-  still be hard to read on its dark background is given a readable color. Any email can be
-  switched from its **...** menu with **Show original colors** or **Show in
-  dark colors**.
+  Emails always follow the app's theme. In dark mode every email is shown in
+  dark colors: emails that ship their own dark styles use them, and the rest
+  are recolored onto the app's dark background, keeping brand colors like
+  buttons and banners. In light mode emails use their light styles, and
+  emails designed with dark gray or black backgrounds are shown on light
+  ones. Any text that would still be hard to read is given a readable color.
+  Any email can be switched from its **...** menu with **Show original
+  colors**, and back again.
   Images an email shows in its body, such as signature logos, are not listed
   again as attachments.
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { Attachment } from "../../shared/types";
-import { fixLowContrastText, neutralizeDarkSurfaces } from "../email-contrast";
+import { DARK_EMAIL_BACKGROUND } from "../email-colors";
+import { fixLowContrastText, lightenDarkSurfaces, neutralizeDarkSurfaces } from "../email-contrast";
 import { buildEmailHtmlDocument, type EmailAppearance } from "../email-html";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +39,10 @@ export function EmailHtmlBody({
     if (!frame || !document) return;
     if (appearance === "dark") {
       neutralizeDarkSurfaces(document);
-      fixLowContrastText(document);
+      fixLowContrastText(document, DARK_EMAIL_BACKGROUND);
+    } else if (appearance === "light") {
+      lightenDarkSurfaces(document);
+      fixLowContrastText(document, "#ffffff");
     }
     trimOuterMargins(document);
 
@@ -71,7 +75,7 @@ export function EmailHtmlBody({
       onLoad={fitContent}
       className={cn(
         "mt-3 block min-h-5 w-full border-0",
-        appearance === "original" ? "bg-white dark:rounded-md" : "bg-transparent",
+        appearance === "dark" ? "bg-transparent" : "bg-white dark:rounded-md",
       )}
     />
   );

@@ -8,19 +8,17 @@ import {
   DARK_EMAIL_LINK,
   DARK_EMAIL_TEXT,
   isBrightColor,
-  isPaperBackground,
 } from "./email-colors";
 import { normalizeContentId } from "./inline-images";
 
-// Background colors on these mark words, not layout (a highlighted phrase).
-const INLINE_ELEMENTS = new Set(["span", "font", "mark", "b", "strong", "i", "em", "u", "a", "s", "small", "code"]);
-
 /**
- * How an HTML email is colored. "original" is exactly what the sender sent,
- * on white. "dark" is dark colors: the email's own dark styles when it has
- * them, otherwise its colors remapped for a dark background.
+ * How an HTML email is colored. Emails follow the app's theme: "dark" is dark
+ * colors (the email's own dark styles when it has them, otherwise its colors
+ * remapped for a dark background) and "light" is light colors (the email's
+ * light styles, with dark gray surfaces made light once it renders).
+ * "original" is exactly what the sender sent, on white.
  */
-export type EmailAppearance = "original" | "dark";
+export type EmailAppearance = "original" | "light" | "dark";
 
 const BLOCKED_ELEMENTS = [
   "script",
@@ -88,16 +86,6 @@ const CONTENT_SECURITY_POLICY = [
   "form-action 'none'",
   "base-uri 'none'",
 ].join("; ");
-
-/**
- * The appearance an email gets in dark mode unless the reader picks another:
- * dark when the email supports dark mode itself or is simple enough to recolor
- * safely, original when it is designed around its own backgrounds.
- */
-export function defaultDarkAppearance(html: string): EmailAppearance {
-  const document = new DOMParser().parseFromString(html, "text/html");
-  return supportsDarkMode(document) || !isDesigned(document) ? "dark" : "original";
-}
 
 export function buildEmailHtmlDocument(
   html: string,
@@ -171,7 +159,7 @@ export function buildEmailHtmlDocument(
   const style = document.createElement("style");
   style.textContent =
     BASE_STYLE +
-    (appearance === "original" ? LIGHT_STYLE : nativeDark ? NATIVE_DARK_STYLE : ADAPTED_DARK_STYLE);
+    (appearance !== "dark" ? LIGHT_STYLE : nativeDark ? NATIVE_DARK_STYLE : ADAPTED_DARK_STYLE);
   document.head.prepend(csp, referrer, viewport, style);
 
   return `<!doctype html>${document.documentElement.outerHTML}`;
@@ -190,30 +178,6 @@ function supportsDarkMode(document: Document): boolean {
   return [...document.querySelectorAll("style")].some((style) =>
     /prefers-color-scheme\s*:\s*dark/i.test(style.textContent ?? ""),
   );
-}
-
-/**
- * The email is laid out on its own backgrounds: a background image, or a
- * background color that is not white, light gray or a pale tint. Recoloring
- * those would change the design, so they keep their original colors.
- */
-function isDesigned(document: Document): boolean {
-  if (document.querySelector("[background]")) return true;
-  const backgrounds = [...document.querySelectorAll("[bgcolor]")].map(
-    (element) => element.getAttribute("bgcolor") ?? "",
-  );
-  const css = [
-    ...[...document.querySelectorAll("style")].map((style) => style.textContent ?? ""),
-    ...[...document.querySelectorAll("[style]")]
-      .filter((element) => !INLINE_ELEMENTS.has(element.localName))
-      .map((element) => element.getAttribute("style") ?? ""),
-  ];
-  for (const text of css) {
-    const found = cssBackgrounds(text);
-    if (found.image) return true;
-    backgrounds.push(...found.colors);
-  }
-  return backgrounds.some((color) => !isPaperBackground(color));
 }
 
 /**

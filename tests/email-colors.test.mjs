@@ -9,7 +9,7 @@ import {
   DARK_EMAIL_BACKGROUND,
   isBrightColor,
   neutralDarkBackground,
-  isPaperBackground,
+  lightBackground,
   parseColor,
 } from "../src/web/email-colors.ts";
 
@@ -53,13 +53,16 @@ test("rewrites colors inside style attributes and style sheets only", () => {
   assert.doesNotMatch(adaptCssColors("border: 1px solid #ddd"), /#ddd/);
 });
 
-test("tells paper backgrounds from designed ones", () => {
-  assert.ok(isPaperBackground("#ffffff"));
-  assert.ok(isPaperBackground("#f2f2f2"));
-  assert.ok(isPaperBackground("#e8f0fe"));
-  assert.ok(isPaperBackground("transparent"));
-  assert.ok(!isPaperBackground("#0055ff"));
-  assert.ok(!isPaperBackground("#111111"));
+test("dark gray surfaces become light and brand colors keep their look", () => {
+  assert.equal(lightBackground("#000000"), "#ffffff");
+  assert.ok((parseColor(lightBackground("#1f2937") ?? "")?.r ?? 0) > 220);
+  assert.equal(lightBackground("#ffffff"), null);
+  assert.equal(lightBackground("#0055ff"), null);
+  assert.equal(lightBackground("#0b1f6b"), null);
+  assert.equal(lightBackground("transparent"), null);
+});
+
+test("finds background colors and images in CSS", () => {
   assert.deepEqual(cssBackgrounds("background-color:#fff;color:red"), { colors: ["#fff"], image: false });
   assert.equal(cssBackgrounds("background:url(hero.jpg) no-repeat").image, true);
   assert.equal(cssBackgrounds("background-image:linear-gradient(red, blue)").image, true);

@@ -1,7 +1,8 @@
-// Color math for showing email HTML in dark mode. Colors are remapped the way
-// dark-mode mail clients do it: dark text gets lighter, light backgrounds get
-// darker, and saturated mid-tone colors (brand buttons, highlights) keep their
-// look. Anything that cannot be parsed is left untouched.
+// Color math for showing email HTML in the app's theme. In dark mode colors
+// are remapped the way dark-mode mail clients do it: dark text gets lighter,
+// light backgrounds get darker, and saturated mid-tone colors (brand buttons,
+// highlights) keep their look. In light mode dark gray surfaces get light.
+// Anything that cannot be parsed is left untouched.
 
 type Rgba = { r: number; g: number; b: number; a: number };
 type Hsl = { h: number; s: number; l: number };
@@ -150,16 +151,16 @@ export function neutralDarkBackground(value: string): string | null {
 }
 
 /**
- * Whether a background reads as "paper": white, near white, light gray or a
- * pale tint. Emails that only use such backgrounds can be shown in dark
- * colors; anything else (brand colors, dark sections) is a designed email.
+ * A light version of a dark gray or near black surface, for showing an email
+ * that was designed dark in light colors; null for any other color. Saturated
+ * dark colors (a navy banner, a brand button) keep their look.
  */
-export function isPaperBackground(value: string): boolean {
+export function lightBackground(value: string): string | null {
   const color = parseColor(value);
-  if (!color) return true;
-  if (color.a < 0.1) return true;
-  const { s, l } = rgbToHsl(color);
-  return l >= 0.93 || (l >= 0.85 && s <= 0.3);
+  if (!color || color.a < 0.5) return null;
+  const hsl = rgbToHsl(color);
+  if (hsl.l >= 0.3 || hsl.s > 0.3) return null;
+  return formatColor({ ...hslToRgb({ h: hsl.h, s: hsl.s * 0.5, l: 1 - hsl.l * 0.5 }), a: color.a });
 }
 
 /**
