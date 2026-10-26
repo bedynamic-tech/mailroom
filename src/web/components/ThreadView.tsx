@@ -1113,6 +1113,9 @@ const SINGLE_PANE_QUERY = "(max-width: 767px)";
 // Scrolls smaller than this are jitter, not the person reading back.
 const SCROLL_UP_PX = 8;
 const AT_BOTTOM_PX = 48;
+// Scrolls this soon after typing in the reply form or the view resizing are
+// the browser settling the layout, not the person reading back.
+const SETTLE_MS = 500;
 
 /**
  * On phones, scrolling back through a conversation folds the reply form into a
@@ -1143,15 +1146,27 @@ function useCollapseReplyOnScroll(
       Math.min(Math.max(container.scrollTop, 0), container.scrollHeight - container.clientHeight);
     let lastTop = clampedTop();
     let lastHeight = container.clientHeight;
+    // The reply form growing a line as the person types shrinks this view, and
+    // iOS can report the scroll that follows late, after the size already
+    // matches, so the size check alone lets it read as scrolling up.
+    let settleUntil = 0;
+    const settle = () => {
+      settleUntil = performance.now() + SETTLE_MS;
+    };
+    const observer = new ResizeObserver(settle);
+    observer.observe(container);
+    const form = formRef.current;
+    form?.addEventListener("input", settle);
     const onScroll = () => {
       const top = clampedTop();
       const delta = top - lastTop;
       lastTop = top;
       // A scroll caused by the view resizing (the keyboard opening, the form
-      // folding or opening) is layout, not the person reading back.
+      // folding, opening or growing) is layout, not the person reading back.
       const resized = container.clientHeight !== lastHeight;
       lastHeight = container.clientHeight;
       if (!query.matches || resized) return;
+      if (delta < 0 && performance.now() < settleUntil) return;
       if (delta < -SCROLL_UP_PX) {
         const active = document.activeElement;
         if (active instanceof HTMLElement && formRef.current?.contains(active)) active.blur();
@@ -1169,6 +1184,8 @@ function useCollapseReplyOnScroll(
     container.addEventListener("scroll", onScroll, { passive: true });
     query.addEventListener("change", onWidthChange);
     return () => {
+      observer.disconnect();
+      form?.removeEventListener("input", settle);
       container.removeEventListener("scroll", onScroll);
       query.removeEventListener("change", onWidthChange);
     };
