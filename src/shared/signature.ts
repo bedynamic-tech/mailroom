@@ -21,6 +21,10 @@ export const SIGNATURE_MODES: readonly SignatureMode[] = ["default", "custom", "
 /** Plain-text signature delimiter (RFC 3676 section 4.3). */
 export const PLAIN_TEXT_SIGNATURE_DELIMITER = "-- ";
 
+/** The style on the wrapper around every HTML email Mailroom sends. */
+export const OUTGOING_HTML_STYLE =
+  "font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1f2937";
+
 /** Sanitize a stored or submitted signature; blank signatures become null. */
 export function normalizeSignature(html: string | null | undefined): string | null {
   if (!html) return null;
@@ -84,7 +88,7 @@ export function composeOutgoingBodies(
     ? `<div class="mailroom-signature"${messageHtml ? ' style="margin-top:16px"' : ""}>${signature}</div>`
     : "";
   const html =
-    `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1f2937">` +
+    `<div style="${OUTGOING_HTML_STYLE}">` +
     `${bodyBlock}${signatureBlock}</div>`;
 
   return { text: combinedText, html };
