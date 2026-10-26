@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Attachment } from "../../shared/types";
 import { DARK_EMAIL_BACKGROUND } from "../email-colors";
 import { fixLowContrastText, lightenDarkSurfaces, neutralizeDarkSurfaces } from "../email-contrast";
@@ -7,6 +7,21 @@ import { cn } from "@/lib/utils";
 
 const MIN_EMAIL_HEIGHT = 20;
 const MAX_EMAIL_HEIGHT = 20_000;
+
+/** The app's touch variant, where message text steps up from text-sm to text-base. */
+const TOUCH_QUERY = "(max-width: 767px), (pointer: coarse)";
+
+/** The pixel size of a plain text message body: 14px, or 16px on touch screens. */
+function useMessageTextSize() {
+  const [touch, setTouch] = useState(() => window.matchMedia(TOUCH_QUERY).matches);
+  useEffect(() => {
+    const query = window.matchMedia(TOUCH_QUERY);
+    const update = () => setTouch(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return touch ? 16 : 14;
+}
 
 export function EmailHtmlBody({
   html,
@@ -21,9 +36,10 @@ export function EmailHtmlBody({
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const textSize = useMessageTextSize();
   const sourceDocument = useMemo(
-    () => buildEmailHtmlDocument(html, attachments, appearance),
-    [appearance, attachments, html],
+    () => buildEmailHtmlDocument(html, attachments, appearance, textSize),
+    [appearance, attachments, html, textSize],
   );
 
   useEffect(

@@ -1,3 +1,4 @@
+import { OUTGOING_HTML_STYLE } from "../shared/signature";
 import type { Attachment } from "../shared/types";
 import {
   adaptBackgroundColor,
@@ -45,6 +46,7 @@ const BASE_STYLE = `
     max-width: 100% !important;
     overflow-wrap: anywhere;
     font-family: Arial, Helvetica, sans-serif;
+    font-size: var(--mailroom-text-size, 14px);
     line-height: 1.5;
   }
   *, *::before, *::after { box-sizing: border-box; }
@@ -87,12 +89,19 @@ const CONTENT_SECURITY_POLICY = [
   "base-uri 'none'",
 ].join("; ");
 
+/**
+ * textSize is the app's body text size in pixels. Text the email leaves
+ * unsized gets it, so plain emails read at the same size as the rest of the
+ * conversation.
+ */
 export function buildEmailHtmlDocument(
   html: string,
   attachments: Attachment[],
   appearance: EmailAppearance = "original",
+  textSize = 14,
 ): string {
   const document = new DOMParser().parseFromString(html, "text/html");
+  followAppTextSize(document);
   const nativeDark = appearance === "dark" && supportsDarkMode(document);
   document.querySelectorAll(BLOCKED_ELEMENTS).forEach((element) => element.remove());
 
@@ -158,11 +167,24 @@ export function buildEmailHtmlDocument(
 
   const style = document.createElement("style");
   style.textContent =
+    `:root { --mailroom-text-size: ${textSize}px; }` +
     BASE_STYLE +
     (appearance !== "dark" ? LIGHT_STYLE : nativeDark ? NATIVE_DARK_STYLE : ADAPTED_DARK_STYLE);
   document.head.prepend(csp, referrer, viewport, style);
 
   return `<!doctype html>${document.documentElement.outerHTML}`;
+}
+
+/**
+ * Mailroom's own sent emails pin 14px for the recipient. In the app they take
+ * the app's text size instead, so a sent message matches the received ones
+ * around it (which grow to 16px on phones).
+ */
+function followAppTextSize(document: Document): void {
+  const wrapper = document.body?.firstElementChild;
+  if (wrapper instanceof HTMLElement && wrapper.getAttribute("style") === OUTGOING_HTML_STYLE) {
+    wrapper.style.removeProperty("font-size");
+  }
 }
 
 /** The email declares its own dark mode styles. */
