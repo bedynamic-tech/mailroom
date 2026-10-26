@@ -29,6 +29,17 @@
         document.documentElement.classList.toggle("dark", dark);
         document.documentElement.style.colorScheme = dark ? "dark" : "light";
       })();
+      // Follow the iOS Text Size setting before the first paint (see
+      // src/web/text-size.ts).
+      (function () {
+        if (!CSS.supports("-webkit-touch-callout", "none") || !CSS.supports("font", "-apple-system-body")) return;
+        var probe = document.createElement("span");
+        probe.style.font = "-apple-system-body";
+        document.documentElement.appendChild(probe);
+        var scale = parseFloat(getComputedStyle(probe).fontSize) / 17 || 1;
+        probe.remove();
+        if (scale !== 1) document.documentElement.style.fontSize = scale * 100 + "%";
+      })();
     </script>
   </head>
   <body>

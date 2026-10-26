@@ -1387,7 +1387,7 @@ function MessageCard({
         </div>
         <time
           dateTime={message.created_at}
-          className="mt-0.5 shrink-0 text-[11px] tabular-nums sm:text-xs text-muted-foreground"
+          className="mt-0.5 shrink-0 text-[0.6875rem] tabular-nums sm:text-xs text-muted-foreground"
           title={new Date(message.created_at).toLocaleString()}
         >
           {formatTime(message.created_at)}
@@ -1510,7 +1510,7 @@ function NoteCard(props: { note: ThreadNote; deleting: boolean; onDelete: () => 
         </div>
         <time
           dateTime={note.created_at}
-          className="mt-0.5 shrink-0 self-start text-[11px] tabular-nums sm:text-xs text-amber-800/80 dark:text-amber-300/80"
+          className="mt-0.5 shrink-0 self-start text-[0.6875rem] tabular-nums sm:text-xs text-amber-800/80 dark:text-amber-300/80"
           title={new Date(note.created_at).toLocaleString()}
         >
           {formatTime(note.created_at)}

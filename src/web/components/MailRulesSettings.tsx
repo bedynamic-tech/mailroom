@@ -762,7 +762,7 @@ function Connector(props: { match: MailRuleMatch; onToggle: () => void }) {
       type="button"
       onClick={props.onToggle}
       title={`Switch to ${props.match === "all" ? "OR" : "AND"}`}
-      className="rounded-md border bg-background px-2 py-0.5 text-[11px] font-semibold tracking-wide text-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="rounded-md border bg-background px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide text-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       {props.match === "all" ? "AND" : "OR"}
     </button>

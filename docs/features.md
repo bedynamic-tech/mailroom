@@ -125,6 +125,10 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
 - **Light and dark mode.** Choose Light, Dark or System in **Settings >
   General > Appearance**. System follows your device, and the choice is saved
   on each device.
+- **Text size follows the device.** The whole app, email bodies included,
+  scales with the device's own text size: the browser's font size setting on
+  desktop and Android, and Settings > Display & Brightness > Text Size on
+  iPhone and iPad.
   Emails always follow the app's theme. In dark mode every email is shown in
   dark colors: emails that ship their own dark styles use them, and the rest
   are recolored onto the app's dark background, keeping brand colors like
