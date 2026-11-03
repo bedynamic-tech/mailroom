@@ -22,6 +22,7 @@ import type {
   Playbook,
   PlaybookInput,
   ReplyAttemptResult,
+  BlockedSenderAction,
   BlockSenderResult,
   BulkBlockSenderResult,
   ThreadSummary,
@@ -193,6 +194,13 @@ export const updateEmailNotificationTemplate = (template: EmailNotificationTempl
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(template),
+  });
+
+export const setBlockedSenderAction = (action: BlockedSenderAction) =>
+  request<{ ok: true; action: BlockedSenderAction }>("/settings/blocked-sender-action", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action }),
   });
 
 export const setAutoCreateContacts = (autoCreate: boolean) =>

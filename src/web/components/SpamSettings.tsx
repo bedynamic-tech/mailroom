@@ -14,12 +14,16 @@ import {
   blockSender,
   fetchBlockedRecipients,
   fetchBlockedSenders,
+  fetchGeneralSettings,
   fetchMailboxes,
+  setBlockedSenderAction,
   unblockRecipient,
   unblockSender,
 } from "../api";
 import { formatTime } from "../lib";
 import { ShieldBanIcon, TrashIcon } from "./Icons";
+import { OptionGroup } from "./BlockSenderDialog";
+import type { BlockedSenderAction } from "../../shared/types";
 import {
   SettingsBlock,
   SettingsHeader,
@@ -39,6 +43,15 @@ export function SpamSettings(props: {
   onOpenAi: () => void;
 }) {
   const queryClient = useQueryClient();
+  const settings = useQuery({ queryKey: ["settings", "general"], queryFn: fetchGeneralSettings });
+  const saveAction = useMutation({
+    mutationFn: setBlockedSenderAction,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["settings", "general"] }),
+  });
+  // Show the choice being saved while the request is in flight.
+  const blockedAction: BlockedSenderAction = saveAction.isPending
+    ? saveAction.variables
+    : settings.data?.blocked_sender_action ?? "archive";
   const [pattern, setPattern] = useState("");
   const [scope, setScope] = useState(ALL_INBOXES);
   const blocked = useQuery({ queryKey: ["blocked-senders"], queryFn: fetchBlockedSenders });
@@ -101,6 +114,41 @@ export function SpamSettings(props: {
       />
 
       <SettingsPage>
+        <SettingsBlock
+          id="blocked-sender-action-heading"
+          title="When you block a sender"
+          description="What happens to the email a sender already sent when you block them from a conversation or mark them as spam. New mail from them is rejected either way."
+        >
+          <SettingsPanel className="px-4 py-4 sm:px-5">
+            <OptionGroup<BlockedSenderAction>
+              legend="Their conversations"
+              name="blocked-sender-action"
+              value={blockedAction}
+              disabled={settings.isPending || saveAction.isPending}
+              onChange={(action) => saveAction.mutate(action)}
+              options={[
+                {
+                  value: "archive",
+                  label: "Archive",
+                  hint: "Open conversations move to the Archive, marked read. You can still find them there.",
+                },
+                {
+                  value: "permanent_delete",
+                  label: "Delete permanently",
+                  hint: "All their conversations, archived ones too, are deleted with their messages and attachments. This can’t be undone.",
+                },
+              ]}
+            />
+            {(settings.isError || saveAction.isError) && (
+              <p className="mt-2 text-xs text-destructive" role="alert">
+                {saveAction.error instanceof Error
+                  ? saveAction.error.message
+                  : "Couldn’t load this setting."}
+              </p>
+            )}
+          </SettingsPanel>
+        </SettingsBlock>
+
         <SettingsBlock
           id="blocked-senders-heading"
           title="Blocked senders"

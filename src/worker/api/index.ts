@@ -11,6 +11,7 @@ import { contactNamesFor, replyGreetingApi } from "./reply-greeting.ts";
 import { parseReplyRecipients } from "../../shared/reply-recipients.ts";
 import { universalSearchApi } from "./universal-search.ts";
 import { MAX_RECIPIENTS_PER_MESSAGE } from "../../shared/email-limits.ts";
+import { isBlockedSenderAction } from "../../shared/blocked-senders.ts";
 import { MAX_SENDER_NAME_LENGTH, normalizeSenderName } from "../../shared/sender-name.ts";
 import { MAX_RICH_TEXT_HTML_LENGTH, normalizeMessageBody } from "../../shared/rich-text.ts";
 import {
@@ -100,7 +101,7 @@ api.get("/settings/general", async (c) => {
               email_notification_from_name, email_notification_from_mailbox_id,
               email_notification_subject, email_notification_body, auto_create_contacts,
               default_signature_html, browser_new_email, email_new_email, browser_replies, email_replies,
-              reply_greeting_enabled, reply_greeting_template
+              reply_greeting_enabled, reply_greeting_template, blocked_sender_action
        FROM global_settings WHERE id = 1`,
     ).first<
       StoredNotificationTemplate & {
@@ -116,6 +117,7 @@ api.get("/settings/general", async (c) => {
         email_replies: number;
         reply_greeting_enabled: number;
         reply_greeting_template: string | null;
+        blocked_sender_action: string | null;
       }
     >(),
     c.env.DB.prepare("SELECT COUNT(*) AS count FROM push_subscriptions")
@@ -146,6 +148,9 @@ api.get("/settings/general", async (c) => {
     email_replies: Boolean(settings?.email_replies ?? 1),
     reply_greeting_enabled: Boolean(settings?.reply_greeting_enabled),
     reply_greeting_template: settings?.reply_greeting_template ?? null,
+    blocked_sender_action: isBlockedSenderAction(settings?.blocked_sender_action)
+      ? settings.blocked_sender_action
+      : "archive",
   };
   return c.json(result);
 });
@@ -361,6 +366,22 @@ api.post("/settings/email-notifications/test", async (c) => {
     console.error("Test email notification failed", { error: message });
     return c.json({ error: `Couldn’t send the test: ${message}` }, 502);
   }
+});
+
+api.put("/settings/blocked-sender-action", async (c) => {
+  const body = await c.req.json<{ action?: unknown }>().catch(() => null);
+  if (!isBlockedSenderAction(body?.action)) {
+    return c.json({ error: "action must be archive or permanent_delete" }, 400);
+  }
+  await c.env.DB.prepare(
+    `UPDATE global_settings
+     SET blocked_sender_action = ?,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE id = 1`,
+  )
+    .bind(body.action)
+    .run();
+  return c.json({ ok: true, action: body.action });
 });
 
 api.put("/settings/contacts", async (c) => {
@@ -1147,7 +1168,9 @@ api.post("/threads/bulk/block-sender", async (c) => {
   if (scope !== "inbox" && scope !== "all") {
     return c.json({ error: "scope must be inbox or all" }, 400);
   }
-  return c.json(await blockThreadSenders(c.env, ids as number[], scope));
+  return c.json(
+    await blockThreadSenders(c.env, ids as number[], scope, { onObjectsFreed: purgeLater(c) }),
+  );
 });
 
 api.post("/threads/:id/read", async (c) => {
@@ -1188,7 +1211,11 @@ api.post("/threads/:id/block-sender", async (c) => {
     return c.json({ error: "scope must be inbox or all" }, 400);
   }
   try {
-    return c.json(await blockThreadSender(c.env, threadId, kind, scope, address));
+    return c.json(
+      await blockThreadSender(c.env, threadId, kind, scope, address, {
+        onObjectsFreed: purgeLater(c),
+      }),
+    );
   } catch (error) {
     if (error instanceof BlockThreadSenderError || error instanceof BlockRuleError) {
       return c.json({ error: error.message }, error.status);
@@ -1214,6 +1241,17 @@ api.delete("/threads/:id", async (c) => {
   // so it does not need to be archived first.
   return removeArchivedConversations(c, [threadId], { includeOpen: true });
 });
+
+/** Purges R2 objects freed by deleted Conversations after the response. */
+function purgeLater(c: Context<{ Bindings: Env }>) {
+  return (keys: string[]) => {
+    c.executionCtx.waitUntil(
+      purgeConversationObjects(c.env.RAW, keys).catch((error) => {
+        console.error("Blocked sender object cleanup failed", { error });
+      }),
+    );
+  };
+}
 
 async function removeArchivedConversations(
   c: Context<{ Bindings: Env }>,

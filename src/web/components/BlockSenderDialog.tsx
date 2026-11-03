@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { domainOf, isSharedMailDomain } from "../../shared/blocked-senders";
+import { fetchGeneralSettings } from "../api";
 
 export type BlockKind = "address" | "domain";
 
@@ -25,8 +26,9 @@ export interface BlockScopeOption {
 
 /**
  * Confirms blocking a sender, by address or by domain, on one of `scopes`.
- * `onBlock` performs the block; `archives` says whether it also archives the
- * sender's open conversations, so the confirmation can say so.
+ * `onBlock` performs the block; `archives` says whether it also acts on the
+ * sender's conversations, archiving or permanently deleting them as the
+ * Blocked sender setting says, so the confirmation can say so.
  */
 export function BlockSenderDialog(props: {
   open: boolean;
@@ -35,13 +37,19 @@ export function BlockSenderDialog(props: {
   senderOptions?: Array<{ address: string; hint: string }>;
   scopes: BlockScopeOption[];
   archives: boolean;
-  /** Whether the chosen sender wrote this conversation, so blocking archives it too. */
+  /** Whether the chosen sender wrote this conversation, so blocking acts on it too. */
   wroteConversation?: (sender: string, kind: BlockKind) => boolean;
   onBlock: (kind: BlockKind, scope: string, sender: string) => Promise<unknown>;
   onOpenChange: (open: boolean) => void;
   onBlocked?: () => void;
 }) {
   const queryClient = useQueryClient();
+  const settings = useQuery({
+    queryKey: ["settings", "general"],
+    queryFn: fetchGeneralSettings,
+    enabled: props.open && props.archives,
+  });
+  const deletes = settings.data?.blocked_sender_action === "permanent_delete";
   const [kind, setKind] = useState<BlockKind>("address");
   const [scope, setScope] = useState(props.scopes[0]?.value ?? "");
   const [sender, setSender] = useState(props.sender);
@@ -134,9 +142,13 @@ export function BlockSenderDialog(props: {
           <span className="font-medium break-all">{blockedWhere}</span> will be rejected.{" "}
           {!props.archives
             ? "Existing conversations stay where they are."
-            : (props.wroteConversation?.(sender, kind) ?? true)
-              ? "This conversation and their other open conversations there will be archived."
-              : "Their open conversations there will be archived. This one stays, since they didn’t write it."}
+            : deletes
+              ? (props.wroteConversation?.(sender, kind) ?? true)
+                ? "This conversation and all their other conversations there will be permanently deleted. This can’t be undone."
+                : "All their conversations there will be permanently deleted. This one stays, since they didn’t write it. This can’t be undone."
+              : (props.wroteConversation?.(sender, kind) ?? true)
+                ? "This conversation and their other open conversations there will be archived."
+                : "Their open conversations there will be archived. This one stays, since they didn’t write it."}
         </p>
 
         {block.isError && (
@@ -158,9 +170,9 @@ export function BlockSenderDialog(props: {
             type="button"
             variant="destructive"
             onClick={() => block.mutate()}
-            disabled={block.isPending || !scope}
+            disabled={block.isPending || !scope || (props.archives && settings.isPending)}
           >
-            {block.isPending ? "Blocking…" : "Block sender"}
+            {block.isPending ? "Blocking…" : deletes ? "Block and delete" : "Block sender"}
           </Button>
         </DialogFooter>
       </DialogContent>

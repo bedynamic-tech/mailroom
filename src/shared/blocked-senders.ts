@@ -1,4 +1,9 @@
 import { isEmailAddress } from "./recipients.ts";
+import type { BlockedSenderAction } from "./types.ts";
+
+export function isBlockedSenderAction(value: unknown): value is BlockedSenderAction {
+  return value === "archive" || value === "permanent_delete";
+}
 
 export type BlockedSenderKind = "address" | "domain";
 

@@ -56,7 +56,15 @@ export interface GeneralSettings {
   reply_greeting_enabled: boolean;
   /** Plain-text greeting with {first_name}; null uses "{first_name},". */
   reply_greeting_template: string | null;
+  /** What blocking a sender from a Conversation does to the mail they sent. */
+  blocked_sender_action: BlockedSenderAction;
 }
+
+/**
+ * What happens to a blocked sender's existing Conversations when they are
+ * blocked from a Conversation: archived, or permanently deleted.
+ */
+export type BlockedSenderAction = "archive" | "permanent_delete";
 
 export interface EmailNotificationTemplate {
   from_name: string;
@@ -348,6 +356,9 @@ export interface BlockSenderResult {
   blocked: BlockedSender;
   /** Conversations archived, including the one the sender was blocked from. */
   archived: number;
+  /** Conversations permanently deleted, when the Blocked sender action deletes. */
+  deleted: number;
+  deleted_ids: number[];
 }
 
 export interface BulkBlockSenderResult {
@@ -355,6 +366,10 @@ export interface BulkBlockSenderResult {
   blocked: BlockedSender[];
   /** Conversations with no sender that could be blocked. */
   skipped: number;
+  /** Conversations archived by the blocks. */
+  archived: number;
+  /** Conversations permanently deleted by the blocks. */
+  deleted: number;
 }
 
 export type MailRuleField =

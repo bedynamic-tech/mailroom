@@ -267,3 +267,73 @@ test("blockThreadSenders marks the senders of several conversations as spam and 
   assert.equal(everywhere.blocked[0].mailbox_id, null);
   assert.equal(statusOf(f.db, 4), "archived");
 });
+
+test("blockThreadSender permanently deletes the sender's conversations when set to", async (t) => {
+  const f = fixture(t);
+  f.db.exec("UPDATE global_settings SET blocked_sender_action = 'permanent_delete' WHERE id = 1");
+  inbound(f.db, { thread: 1, from: "spam@bad.example" });
+  inbound(f.db, { thread: 2, from: "spam@bad.example", status: "archived" });
+  inbound(f.db, { thread: 3, from: "spam@bad.example", mailbox: 2 });
+  inbound(f.db, { thread: 4, from: "friend@good.example" });
+  f.db.prepare(`INSERT INTO messages (thread_id, message_id, direction, from_address, raw_key, created_at)
+    VALUES (1, '<raw@x>', 'inbound', 'spam@bad.example', 'raw/1.eml', '2026-01-02T00:00:00.000Z')`).run();
+
+  const freed = [];
+  const result = await blockThreadSender(f.env, 1, "address", "inbox", undefined, {
+    onObjectsFreed: (keys) => freed.push(...keys),
+  });
+  assert.equal(result.deleted, 2, "open and archived conversations on the inbox are deleted");
+  assert.deepEqual(result.deleted_ids, [1, 2]);
+  assert.equal(result.archived, 0);
+  assert.deepEqual(freed, ["raw/1.eml"]);
+  const remaining = f.db.prepare("SELECT id FROM threads ORDER BY id").all().map((row) => row.id);
+  assert.deepEqual(remaining, [3, 4], "other inboxes and senders are untouched");
+  assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM messages WHERE thread_id IN (1, 2)").get().n, 0);
+});
+
+test("a conversation still sending is archived instead of deleted", async (t) => {
+  const f = fixture(t);
+  f.db.exec("UPDATE global_settings SET blocked_sender_action = 'permanent_delete' WHERE id = 1");
+  inbound(f.db, { thread: 1, from: "spam@bad.example" });
+  inbound(f.db, { thread: 2, from: "spam@bad.example" });
+  const sending = f.db.prepare("SELECT sql FROM sqlite_master WHERE name = 'reply_attempts'").get();
+  assert.ok(sending, "reply_attempts exists");
+  f.db.exec("PRAGMA foreign_keys = OFF");
+  const columns = f.db.prepare("PRAGMA table_info(reply_attempts)").all();
+  const required = columns.filter((column) => column.notnull && column.dflt_value === null && !column.pk);
+  const values = Object.fromEntries(required.map((column) => [column.name, column.type.includes("INT") ? 1 : "x"]));
+  values.thread_id = 2;
+  values.status = "sending";
+  const names = Object.keys(values);
+  f.db.prepare(`INSERT INTO reply_attempts (${names.join(", ")}) VALUES (${names.map(() => "?").join(", ")})`)
+    .run(...names.map((name) => values[name]));
+
+  const result = await blockThreadSender(f.env, 1, "address", "all");
+  assert.deepEqual(result.deleted_ids, [1]);
+  assert.equal(result.archived, 1);
+  assert.equal(statusOf(f.db, 2), "archived");
+});
+
+test("blockThreadSenders deletes in bulk and skips conversations already deleted", async (t) => {
+  const f = fixture(t);
+  f.db.exec("UPDATE global_settings SET blocked_sender_action = 'permanent_delete' WHERE id = 1");
+  inbound(f.db, { thread: 1, from: "spam@bad.example" });
+  inbound(f.db, { thread: 2, from: "spam@bad.example" });
+  inbound(f.db, { thread: 3, from: "junk@worse.example" });
+  inbound(f.db, { thread: 4, from: "friend@good.example" });
+
+  const result = await blockThreadSenders(f.env, [1, 2, 3], "inbox");
+  assert.equal(result.blocked.length, 2);
+  assert.equal(result.skipped, 0, "a conversation deleted by an earlier block isn't counted as skipped");
+  assert.equal(result.deleted, 3);
+  assert.deepEqual(f.db.prepare("SELECT id FROM threads").all().map((row) => row.id), [4]);
+});
+
+test("the Blocked sender action defaults to archive", async (t) => {
+  const f = fixture(t);
+  assert.equal(
+    f.db.prepare("SELECT blocked_sender_action AS a FROM global_settings WHERE id = 1").get().a,
+    "archive",
+  );
+  assert.throws(() => f.db.exec("UPDATE global_settings SET blocked_sender_action = 'trash' WHERE id = 1"));
+});

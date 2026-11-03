@@ -770,7 +770,14 @@ export function ThreadView(props: {
           wroteConversation={wroteConversation}
           onBlock={(kind, scope, sender) => {
             blockArchivesThis.current = wroteConversation(sender, kind);
-            return blockThreadSender(props.threadId, kind, scope === "all" ? "all" : "inbox", sender);
+            return blockThreadSender(props.threadId, kind, scope === "all" ? "all" : "inbox", sender)
+              .then((result) => {
+                // A deleted conversation must not be fetched again.
+                if (result.deleted_ids.includes(props.threadId)) {
+                  queryClient.removeQueries({ queryKey: ["thread", props.threadId] });
+                }
+                return result;
+              });
           }}
           onOpenChange={(open) => !open && setBlocking(null)}
           onBlocked={() => {
