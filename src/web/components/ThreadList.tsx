@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SquarePen } from "lucide-react";
-import type { Label, Mailbox, ThreadSummary } from "../../shared/types";
+import type { BulkBlockSenderResult, Label, Mailbox, ThreadSummary } from "../../shared/types";
 import { Badge } from "@/components/ui/badge";
 import { CatchAllBadge } from "./CatchAllBadge";
 import { Button } from "@/components/ui/button";
@@ -142,7 +142,7 @@ export function ThreadList(props: {
     if (selected !== null && (ids === null || ids.includes(selected))) props.onDeselect();
   };
 
-  const onSendersMarkedSpam = () => {
+  const onSendersMarkedSpam = (result: BulkBlockSenderResult) => {
     const ids = [...checked];
     setMarkingSpam(false);
     setChecked(new Set());
@@ -150,7 +150,7 @@ export function ThreadList(props: {
     queryClient.invalidateQueries({ queryKey: ["thread"] });
     queryClient.invalidateQueries({ queryKey: ["mailboxes"] });
     queryClient.invalidateQueries({ queryKey: ["blocked-senders"] });
-    if (!props.archive && props.selected !== null && ids.includes(props.selected)) {
+    if ((!props.archive || result.deleted > 0) && props.selected !== null && ids.includes(props.selected)) {
       props.onDeselect();
     }
   };

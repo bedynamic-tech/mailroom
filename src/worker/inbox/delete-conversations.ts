@@ -29,7 +29,7 @@ const MAX_BOUND_PARAMETERS = 100;
  * `includeOpen` is set; Contacts are left untouched.
  */
 export async function deleteArchivedConversations(
-  env: ConversationDeletionEnv,
+  env: Pick<ConversationDeletionEnv, "DB">,
   input: { ids: number[]; includeOpen?: boolean },
 ): Promise<DeletedConversations> {
   const ids = [...new Set(input.ids)];

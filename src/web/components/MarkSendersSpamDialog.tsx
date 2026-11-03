@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type { BulkBlockSenderResult } from "../../shared/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,14 +10,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { blockThreadSenders } from "../api";
+import { blockThreadSenders, fetchGeneralSettings } from "../api";
 import { OptionGroup } from "./BlockSenderDialog";
 
 type Scope = "inbox" | "all";
 
 /**
  * Confirms marking the senders of the selected Conversations as spam: each
- * one's sender is blocked by address and their open Conversations archived.
+ * one's sender is blocked by address and their Conversations archived or
+ * permanently deleted, as the Blocked sender setting says.
  */
 export function MarkSendersSpamDialog(props: {
   open: boolean;
@@ -26,6 +27,12 @@ export function MarkSendersSpamDialog(props: {
   onMarked: (result: BulkBlockSenderResult) => void;
 }) {
   const [scope, setScope] = useState<Scope>("inbox");
+  const settings = useQuery({
+    queryKey: ["settings", "general"],
+    queryFn: fetchGeneralSettings,
+    enabled: props.open,
+  });
+  const deletes = settings.data?.blocked_sender_action === "permanent_delete";
   const mark = useMutation({
     mutationFn: () => blockThreadSenders(props.ids, scope),
     onSuccess: props.onMarked,
@@ -78,8 +85,18 @@ export function MarkSendersSpamDialog(props: {
         />
 
         <p className="rounded-lg bg-muted/60 px-3 py-2.5 text-sm leading-5 text-foreground">
-          {many ? "These conversations" : "This conversation"} and the{" "}
-          {many ? "senders’" : "sender’s"} other open conversations there will be archived.
+          {deletes ? (
+            <>
+              {many ? "These conversations" : "This conversation"} and all the{" "}
+              {many ? "senders’" : "sender’s"} other conversations there will be permanently
+              deleted. This can’t be undone.
+            </>
+          ) : (
+            <>
+              {many ? "These conversations" : "This conversation"} and the{" "}
+              {many ? "senders’" : "sender’s"} other open conversations there will be archived.
+            </>
+          )}
         </p>
 
         {mark.isError && (
@@ -101,9 +118,9 @@ export function MarkSendersSpamDialog(props: {
             type="button"
             variant="destructive"
             onClick={() => mark.mutate()}
-            disabled={mark.isPending || count === 0}
+            disabled={mark.isPending || count === 0 || settings.isPending}
           >
-            {mark.isPending ? "Marking…" : "Mark as spam"}
+            {mark.isPending ? "Marking…" : deletes ? "Mark as spam and delete" : "Mark as spam"}
           </Button>
         </DialogFooter>
       </DialogContent>

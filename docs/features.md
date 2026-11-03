@@ -159,8 +159,16 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   it, such as Cc'd addresses, you choose which one to block. To clear out
   several at once, select conversations in the list and choose **Mark sender as
   spam** (the shield button): each one's sender is blocked by address, on its
-  own inbox or on all inboxes, and their open conversations are archived.
-  Blocked mail is rejected before it reaches Mailroom.
+  own inbox or on all inboxes, and their conversations are archived or
+  deleted as set below. Blocked mail is rejected before it reaches Mailroom.
+- **What happens to a blocked sender's email.** In **Settings > Spam**, choose
+  what blocking a sender from a conversation or marking them as spam does to
+  the email they already sent. **Archive** (the default) moves their open
+  conversations to the Archive, marked read. **Delete permanently** deletes all
+  their conversations on the blocked inbox or inboxes, archived ones too, with
+  their messages and attachments; this can't be undone. A conversation with an
+  email still sending is archived instead. The block dialogs say which will
+  happen before you confirm.
 
 ## Integrations
 
