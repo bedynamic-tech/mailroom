@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowLeftIcon } from "./Icons";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ArrowLeftIcon, CheckIcon, ChevronDownIcon } from "./Icons";
 
 export type SettingsSection = "general" | "notifications" | "inboxes" | "contacts" | "rules" | "spam" | "ai";
 
@@ -16,6 +22,17 @@ export function SettingsHeader(props: {
   onOpenSpam: () => void;
   onOpenAi: () => void;
 }) {
+  const sections: { id: SettingsSection; label: string; open: () => void }[] = [
+    { id: "general", label: "General", open: props.onOpenGeneral },
+    { id: "notifications", label: "Notifications", open: props.onOpenNotifications },
+    { id: "inboxes", label: "Inboxes", open: props.onOpenInboxes },
+    { id: "contacts", label: "Contacts", open: props.onOpenContacts },
+    { id: "rules", label: "Rules", open: props.onOpenRules },
+    { id: "spam", label: "Spam", open: props.onOpenSpam },
+    { id: "ai", label: "AI", open: props.onOpenAi },
+  ];
+  const activeLabel = sections.find((section) => section.id === props.active)?.label ?? "General";
+
   return (
     <header className="shrink-0 border-b bg-background px-4 md:px-6">
       <div className="flex h-14 items-center gap-2">
@@ -29,32 +46,45 @@ export function SettingsHeader(props: {
           <ArrowLeftIcon className="h-5 w-5" />
         </Button>
         <h1 className="text-base font-semibold tracking-[-0.015em] text-foreground">Settings</h1>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="-mr-1 ml-auto gap-1.5 md:hidden"
+              aria-label={`Settings section: ${activeLabel}`}
+            >
+              {activeLabel}
+              <ChevronDownIcon className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-48">
+            {sections.map((section) => (
+              <DropdownMenuItem
+                key={section.id}
+                onSelect={section.open}
+                aria-current={props.active === section.id ? "page" : undefined}
+                className={cn(props.active === section.id && "font-medium")}
+              >
+                <span className="flex-1">{section.label}</span>
+                {props.active === section.id && <CheckIcon className="text-foreground" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <nav
         aria-label="Settings sections"
-        className="-mb-px flex gap-5 overflow-x-auto [scrollbar-width:none]"
+        className="-mb-px hidden gap-5 overflow-x-auto [scrollbar-width:none] md:flex"
       >
-        <SettingsTab active={props.active === "general"} onClick={props.onOpenGeneral}>
-          General
-        </SettingsTab>
-        <SettingsTab active={props.active === "notifications"} onClick={props.onOpenNotifications}>
-          Notifications
-        </SettingsTab>
-        <SettingsTab active={props.active === "inboxes"} onClick={props.onOpenInboxes}>
-          Inboxes
-        </SettingsTab>
-        <SettingsTab active={props.active === "contacts"} onClick={props.onOpenContacts}>
-          Contacts
-        </SettingsTab>
-        <SettingsTab active={props.active === "rules"} onClick={props.onOpenRules}>
-          Rules
-        </SettingsTab>
-        <SettingsTab active={props.active === "spam"} onClick={props.onOpenSpam}>
-          Spam
-        </SettingsTab>
-        <SettingsTab active={props.active === "ai"} onClick={props.onOpenAi}>
-          AI
-        </SettingsTab>
+        {sections.map((section) => (
+          <SettingsTab
+            key={section.id}
+            active={props.active === section.id}
+            onClick={section.open}
+          >
+            {section.label}
+          </SettingsTab>
+        ))}
       </nav>
     </header>
   );
