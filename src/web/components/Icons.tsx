@@ -233,3 +233,11 @@ export function ContrastIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props}>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
