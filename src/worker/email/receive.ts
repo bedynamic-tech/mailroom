@@ -11,6 +11,7 @@ import { applyMailRules, deletingMailRules, matchingMailRules, NO_MAIL_RULES } f
 import type { MailRuleAddress, MailRuleSubject } from "../../shared/mail-rules";
 import { sendRuleForward, type ForwardedOriginal } from "./rule-forward";
 import { FORWARD_HEADER } from "./send";
+import { switchForwardToOriginalSender } from "./forward-sender";
 import { matchBounce, parseBounce, recordBounces, type MatchedBounce } from "./bounce";
 import {
   addressOf,
@@ -130,6 +131,26 @@ export async function receiveEmail(
 
   await storeAttachments(env, mailbox.id, stored.messageId, parsed.attachments);
 
+  // A forward that starts a Conversation is switched to its original sender
+  // before anything announces it, so notifications, contacts and drafts use them.
+  const switchedTo =
+    existingThreadId === null && !bounce && !isAutoSubmitted(parsed)
+      ? await switchForwardToOriginalSender(env, {
+          threadId: stored.threadId,
+          sender,
+          subject,
+          textBody,
+        }).catch((error) => {
+          console.error("Switching a forward to its original sender failed", {
+            threadId: stored.threadId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return null;
+        })
+      : null;
+  const fromName = parsed.from && "name" in parsed.from ? parsed.from.name : null;
+  const shownSender = switchedTo ?? { address: sender, name: fromName };
+
   if (bounce) {
     await recordBounces(env, bounce, stored.messageId).catch((error) =>
       console.error("Recording bounce failed", {
@@ -188,8 +209,8 @@ export async function receiveEmail(
   if (sender && !bounce && !isAutoSubmitted(parsed)) {
     ctx.waitUntil(
       recordSender(env, {
-        address: sender,
-        name: parsed.from && "name" in parsed.from ? parsed.from.name : null,
+        address: shownSender.address,
+        name: shownSender.name,
         seenAt: now,
       }).catch((error) =>
         console.error("Contact update failed", {
@@ -217,8 +238,8 @@ export async function receiveEmail(
       notifyNewEmail(env, {
         threadId: stored.threadId,
         isReply: existingThreadId !== null,
-        senderName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
-        senderAddress: sender || "unknown",
+        senderName: shownSender.name,
+        senderAddress: shownSender.address || "unknown",
         subject,
       }).catch((error) => console.error("Browser notification task failed", error)),
     );
@@ -228,8 +249,8 @@ export async function receiveEmail(
         threadId: stored.threadId,
         isReply: existingThreadId !== null,
         inboxAddress: mailbox.address,
-        senderName: parsed.from && "name" in parsed.from ? parsed.from.name : null,
-        senderAddress: sender,
+        senderName: shownSender.name,
+        senderAddress: shownSender.address,
         subject,
         preview: snippet,
       }).catch((error) =>

@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { threadContactApi } from "../src/worker/api/thread-contact.ts";
 import { requireSameOrigin } from "../src/worker/api/csrf.ts";
 import { forwardedSender } from "../src/shared/forwarded-sender.ts";
+import { switchForwardToOriginalSender } from "../src/worker/email/forward-sender.ts";
 
 function fixture(t) {
   const db = new DatabaseSync(":memory:");
@@ -56,7 +57,7 @@ function fixture(t) {
     `SELECT id, from_address, from_name, reply_to_addresses, original_from_address, original_from_name,
        original_reply_to_addresses FROM messages ORDER BY id`,
   ).all().map((row) => ({ ...row }));
-  return { db, call, messages };
+  return { db, env, call, messages };
 }
 
 test("changing the contact reassigns every received email from the current sender", async (t) => {
@@ -143,4 +144,29 @@ test("forwardedSender reads the original sender from common forward headers", ()
   );
   assert.equal(forwardedSender("From: jane@customer.example\nNo forward marker here"), null);
   assert.equal(forwardedSender(null), null);
+});
+
+const FORWARD_BODY = "Can you take this?\n\n---------- Forwarded message ---------\nFrom: Jane Doe <jane@customer.example>\nSubject: Refund\n\nHi";
+
+test("a forward that starts a conversation switches to the original sender by default", async (t) => {
+  const f = fixture(t);
+  const switched = await switchForwardToOriginalSender(f.env, {
+    threadId: 1, sender: "kyle@home.example", subject: "Fwd: Refund", textBody: FORWARD_BODY,
+  });
+  assert.deepEqual(switched, { address: "jane@customer.example", name: "Jane Doe" });
+  const [first] = f.messages();
+  assert.equal(first.from_address, "jane@customer.example");
+  assert.equal(first.original_from_address, "kyle@home.example");
+});
+
+test("forwards are left alone when the setting is off, the subject is not a forward, or the original is an inbox", async (t) => {
+  const f = fixture(t);
+  const input = { threadId: 1, sender: "kyle@home.example", subject: "Fwd: Refund", textBody: FORWARD_BODY };
+  assert.equal(await switchForwardToOriginalSender(f.env, { ...input, subject: "Refund" }), null);
+  assert.equal(await switchForwardToOriginalSender(f.env, {
+    ...input, textBody: FORWARD_BODY.replace("jane@customer.example", "support@example.com"),
+  }), null);
+  f.db.exec("UPDATE global_settings SET reassign_forwards = 0");
+  assert.equal(await switchForwardToOriginalSender(f.env, input), null);
+  assert.equal(f.messages()[0].from_address, "kyle@home.example");
 });

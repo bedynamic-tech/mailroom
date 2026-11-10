@@ -203,6 +203,13 @@ export const setBlockedSenderAction = (action: BlockedSenderAction) =>
     body: JSON.stringify({ action }),
   });
 
+export const setReassignForwards = (enabled: boolean) =>
+  request<{ ok: true }>("/settings/contacts", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reassign_forwards: enabled }),
+  });
+
 export const setAutoCreateContacts = (autoCreate: boolean) =>
   request<{ ok: true }>("/settings/contacts", {
     method: "PUT",

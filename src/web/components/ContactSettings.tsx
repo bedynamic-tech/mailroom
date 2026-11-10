@@ -11,7 +11,7 @@ import {
   type ParsedContactFile,
 } from "../../shared/contacts";
 import type { ContactImportResult } from "../../shared/types";
-import { fetchGeneralSettings, importContacts, setAutoCreateContacts } from "../api";
+import { fetchGeneralSettings, importContacts, setAutoCreateContacts, setReassignForwards } from "../api";
 import { ContactsIcon } from "./Icons";
 import {
   SettingsBlock,
@@ -44,6 +44,13 @@ export function ContactSettings(props: {
   const checked = toggle.isPending
     ? Boolean(toggle.variables)
     : Boolean(settings.data?.auto_create_contacts);
+  const forwardsToggle = useMutation({
+    mutationFn: setReassignForwards,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["settings", "general"] }),
+  });
+  const forwardsChecked = forwardsToggle.isPending
+    ? Boolean(forwardsToggle.variables)
+    : (settings.data?.reassign_forwards ?? true);
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-canvas">
@@ -71,45 +78,66 @@ export function ContactSettings(props: {
             </Button>
           }
         >
-          <SettingsPanel>
-            <div className="flex items-start gap-4 px-4 py-4 sm:px-5">
-              <div className="min-w-0 flex-1">
-                <label
-                  htmlFor="auto-create-contacts"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Automatically create new contacts
-                </label>
-                <p
-                  id="auto-create-contacts-description"
-                  className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground"
-                >
-                  Adds a contact for each new sender whose name appears in their email. Senders
-                  without a name, automated mail and your own inboxes are skipped. Existing
-                  contacts stay up to date either way.
-                </p>
-                {toggle.isError && (
-                  <p className="mt-2 text-xs leading-5 text-destructive" role="alert">
-                    {toggle.error instanceof Error
-                      ? toggle.error.message
-                      : "Couldn’t update this setting"}
-                  </p>
-                )}
-              </div>
-              <Switch
-                id="auto-create-contacts"
-                checked={checked}
-                onCheckedChange={(value) => toggle.mutate(value)}
-                disabled={settings.isLoading || settings.isError || toggle.isPending}
-                aria-describedby="auto-create-contacts-description"
-                className="mt-0.5"
-              />
-            </div>
+          <SettingsPanel className="divide-y">
+            <SettingToggle
+              id="auto-create-contacts"
+              label="Automatically create new contacts"
+              description="Adds a contact for each new sender whose name appears in their email. Senders without a name, automated mail and your own inboxes are skipped. Existing contacts stay up to date either way."
+              checked={checked}
+              disabled={settings.isLoading || settings.isError || toggle.isPending}
+              error={toggle.isError ? toggle.error : null}
+              onChange={(value) => toggle.mutate(value)}
+            />
+            <SettingToggle
+              id="reassign-forwards"
+              label="Switch forwards to the original sender"
+              description="When an email you forward in starts a new conversation, it is shown as from the person who wrote the original, and replies go to them. You can change it back with Change contact in the conversation menu."
+              checked={forwardsChecked}
+              disabled={settings.isLoading || settings.isError || forwardsToggle.isPending}
+              error={forwardsToggle.isError ? forwardsToggle.error : null}
+              onChange={(value) => forwardsToggle.mutate(value)}
+            />
           </SettingsPanel>
         </SettingsBlock>
 
         <ContactImport onOpenContacts={props.onOpenContacts} />
       </SettingsPage>
+    </div>
+  );
+}
+
+function SettingToggle(props: {
+  id: string;
+  label: string;
+  description: string;
+  checked: boolean;
+  disabled: boolean;
+  error: Error | null;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start gap-4 px-4 py-4 sm:px-5">
+      <div className="min-w-0 flex-1">
+        <label htmlFor={props.id} className="text-sm font-medium text-foreground">
+          {props.label}
+        </label>
+        <p id={`${props.id}-description`} className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">
+          {props.description}
+        </p>
+        {props.error && (
+          <p className="mt-2 text-xs leading-5 text-destructive" role="alert">
+            {props.error.message || "Couldn’t update this setting"}
+          </p>
+        )}
+      </div>
+      <Switch
+        id={props.id}
+        checked={props.checked}
+        onCheckedChange={props.onChange}
+        disabled={props.disabled}
+        aria-describedby={`${props.id}-description`}
+        className="mt-0.5"
+      />
     </div>
   );
 }
