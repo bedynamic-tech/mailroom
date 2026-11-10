@@ -16,6 +16,15 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   the latest sender. In a conversation you started that nobody has answered
   yet, it shows **To** and the recipient's name, taken from their Contact, else
   from the name on mail they sent you before, else their address.
+- **Change contact.** When a conversation came in from the wrong address, for
+  example an email you forwarded into Mailroom from your own mailbox, choose
+  **Change contact** in the conversation menu to reassign it. For a forward,
+  Mailroom finds the original sender in the forwarded-message header and
+  offers them with one tap; you can also pick a Contact or type any address
+  and an optional name. The received emails from the old sender move to the
+  new one, so the list, replies, the AI agent and blocking all use them, and
+  each email notes the address it arrived from. **Restore original sender**
+  in the same dialog undoes it.
 - **Compose and reply.** Send new mail or reply to conversations, with attachments.
   A new message starts with **From** empty, so you always choose the sending
   inbox before it can go out.
@@ -98,8 +107,8 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   archive or mark senders as spam in bulk, and restore or permanently delete
   archived conversations.
 - **Conversation menu.** The three dot menu at the top of a conversation
-  has **Archive** (or **Move to inbox**) and **Delete**. Delete works whether
-  the conversation is archived or not, asks for confirmation first, and
+  has **Archive** (or **Move to inbox**), **Change contact** and **Delete**.
+  Delete works whether the conversation is archived or not, asks for confirmation first, and
   permanently removes its messages, attachments, drafts and notes.
 - **Universal search.** The search box in the top right (or Ctrl K / Cmd K,
   and the search icon on phones) finds conversations by subject, message text,

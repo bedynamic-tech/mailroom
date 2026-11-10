@@ -562,5 +562,13 @@ export const addThreadNote = (threadId: number, text: string, html: string) =>
 export const saveReplyRecipients = (threadId: number, recipients: ReplyRecipients) =>
   request<{ ok: true }>(`/threads/${threadId}/reply-recipients`, jsonBody("PUT", recipients));
 
+/** Reassigns a Conversation's received email to `address`, such as the original sender of a forward. */
+export const changeThreadContact = (threadId: number, address: string, name: string | null) =>
+  request<{ ok: true; updated: number }>(`/threads/${threadId}/contact`, jsonBody("PUT", { address, name }));
+
+/** Puts back the sender each received email arrived with. */
+export const restoreThreadContact = (threadId: number) =>
+  request<{ ok: true; updated: number }>(`/threads/${threadId}/contact`, { method: "DELETE" });
+
 export const deleteThreadNote = (threadId: number, noteId: number) =>
   request<{ ok: true }>(`/threads/${threadId}/notes/${noteId}`, { method: "DELETE" });
