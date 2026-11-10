@@ -178,6 +178,9 @@ export interface Message {
   text_body: string | null;
   html_body: string | null;
   is_auto_submitted: number;
+  /** The sender as received, when the Conversation was later reassigned to someone else; null otherwise. */
+  original_from_address: string | null;
+  original_from_name: string | null;
   created_at: string;
   attachments: Attachment[];
   /** Recipients of an outbound Message that a returned bounce notice reported as failed. */

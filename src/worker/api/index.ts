@@ -7,6 +7,7 @@ import { blockedSendersApi } from "./blocked-senders.ts";
 import { mailRulesApi } from "./mail-rules.ts";
 import { listThreadNotes, threadNotesApi } from "./thread-notes.ts";
 import { replyRecipientsApi } from "./reply-recipients.ts";
+import { threadContactApi } from "./thread-contact.ts";
 import { contactNamesFor, replyGreetingApi } from "./reply-greeting.ts";
 import { parseReplyRecipients } from "../../shared/reply-recipients.ts";
 import { universalSearchApi } from "./universal-search.ts";
@@ -91,6 +92,7 @@ api.route("/blocked-senders", blockedSendersApi);
 api.route("/mail-rules", mailRulesApi);
 api.route("/threads", threadNotesApi);
 api.route("/threads", replyRecipientsApi);
+api.route("/threads", threadContactApi);
 api.route("/settings/reply-greeting", replyGreetingApi);
 api.route("/search/all", universalSearchApi);
 

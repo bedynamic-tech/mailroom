@@ -63,8 +63,11 @@ import {
   SparklesIcon,
   TagIcon,
   TrashIcon,
+  UserIcon,
   XIcon,
 } from "./Icons";
+import { ChangeContactDialog } from "./ChangeContactDialog";
+import { forwardedSender } from "../../shared/forwarded-sender";
 import { DeleteConversationsDialog } from "./DeleteConversationsDialog";
 import { BlockSenderDialog } from "./BlockSenderDialog";
 import { CatchAllBadge } from "./CatchAllBadge";
@@ -116,6 +119,7 @@ export function ThreadView(props: {
   const [blocking, setBlocking] = useState<{ sender: string; options: BlockCandidate[] } | null>(null);
   const [creatingInbox, setCreatingInbox] = useState(false);
   const [blockingAddress, setBlockingAddress] = useState(false);
+  const [changingContact, setChangingContact] = useState(false);
   const navigate = useNavigate();
   const seenDraftIds = useRef(new Set<number>());
   const blockArchivesThis = useRef(false);
@@ -428,6 +432,8 @@ export function ThreadView(props: {
 
   const { thread, messages, drafts, notes } = detail.data;
   const timeline = conversationTimeline(messages, notes);
+  const latestInbound = [...messages].reverse().find((message) => message.direction === "inbound");
+  const reassignedFrom = messages.find((message) => message.original_from_address);
   const ownAddresses = new Set(
     [
       thread.mailbox_address,
@@ -658,6 +664,12 @@ export function ThreadView(props: {
                 Archive
               </DropdownMenuItem>
             )}
+            {latestInbound && (
+              <DropdownMenuItem onSelect={() => setChangingContact(true)}>
+                <UserIcon />
+                Change contact
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
@@ -681,6 +693,28 @@ export function ThreadView(props: {
           onConfirm={() => removeThread.mutate()}
           onOpenChange={setConfirmDelete}
         />
+        {latestInbound && (
+          <ChangeContactDialog
+            open={changingContact}
+            threadId={props.threadId}
+            current={{
+              address: latestInbound.from_address,
+              name:
+                detail.data.contact_names?.[latestInbound.from_address.toLowerCase()]?.trim() ||
+                latestInbound.from_name?.trim() ||
+                latestInbound.from_address,
+            }}
+            suggestion={forwardedSender(
+              latestInbound.text_body ?? richTextToPlainText(latestInbound.html_body ?? ""),
+            )}
+            original={
+              reassignedFrom?.original_from_address
+                ? { address: reassignedFrom.original_from_address, name: reassignedFrom.original_from_name }
+                : null
+            }
+            onOpenChange={setChangingContact}
+          />
+        )}
       </header>
 
       {thread.catch_all_recipient && (
@@ -1376,6 +1410,14 @@ function MessageCard({
           <div className="mt-0.5 truncate text-xs text-muted-foreground">
             {isOutbound ? `to ${to.join(", ")}` : message.from_address}
           </div>
+          {message.original_from_address && (
+            <div
+              className="truncate text-xs text-muted-foreground"
+              title={`Arrived from ${message.original_from_address}`}
+            >
+              arrived from {message.original_from_name?.trim() || message.original_from_address}
+            </div>
+          )}
           {!isOutbound && to.length > 1 && (
             <div className="truncate text-xs text-muted-foreground" title={to.join(", ")}>
               to {to.join(", ")}
