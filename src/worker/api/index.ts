@@ -103,7 +103,8 @@ api.get("/settings/general", async (c) => {
               email_notification_from_name, email_notification_from_mailbox_id,
               email_notification_subject, email_notification_body, auto_create_contacts,
               default_signature_html, browser_new_email, email_new_email, browser_replies, email_replies,
-              reply_greeting_enabled, reply_greeting_template, blocked_sender_action
+              reply_greeting_enabled, reply_greeting_template, blocked_sender_action,
+              reassign_forwards
        FROM global_settings WHERE id = 1`,
     ).first<
       StoredNotificationTemplate & {
@@ -120,6 +121,7 @@ api.get("/settings/general", async (c) => {
         reply_greeting_enabled: number;
         reply_greeting_template: string | null;
         blocked_sender_action: string | null;
+        reassign_forwards: number;
       }
     >(),
     c.env.DB.prepare("SELECT COUNT(*) AS count FROM push_subscriptions")
@@ -153,6 +155,7 @@ api.get("/settings/general", async (c) => {
     blocked_sender_action: isBlockedSenderAction(settings?.blocked_sender_action)
       ? settings.blocked_sender_action
       : "archive",
+    reassign_forwards: Boolean(settings?.reassign_forwards ?? 1),
   };
   return c.json(result);
 });
@@ -387,17 +390,28 @@ api.put("/settings/blocked-sender-action", async (c) => {
 });
 
 api.put("/settings/contacts", async (c) => {
-  const body = await c.req.json<{ auto_create?: unknown }>().catch(() => null);
-  if (typeof body?.auto_create !== "boolean") {
-    return c.json({ error: "auto_create must be true or false" }, 400);
+  const body = await c.req.json<{ auto_create?: unknown; reassign_forwards?: unknown }>().catch(() => null);
+  const autoCreate = body?.auto_create;
+  const reassignForwards = body?.reassign_forwards;
+  if (
+    (autoCreate === undefined && reassignForwards === undefined) ||
+    (autoCreate !== undefined && typeof autoCreate !== "boolean") ||
+    (reassignForwards !== undefined && typeof reassignForwards !== "boolean")
+  ) {
+    return c.json({ error: "auto_create and reassign_forwards must be true or false" }, 400);
   }
+  // A setting left out keeps its value.
   await c.env.DB.prepare(
     `UPDATE global_settings
-     SET auto_create_contacts = ?,
+     SET auto_create_contacts = COALESCE(?, auto_create_contacts),
+         reassign_forwards = COALESCE(?, reassign_forwards),
          updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
      WHERE id = 1`,
   )
-    .bind(body.auto_create ? 1 : 0)
+    .bind(
+      autoCreate === undefined ? null : autoCreate ? 1 : 0,
+      reassignForwards === undefined ? null : reassignForwards ? 1 : 0,
+    )
     .run();
   return c.json({ ok: true });
 });

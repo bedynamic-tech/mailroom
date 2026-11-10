@@ -58,6 +58,8 @@ export interface GeneralSettings {
   reply_greeting_template: string | null;
   /** What blocking a sender from a Conversation does to the mail they sent. */
   blocked_sender_action: BlockedSenderAction;
+  /** Switch a forward that starts a Conversation to the original sender in its forwarded header. */
+  reassign_forwards: boolean;
 }
 
 /**

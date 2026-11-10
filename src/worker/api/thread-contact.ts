@@ -52,18 +52,8 @@ threadContactApi.put("/:id/contact", async (c) => {
     return c.json({ error: "This conversation has no received email to reassign" }, 409);
   }
 
-  // SQLite reads every right-hand side from the row as it was, so the
-  // original columns capture the sender before this change, once.
   const [updated] = await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE messages SET
-         original_from_name = CASE WHEN original_from_address IS NULL THEN from_name ELSE original_from_name END,
-         original_reply_to_addresses = CASE WHEN original_from_address IS NULL
-           THEN reply_to_addresses ELSE original_reply_to_addresses END,
-         original_from_address = COALESCE(original_from_address, from_address),
-         from_address = ?, from_name = ?, reply_to_addresses = '[]'
-       WHERE thread_id = ? AND direction = 'inbound' AND from_address = ? COLLATE NOCASE`,
-    ).bind(address, name, threadId, current.from_address),
+    reassignSender(c.env.DB, threadId, current.from_address, { address, name }),
     followNewSender(c.env.DB, threadId, thread.reply_recipients),
   ]);
   return c.json({ ok: true, updated: updated.meta.changes ?? 0 });
@@ -89,6 +79,30 @@ threadContactApi.delete("/:id/contact", async (c) => {
   ]);
   return c.json({ ok: true, updated: restored.meta.changes ?? 0 });
 });
+
+/**
+ * Rewrites the received Messages of a Conversation from `from` to `to`.
+ * SQLite reads every right-hand side from the row as it was, so the
+ * original columns capture the sender before the first change, once.
+ */
+export function reassignSender(
+  db: D1Database,
+  threadId: number,
+  from: string,
+  to: { address: string; name: string | null },
+) {
+  return db
+    .prepare(
+      `UPDATE messages SET
+         original_from_name = CASE WHEN original_from_address IS NULL THEN from_name ELSE original_from_name END,
+         original_reply_to_addresses = CASE WHEN original_from_address IS NULL
+           THEN reply_to_addresses ELSE original_reply_to_addresses END,
+         original_from_address = COALESCE(original_from_address, from_address),
+         from_address = ?, from_name = ?, reply_to_addresses = '[]'
+       WHERE thread_id = ? AND direction = 'inbound' AND from_address = ? COLLATE NOCASE`,
+    )
+    .bind(to.address, to.name, threadId, from);
+}
 
 /** Drops an edited reply To, so the reply box addresses whoever the Conversation is now with. */
 function followNewSender(db: D1Database, threadId: number, raw: string | null) {

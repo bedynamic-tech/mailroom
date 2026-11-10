@@ -25,6 +25,12 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   new one, so the list, replies, the AI agent and blocking all use them, and
   each email notes the address it arrived from. **Restore original sender**
   in the same dialog undoes it.
+- **Forwards switch to the original sender.** When an email that starts a new
+  conversation is a forward (its subject starts with Fwd: or FW: and it has a
+  forwarded-message header), Mailroom switches it to the original sender
+  before notifications, contacts and AI drafts run, the same as Change
+  contact. It is on by default; turn off **Switch forwards to the original
+  sender** in **Settings > Contacts** to keep forwards under whoever sent them.
 - **Compose and reply.** Send new mail or reply to conversations, with attachments.
   A new message starts with **From** empty, so you always choose the sending
   inbox before it can go out.
