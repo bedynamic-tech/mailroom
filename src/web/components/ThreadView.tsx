@@ -1367,8 +1367,6 @@ function MessageCard({
 }) {
   const [forwarding, setForwarding] = useState(false);
   const [showQuoted, setShowQuoted] = useState(false);
-  // HTML emails report their quoted history once they render.
-  const [htmlQuoted, setHtmlQuoted] = useState(false);
   const dark = useResolvedTheme() === "dark";
   // Emails follow the app's theme unless the reader asks for the original.
   const [showOriginal, setShowOriginal] = useState(false);
@@ -1490,20 +1488,18 @@ function MessageCard({
           attachments={message.attachments}
           sender={displayName}
           appearance={appearance}
-          showQuoted={showQuoted}
-          onQuotedHistory={setHtmlQuoted}
         />
       ) : (
         <div className="max-w-[72ch] break-words text-sm leading-6 whitespace-pre-wrap text-foreground touch:text-base">
           <LinkifiedText text={main} />
         </div>
       )}
-      {(message.html_body ? htmlQuoted : quoted) && (
+      {!message.html_body && quoted && (
         <div className="mt-2">
           <QuotedTextToggle shown={showQuoted} onToggle={() => setShowQuoted((visible) => !visible)} />
-          {showQuoted && !message.html_body && (
+          {showQuoted && (
             <div className="mt-2 break-words border-l border-border pl-3 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
-              <LinkifiedText text={quoted ?? ""} />
+              <LinkifiedText text={quoted} />
             </div>
           )}
         </div>

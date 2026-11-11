@@ -2,7 +2,9 @@
  * Finds the quoted history in an HTML email: the earlier messages a reply
  * carries along ("On ... wrote:" and the quote under it). Those messages are
  * already in the conversation, so the app hides them behind "Show quoted
- * text", the way plain text emails already work (see splitQuotedTail).
+ * text", the way plain text emails already work (see splitQuotedTail). The
+ * "..." toggle goes where the quote starts. Emails render without scripts, so
+ * it is a checkbox and label that CSS reacts to.
  *
  * Only the quote itself is marked. Content after it, such as a signature the
  * sender's client put below the quote, stays visible.
@@ -11,12 +13,28 @@
 /** Marks every element that belongs to the quoted history. */
 export const QUOTED_ATTRIBUTE = "data-mailroom-quoted";
 
-/** Set on the email's root element to show the quoted history again. */
-export const SHOW_QUOTED_CLASS = "mailroom-show-quoted";
+const TOGGLE_ID = "mailroom-quote-toggle";
 
 export const QUOTED_STYLE = `
-  html:not(.${SHOW_QUOTED_CLASS}) [${QUOTED_ATTRIBUTE}] { display: none !important; }
+  html:not(:has(#${TOGGLE_ID}:checked)) [${QUOTED_ATTRIBUTE}] { display: none !important; }
+  .mailroom-quote-toggle { margin: 0.5em 0 !important; line-height: 0 !important; }
+  .mailroom-quote-toggle input {
+    position: absolute !important; width: 1px !important; height: 1px !important;
+    margin: 0 !important; opacity: 0 !important; pointer-events: none !important;
+  }
+  .mailroom-quote-toggle label {
+    display: inline-flex !important; align-items: center; height: 20px; padding: 0 8px;
+    border-radius: 999px; cursor: pointer; color: inherit; opacity: 0.75;
+    background: rgba(128, 128, 128, 0.2) !important;
+  }
+  .mailroom-quote-toggle label:hover, #${TOGGLE_ID}:checked + label { opacity: 1; background: rgba(128, 128, 128, 0.32) !important; }
+  #${TOGGLE_ID}:focus-visible + label { outline: 2px solid rgba(128, 128, 128, 0.7); outline-offset: 2px; }
+  .mailroom-quote-toggle svg { display: block; width: 16px; height: 16px; }
 `;
+
+const DOTS =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.6" fill="currentColor"/>' +
+  '<circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18" cy="12" r="1.6" fill="currentColor"/></svg>';
 
 const ATTRIBUTION =
   /^\s*(On|Le|Am|El|Il|Op)\s[\s\S]{4,300}(wrote|writes|a écrit|schrieb|escribió|ha scritto|schreef)\s*:\s*$/i;
@@ -24,8 +42,8 @@ const OUTLOOK_HEADER = /^\s*From:\s[\s\S]{1,400}?\b(Sent|Date):\s/i;
 const FORWARDED = /forwarded message|original message follows/i;
 
 /**
- * Marks the email's quoted history with QUOTED_ATTRIBUTE. Returns whether
- * anything was marked. An email that is nothing but a quote (a forward, or a
+ * Marks the email's quoted history with QUOTED_ATTRIBUTE and puts the "..."
+ * toggle where it starts. Returns whether anything was marked. An email that is nothing but a quote (a forward, or a
  * reply with no text of its own) is left alone, so it never renders empty.
  */
 export function markQuotedHistory(document: Document): boolean {
@@ -47,6 +65,7 @@ export function markQuotedHistory(document: Document): boolean {
       previous = previous.previousElementSibling;
     }
     for (const element of elements) element.setAttribute(QUOTED_ATTRIBUTE, "");
+    first.before(quoteToggle(document));
     return true;
   }
   return false;
@@ -143,4 +162,19 @@ function hasContent(node: Node): boolean {
 
 function textOf(node: Node): string {
   return (node.textContent ?? "").replace(/ /g, " ");
+}
+
+function quoteToggle(document: Document): HTMLElement {
+  const wrapper = document.createElement("div");
+  wrapper.className = "mailroom-quote-toggle";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.id = TOGGLE_ID;
+  input.setAttribute("aria-label", "Show quoted text");
+  const label = document.createElement("label");
+  label.htmlFor = TOGGLE_ID;
+  label.title = "Show quoted text";
+  label.innerHTML = DOTS;
+  wrapper.append(input, label);
+  return wrapper;
 }
