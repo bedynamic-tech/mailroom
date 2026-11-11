@@ -3,6 +3,7 @@ import type { Attachment } from "../../shared/types";
 import { DARK_EMAIL_BACKGROUND } from "../email-colors";
 import { fixLowContrastText, lightenDarkSurfaces, neutralizeDarkSurfaces } from "../email-contrast";
 import { buildEmailHtmlDocument, type EmailAppearance } from "../email-html";
+import { QUOTED_ATTRIBUTE, SHOW_QUOTED_CLASS } from "../email-quote";
 import { useRootFontSize } from "../text-size";
 import { cn } from "@/lib/utils";
 
@@ -33,11 +34,17 @@ export function EmailHtmlBody({
   attachments,
   sender,
   appearance,
+  showQuoted = false,
+  onQuotedHistory,
 }: {
   html: string;
   attachments: Attachment[];
   sender: string;
   appearance: EmailAppearance;
+  /** Shows the earlier messages quoted in this email, hidden by default. */
+  showQuoted?: boolean;
+  /** Called once the email renders, with whether it has quoted history to show. */
+  onQuotedHistory?: (present: boolean) => void;
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -46,6 +53,10 @@ export function EmailHtmlBody({
     () => buildEmailHtmlDocument(html, attachments, appearance, textSize),
     [appearance, attachments, html, textSize],
   );
+
+  useEffect(() => {
+    frameRef.current?.contentDocument?.documentElement.classList.toggle(SHOW_QUOTED_CLASS, showQuoted);
+  }, [showQuoted]);
 
   useEffect(
     () => () => {
@@ -66,6 +77,8 @@ export function EmailHtmlBody({
       fixLowContrastText(document, "#ffffff");
     }
     trimOuterMargins(document);
+    document.documentElement.classList.toggle(SHOW_QUOTED_CLASS, showQuoted);
+    onQuotedHistory?.(document.querySelector(`[${QUOTED_ATTRIBUTE}]`) !== null);
 
     const resize = () => {
       // The root's scrollHeight never drops below the frame's own height, so a

@@ -10,6 +10,7 @@ import {
   DARK_EMAIL_TEXT,
   isBrightColor,
 } from "./email-colors";
+import { markQuotedHistory, QUOTED_STYLE } from "./email-quote";
 import { normalizeContentId } from "./inline-images";
 
 /**
@@ -104,6 +105,7 @@ export function buildEmailHtmlDocument(
   followAppTextSize(document);
   const nativeDark = appearance === "dark" && supportsDarkMode(document);
   document.querySelectorAll(BLOCKED_ELEMENTS).forEach((element) => element.remove());
+  markQuotedHistory(document);
 
   for (const element of document.querySelectorAll("*")) {
     for (const attribute of [...element.attributes]) {
@@ -169,6 +171,7 @@ export function buildEmailHtmlDocument(
   style.textContent =
     `:root { --mailroom-text-size: ${textSize}px; }` +
     BASE_STYLE +
+    QUOTED_STYLE +
     (appearance !== "dark" ? LIGHT_STYLE : nativeDark ? NATIVE_DARK_STYLE : ADAPTED_DARK_STYLE);
   document.head.prepend(csp, referrer, viewport, style);
 

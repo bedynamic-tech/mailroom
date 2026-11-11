@@ -1367,6 +1367,8 @@ function MessageCard({
 }) {
   const [forwarding, setForwarding] = useState(false);
   const [showQuoted, setShowQuoted] = useState(false);
+  // HTML emails report their quoted history once they render.
+  const [htmlQuoted, setHtmlQuoted] = useState(false);
   const dark = useResolvedTheme() === "dark";
   // Emails follow the app's theme unless the reader asks for the original.
   const [showOriginal, setShowOriginal] = useState(false);
@@ -1488,10 +1490,22 @@ function MessageCard({
           attachments={message.attachments}
           sender={displayName}
           appearance={appearance}
+          showQuoted={showQuoted}
+          onQuotedHistory={setHtmlQuoted}
         />
       ) : (
         <div className="max-w-[72ch] break-words text-sm leading-6 whitespace-pre-wrap text-foreground touch:text-base">
           <LinkifiedText text={main} />
+        </div>
+      )}
+      {(message.html_body ? htmlQuoted : quoted) && (
+        <div className="mt-2">
+          <QuotedTextToggle shown={showQuoted} onToggle={() => setShowQuoted((visible) => !visible)} />
+          {showQuoted && !message.html_body && (
+            <div className="mt-2 break-words border-l border-border pl-3 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
+              <LinkifiedText text={quoted ?? ""} />
+            </div>
+          )}
         </div>
       )}
       {attachments.length > 0 && (
@@ -1510,30 +1524,32 @@ function MessageCard({
           ))}
         </div>
       )}
-      {!message.html_body && quoted && (
-        <div className="mt-3">
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => setShowQuoted((visible) => !visible)}
-            aria-expanded={showQuoted}
-            className="-ml-2 text-muted-foreground"
-          >
-            {showQuoted ? "Hide quoted text" : "Show quoted text"}
-          </Button>
-          {showQuoted && (
-            <div className="mt-2 break-words border-l border-border pl-3 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
-              <LinkifiedText text={quoted} />
-            </div>
-          )}
-        </div>
-      )}
       {isOutbound && (
         <div className="-mr-1.5 -mb-1 mt-3 flex justify-end">
           <DeliveryStatus bounces={message.bounces ?? []} />
         </div>
       )}
     </Card>
+  );
+}
+
+/** The "..." pill that shows or hides the earlier messages an email quotes. */
+function QuotedTextToggle(props: { shown: boolean; onToggle: () => void }) {
+  const label = props.shown ? "Hide quoted text" : "Show quoted text";
+  return (
+    <button
+      type="button"
+      onClick={props.onToggle}
+      aria-expanded={props.shown}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "inline-flex h-5 items-center rounded-full bg-muted px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 touch:h-6 touch:px-2.5",
+        props.shown && "bg-accent text-foreground",
+      )}
+    >
+      <MoreIcon className="h-4 w-4" />
+    </button>
   );
 }
 
