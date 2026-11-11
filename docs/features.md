@@ -31,6 +31,13 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   before notifications, contacts and AI drafts run, the same as Change
   contact. It is on by default; turn off **Switch forwards to the original
   sender** in **Settings > Contacts** to keep forwards under whoever sent them.
+- **Quoted history hidden.** When someone replies, the earlier messages their
+  email client quotes below the reply (the "On ... wrote:" block) are already
+  in the conversation, so Mailroom hides them behind a small **...** button
+  under the email. Tap it to show or hide the quoted text. This works for
+  Gmail, Apple Mail, Outlook, Yahoo, Proton and Thunderbird replies; the
+  sender's signature and anything else after the quote stay visible, and
+  forwards are never hidden.
 - **Compose and reply.** Send new mail or reply to conversations, with attachments.
   A new message starts with **From** empty, so you always choose the sending
   inbox before it can go out.
