@@ -13,10 +13,13 @@
 /** Marks every element that belongs to the quoted history. */
 export const QUOTED_ATTRIBUTE = "data-mailroom-quoted";
 
+/** Marks empty lines at the end of the reply, hidden whether or not the quote is open. */
+const BLANK_ATTRIBUTE = "data-mailroom-blank";
+
 const TOGGLE_ID = "mailroom-quote-toggle";
 
 export const QUOTED_STYLE = `
-  html:not(:has(#${TOGGLE_ID}:checked)) [${QUOTED_ATTRIBUTE}] { display: none !important; }
+  html:not(:has(#${TOGGLE_ID}:checked)) [${QUOTED_ATTRIBUTE}], [${BLANK_ATTRIBUTE}] { display: none !important; }
   .mailroom-quote-toggle { margin: 0.5em 0 !important; line-height: 0 !important; }
   .mailroom-quote-toggle input {
     position: absolute !important; width: 1px !important; height: 1px !important;
@@ -58,17 +61,39 @@ export function markQuotedHistory(document: Document): boolean {
   for (const elements of candidates) {
     const first = elements[0];
     if (!hasContentBefore(first, body)) continue;
-    // Blank lines and rules between the reply and its quote go with the quote.
-    let previous = first.previousElementSibling;
-    while (previous && !hasContent(previous)) {
-      previous.setAttribute(QUOTED_ATTRIBUTE, "");
-      previous = previous.previousElementSibling;
-    }
     for (const element of elements) element.setAttribute(QUOTED_ATTRIBUTE, "");
-    first.before(quoteToggle(document));
+    // Blank lines and rules around the quote go with it, and the reply's own
+    // trailing blank lines are dropped, so the collapsed email has no gaps.
+    // The toggle goes above all of them, so it stays put when the quote opens.
+    let start: ChildNode = first;
+    for (let node = first.previousSibling; node && !hasContent(node); node = node.previousSibling) {
+      if (node instanceof Element) node.setAttribute(QUOTED_ATTRIBUTE, "");
+      start = node;
+    }
+    const reply = start.previousSibling;
+    if (reply instanceof Element) markTrailingBlanks(reply);
+    const last = elements[elements.length - 1];
+    for (let node = last.nextSibling; node && !hasContent(node); node = node.nextSibling) {
+      if (node instanceof Element) node.setAttribute(QUOTED_ATTRIBUTE, "");
+    }
+    start.before(quoteToggle(document));
     return true;
   }
   return false;
+}
+
+/** Hides the empty lines at the end of the reply, however deeply nested. */
+function markTrailingBlanks(element: Element) {
+  if (["TABLE", "TBODY", "THEAD", "TR"].includes(element.tagName)) return;
+  for (let node = element.lastChild; node; node = node.previousSibling) {
+    if (hasContent(node)) {
+      if (node instanceof Element) markTrailingBlanks(node);
+      return;
+    }
+    if (node instanceof Element && !["TD", "TH"].includes(node.tagName)) {
+      node.setAttribute(BLANK_ATTRIBUTE, "");
+    }
+  }
 }
 
 /** Each candidate is the run of elements that make up one quote, in order. */
