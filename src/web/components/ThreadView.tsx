@@ -47,7 +47,7 @@ import { EmailHtmlBody } from "./EmailHtmlBody";
 import type { EmailAppearance } from "../email-html";
 import { inlineAttachmentIds } from "../inline-images";
 import { useResolvedTheme } from "../theme";
-import { useStickToBottom } from "../use-stick-to-bottom";
+import { ENTRY_ATTRIBUTE, useOpenAtLatest } from "../use-open-at-latest";
 import {
   ArchiveIcon,
   ArrowLeftIcon,
@@ -232,7 +232,7 @@ export function ThreadView(props: {
     Boolean(detail.data),
   );
 
-  useStickToBottom(
+  useOpenAtLatest(
     conversationRef,
     props.threadId,
     Boolean(detail.data),
@@ -757,25 +757,27 @@ export function ThreadView(props: {
           {timeline.map((entry, index) => (
             <Fragment key={`${entry.kind}-${entry.item.id}`}>
               {index > 0 && <MessageConnector />}
-              {entry.kind === "note" ? (
-                <NoteCard
-                  note={entry.item}
-                  deleting={removeNote.isPending && removeNote.variables === entry.item.id}
-                  onDelete={() => removeNote.mutate(entry.item.id)}
-                />
-              ) : (
-                <MessageCard
-                  message={entry.item}
-                  contactNames={detail.data.contact_names}
-                  catchAllRecipient={thread.catch_all_recipient}
-                  onForward={(senderName) => forwardMessage(entry.item, senderName)}
-                  onBlockSender={
-                    blockCandidatesFor(entry.item, ownAddresses).length > 0
-                      ? () => openBlockSender(entry.item)
-                      : undefined
-                  }
-                />
-              )}
+              <div {...{ [ENTRY_ATTRIBUTE]: "" }}>
+                {entry.kind === "note" ? (
+                  <NoteCard
+                    note={entry.item}
+                    deleting={removeNote.isPending && removeNote.variables === entry.item.id}
+                    onDelete={() => removeNote.mutate(entry.item.id)}
+                  />
+                ) : (
+                  <MessageCard
+                    message={entry.item}
+                    contactNames={detail.data.contact_names}
+                    catchAllRecipient={thread.catch_all_recipient}
+                    onForward={(senderName) => forwardMessage(entry.item, senderName)}
+                    onBlockSender={
+                      blockCandidatesFor(entry.item, ownAddresses).length > 0
+                        ? () => openBlockSender(entry.item)
+                        : undefined
+                    }
+                  />
+                )}
+              </div>
             </Fragment>
           ))}
         </div>
