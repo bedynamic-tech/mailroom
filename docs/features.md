@@ -107,8 +107,9 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   before to To, Cc or Bcc, it turns red with a warning under the field, since
   sending to it again can hurt your sender reputation. Hover over it to see why
   it bounced. You can still send if you know the address works now.
-- **Opens at the latest message.** A conversation opens scrolled to the bottom
-  and stays there while emails and images finish loading, until you scroll up.
+- **Opens at the latest message.** A conversation opens at the top of its
+  latest message, so a new email is read from its first line, and stays there
+  while emails and images finish loading, until you scroll.
 - **Internal notes.** Leave notes for your team on any conversation. Write in
   the reply box, then choose **Add internal note** from the arrow next to
   **Send reply**. Notes appear in yellow between the messages, in the order
