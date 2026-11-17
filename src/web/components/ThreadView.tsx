@@ -752,7 +752,7 @@ export function ThreadView(props: {
         </div>
       )}
 
-      <div ref={conversationRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div ref={conversationRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]">
         <div className="mr-auto w-full max-w-[1100px] px-4 py-5 md:px-6 md:py-6">
           {timeline.map((entry, index) => (
             <Fragment key={`${entry.kind}-${entry.item.id}`}>
