@@ -79,9 +79,8 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   **Signature: Default** for the workspace default, or **Signature: Mailbox**
   when the Inbox has its own. On phones, a conversation opens with
   the reply box folded into a round **Reply** button so the messages get
-  the whole screen. Tap it and the reply box grows out of the button.
-  Scrolling back up a good way shrinks it back into the button, keeping
-  anything already written.
+  the whole screen. Tap it to open the reply box. Scrolling back up a good
+  way folds it again, keeping anything already written.
 - **Reply greeting.** Turn on **Add a greeting to replies** in
   **Settings > General** and each reply box starts with a greeting such as
   `Jane,` followed by a blank line, with the cursor on the line below, as if
