@@ -77,10 +77,10 @@ A detailed tour of everything Mailroom + does. For a quick overview, see the [RE
   at the right of the formatting toolbar drafts a reply with AI. Beside
   **Send reply**, the reply box shows which signature will be added:
   **Signature: Default** for the workspace default, or **Signature: Mailbox**
-  when the Inbox has its own. On phones, scrolling back through a
-  conversation folds the reply box into a round **Reply** button, keeping
-  anything already written. Tap it, or scroll back down to the latest
-  message, to open the reply box again.
+  when the Inbox has its own. On phones, a conversation opens with
+  the reply box folded into a round **Reply** button so the messages get
+  the whole screen. Tap it to open the reply box. Scrolling back up a good
+  way folds it again, keeping anything already written.
 - **Reply greeting.** Turn on **Add a greeting to replies** in
   **Settings > General** and each reply box starts with a greeting such as
   `Jane,` followed by a blank line, with the cursor on the line below, as if

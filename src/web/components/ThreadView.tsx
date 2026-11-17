@@ -1153,20 +1153,19 @@ export function ThreadView(props: {
 
 /** Single-pane widths, where the conversation fills the screen. */
 const SINGLE_PANE_QUERY = "(max-width: 767px)";
-// Scrolls smaller than this are jitter, not the person reading back.
-const SCROLL_UP_PX = 8;
-const AT_BOTTOM_PX = 48;
+// How far the person has to scroll back up, in one go, before an open reply
+// form folds away again. Shorter scrolls are jitter or a small nudge.
+const COLLAPSE_SCROLL_UP_PX = 240;
 // Scrolls this soon after typing in the reply form or the view resizing are
 // the browser settling the layout, not the person reading back.
 const SETTLE_MS = 500;
 
 /**
- * On phones, scrolling back through a conversation folds the reply form into a
- * round Reply button so the messages get the whole screen. The form stays
- * mounted, so a half-written reply is kept. It opens again from the button, or
- * when the person scrolls back down to the latest message. Scrolling up folds
- * it even while it has focus, since focus stays in the editor after the
- * keyboard is put away.
+ * On phones, the reply form starts folded into a round Reply button so the
+ * messages get the whole screen, and opens only from that button. Once open,
+ * scrolling back up a good distance folds it again. The form stays mounted, so
+ * a half-written reply is kept. Scrolling up folds it even while it has focus,
+ * since focus stays in the editor after the keyboard is put away.
  */
 function useCollapseReplyOnScroll(
   containerRef: React.RefObject<HTMLElement | null>,
@@ -1174,9 +1173,10 @@ function useCollapseReplyOnScroll(
   resetKey: unknown,
   ready: boolean,
 ) {
-  const [collapsed, setCollapsed] = useState(false);
+  const isSinglePane = () => window.matchMedia(SINGLE_PANE_QUERY).matches;
+  const [collapsed, setCollapsed] = useState(isSinglePane);
 
-  useEffect(() => setCollapsed(false), [resetKey]);
+  useEffect(() => setCollapsed(isSinglePane()), [resetKey]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -1193,6 +1193,8 @@ function useCollapseReplyOnScroll(
     // iOS can report the scroll that follows late, after the size already
     // matches, so the size check alone lets it read as scrolling up.
     let settleUntil = 0;
+    // Distance scrolled up since the person last scrolled down.
+    let scrolledUp = 0;
     const settle = () => {
       settleUntil = performance.now() + SETTLE_MS;
     };
@@ -1209,21 +1211,20 @@ function useCollapseReplyOnScroll(
       const resized = container.clientHeight !== lastHeight;
       lastHeight = container.clientHeight;
       if (!query.matches || resized) return;
-      if (delta < 0 && performance.now() < settleUntil) return;
-      if (delta < -SCROLL_UP_PX) {
+      if (delta > 0) {
+        scrolledUp = 0;
+        return;
+      }
+      if (delta === 0 || performance.now() < settleUntil) return;
+      scrolledUp -= delta;
+      if (scrolledUp >= COLLAPSE_SCROLL_UP_PX) {
+        scrolledUp = 0;
         const active = document.activeElement;
         if (active instanceof HTMLElement && formRef.current?.contains(active)) active.blur();
         setCollapsed(true);
-      } else if (
-        delta > 0 &&
-        container.scrollHeight - container.clientHeight - top <= AT_BOTTOM_PX
-      ) {
-        setCollapsed(false);
       }
     };
-    const onWidthChange = () => {
-      if (!query.matches) setCollapsed(false);
-    };
+    const onWidthChange = () => setCollapsed(query.matches);
     container.addEventListener("scroll", onScroll, { passive: true });
     query.addEventListener("change", onWidthChange);
     return () => {
