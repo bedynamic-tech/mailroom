@@ -835,8 +835,25 @@ export function ThreadView(props: {
         </Button>
       )}
       <footer
-        className={cn("shrink-0 bg-canvas pt-1 pb-3 sm:pb-5", replyCollapsed.collapsed && "hidden")}
+        ref={replyCollapsed.footerRef}
+        className={cn(
+          "relative shrink-0 bg-canvas pt-1 pb-3 sm:pb-5",
+          replyCollapsed.collapsed && "hidden",
+        )}
+        style={replyCollapsed.footerStyle}
+        onTransitionEnd={replyCollapsed.onTransitionEnd}
       >
+        {replyCollapsed.morphing && (
+          // Stands in for the round Reply button while the form grows out of
+          // it or shrinks back into it, so the two read as one shape.
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-10 bg-primary text-primary-foreground"
+            style={replyCollapsed.overlayStyle}
+          >
+            <Reply className="absolute right-[34px] bottom-[34px] size-5" />
+          </div>
+        )}
         <div ref={replyFormRef} className="mr-auto w-full max-w-[1100px] px-4 md:px-6">
           <Card className="gap-0 py-0 shadow-[0_1px_2px_oklch(0.2_0.012_265/0.04),0_4px_16px_-6px_oklch(0.2_0.012_265/0.08)] transition-shadow focus-within:ring-foreground/25">
             <div className="border-b border-border/70 text-xs">
@@ -1162,7 +1179,8 @@ const SETTLE_MS = 500;
 
 /**
  * On phones, the reply form starts folded into a round Reply button so the
- * messages get the whole screen, and opens only from that button. Once open,
+ * messages get the whole screen, and opens only from that button, growing out
+ * of it and shrinking back into it when it folds. Once open,
  * scrolling back up a good distance folds it again. The form stays mounted, so
  * a half-written reply is kept. Scrolling up folds it even while it has focus,
  * since focus stays in the editor after the keyboard is put away.
@@ -1174,9 +1192,43 @@ function useCollapseReplyOnScroll(
   ready: boolean,
 ) {
   const isSinglePane = () => window.matchMedia(SINGLE_PANE_QUERY).matches;
-  const [collapsed, setCollapsed] = useState(isSinglePane);
+  const restingPhase = (): ReplyPhase => (isSinglePane() ? "closed" : "open");
+  const [phase, setPhase] = useState<ReplyPhase>(restingPhase);
+  const footerRef = useRef<HTMLElement>(null);
 
-  useEffect(() => setCollapsed(isSinglePane()), [resetKey]);
+  // Opening a different conversation, or the width crossing the phone
+  // breakpoint, snaps to the resting state without animating.
+  useEffect(() => setPhase(restingPhase()), [resetKey]);
+
+  // Each animation starts from a frame drawn in its first shape, so the
+  // browser has something to transition from.
+  useEffect(() => {
+    if (phase !== "opening" && phase !== "closing") return;
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => setPhase(phase === "opening" ? "growing" : "shrinking"));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [phase]);
+
+  // transitionend can be skipped (a backgrounded tab, a cancelled
+  // transition), so a timer makes sure the animation always settles.
+  useEffect(() => {
+    if (phase !== "growing" && phase !== "shrinking") return;
+    const timer = window.setTimeout(
+      () => setPhase(phase === "growing" ? "open" : "closed"),
+      MORPH_MS + 150,
+    );
+    return () => window.clearTimeout(timer);
+  }, [phase]);
+
+  const fold = () =>
+    setPhase((current) =>
+      current === "closed" || current === "closing" || current === "shrinking"
+        ? current
+        : prefersReducedMotion()
+          ? "closed"
+          : "closing",
+    );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -1221,10 +1273,10 @@ function useCollapseReplyOnScroll(
         scrolledUp = 0;
         const active = document.activeElement;
         if (active instanceof HTMLElement && formRef.current?.contains(active)) active.blur();
-        setCollapsed(true);
+        fold();
       }
     };
-    const onWidthChange = () => setCollapsed(query.matches);
+    const onWidthChange = () => setPhase(query.matches ? "closed" : "open");
     container.addEventListener("scroll", onScroll, { passive: true });
     query.addEventListener("change", onWidthChange);
     return () => {
@@ -1236,13 +1288,61 @@ function useCollapseReplyOnScroll(
   }, [containerRef, formRef, ready, resetKey]);
 
   const expand = () => {
-    setCollapsed(false);
+    setPhase(prefersReducedMotion() ? "open" : "opening");
     requestAnimationFrame(() =>
-      formRef.current?.querySelector<HTMLElement>("[contenteditable=true]")?.focus(),
+      formRef.current?.querySelector<HTMLElement>("[contenteditable=true]")?.focus({
+        preventScroll: true,
+      }),
     );
   };
 
-  return { collapsed, expand };
+  const onTransitionEnd = (event: React.TransitionEvent<HTMLElement>) => {
+    if (event.target !== footerRef.current || event.propertyName !== "clip-path") return;
+    if (phase === "growing") setPhase("open");
+    else if (phase === "shrinking") setPhase("closed");
+  };
+
+  // Shaped like the Reply button: 56px round, 16px in from the bottom right.
+  const buttonClip = "inset(calc(100% - 72px) 16px 16px calc(100% - 72px) round 28px)";
+  const fullClip = "inset(0px 0px 0px 0px round 0px)";
+  const atButton = phase === "opening" || phase === "shrinking";
+  const animating = phase === "growing" || phase === "shrinking";
+  const morphing = phase !== "open" && phase !== "closed";
+  const footerStyle: React.CSSProperties | undefined = morphing
+    ? {
+        clipPath: atButton ? buttonClip : fullClip,
+        transition: animating ? `clip-path ${MORPH_MS}ms ${MORPH_EASE}` : "none",
+      }
+    : undefined;
+  const overlayStyle: React.CSSProperties = {
+    opacity: atButton ? 1 : 0,
+    transition: animating ? `opacity ${MORPH_MS}ms ${MORPH_EASE}` : "none",
+  };
+
+  return {
+    collapsed: phase === "closed",
+    expand,
+    footerRef,
+    footerStyle,
+    onTransitionEnd,
+    morphing,
+    overlayStyle,
+  };
+}
+
+/**
+ * Where the phone reply form is: folded into the Reply button, open, or part
+ * way through growing out of it or shrinking back into it. "opening" and
+ * "closing" are the one frame drawn in the starting shape before each
+ * animation runs.
+ */
+type ReplyPhase = "closed" | "opening" | "growing" | "open" | "closing" | "shrinking";
+
+const MORPH_MS = 260;
+const MORPH_EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 function CopyRecipientsRow(props: {
